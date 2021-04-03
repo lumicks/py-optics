@@ -163,6 +163,71 @@ class MieCalc:
         else:
             return Ex, Ey, Ez
 
+    def fields_plane_wave(self, x, y, z, theta=0, phi=0, polarization=(1,0), 
+                         num_orders=None, return_grid=False, 
+                         total_field=True, inside_bead=True, verbose=False):
+    
+        x = np.atleast_1d(x)
+        y = np.atleast_1d(y)
+        z = np.atleast_1d(z)
+
+        self._init_local_coordinates(x,y,z, (0,0,0))
+        self._get_mie_coefficients(num_orders)
+
+        # Abuse the back focal plane to contain a single pixel/plane wave, at 
+        # angles theta and phi and with amplitude and polarization 
+        # (E_theta, E_phi) given by `polarization`
+        self._Einf_theta = np.atleast_2d(polarization[0])
+        self._Einf_phi = np.atleast_2d(polarization[1])
+        self._Einf = np.ones(self._Einf_phi.shape)
+        self._Th = np.atleast_2d(theta)
+        self._Phi = np.atleast_2d(phi)
+        self._Kz = np.zeros(self._Einf_phi.shape)
+        self._Ky = np.zeros(self._Einf_phi.shape)
+        self._Kx = np.zeros(self._Einf_phi.shape)
+        
+        if verbose:
+            print('Hankel functions')
+        self._init_hankel()
+        if verbose:
+            print('Legendre functions')
+        self._init_legendre(outside=True)
+        
+        Ex = np.zeros(self._XYZshape, dtype='complex128')
+        Ey = np.zeros(self._XYZshape, dtype='complex128')
+        Ez = np.zeros(self._XYZshape, dtype='complex128')
+        
+        if verbose:
+            print('External field')
+        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field, 
+                                             bead_center=(0,0,0))
+
+        if inside_bead:
+            if verbose:
+                print('Bessel functions')
+            self._init_bessel()
+            if verbose:
+                print('Legendre functions')
+            self._init_legendre(outside=False)
+            if verbose:
+                print('Internal field')
+            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field, 
+                                             bead_center=(0,0,0))
+        
+
+        Ex = np.squeeze(Ex)
+        Ey = np.squeeze(Ey)
+        Ez = np.squeeze(Ez)
+ 
+        if return_grid:
+            X, Y, Z = np.meshgrid(x, y, z)
+            X = np.squeeze(X)
+            Y = np.squeeze(Y)
+            Z = np.squeeze(Z)
+            return Ex, Ey, Ez, X, Y, Z
+        else:
+            return Ex, Ey, Ez
+        
     def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
         # Set up coordinate system around bead
         X, Y, Z = np.meshgrid(x, y, z)
@@ -184,16 +249,12 @@ class MieCalc:
         self._Zout = Zlocal[self._outside]
 
     def _get_mie_coefficients(self, num_orders=None):
-        # Get scattering and internal field coefficients
-        an, bn = self.ab_coeffs(num_orders)
-        cn, dn = self.cd_coeffs(num_orders)
-
-        self._n_coeffs = an.shape[0]
-        self._an = an
-        self._bn = bn
-        self._cn = cn
-        self._dn = dn
-
+        # Get scattering and internal field coefficients                 
+        self._an, self._bn = self.ab_coeffs(num_orders)
+        self._cn, self._dn = self.cd_coeffs(num_orders)
+        
+        self._n_coeffs = self._an.shape[0]
+    
     def _init_back_focal_plane(self, n_BFP, focal_length, NA, bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
