@@ -1,13 +1,16 @@
 import numpy as np
 import scipy.special as sp
+import numpy.polynomial as npp
+
 
 def associated_legendre(n, x):
     """associated_legendre(n, x): Return the 1st order (m == 1) of the 
     associated Legendre polynomial of degree n, evaluated at x.
     """
-    #assert np.all(x >= -1) and np.all(x <= 1)
-    result = - np.polyval(sp.legendre(n).deriv(), x) * np.sqrt(1 - x**2)
-    return result
+    orders = np.zeros(n+1)
+    orders[n]=1
+    c=npp.Legendre(npp.legendre.legder(orders))
+    return -c(x) * np.sqrt(1 - x**2)
 
 def associated_legendre_dtheta(n, cos_theta, alp_pre=(None, None)):
     """Evaluate the derivative of the associated legendre polynomial 
