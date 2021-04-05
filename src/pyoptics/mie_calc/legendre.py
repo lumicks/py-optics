@@ -8,8 +8,8 @@ import numpy.polynomial as npp
 def associated_legendre(n, x):
     """Return the 1st order (m == 1) of the associated Legendre polynomial of degree n, evaluated at x"""
     orders = np.zeros(n+1)
-    orders[n]=1
-    c=npp.Legendre(npp.legendre.legder(orders))
+    orders[n] = 1
+    c = npp.Legendre(npp.legendre.legder(orders))
     return -c(x) * np.sqrt(1 - x**2)
 
 
