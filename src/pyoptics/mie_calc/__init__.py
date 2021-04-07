@@ -1,10 +1,12 @@
+from .legendre import *
+
 import numpy as np
-from legendre import *
 import scipy.special as sp
 from scipy.special import jv, yv
 
+
 class MieCalc:
-    def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,  
+    def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
               lambda_vac=1064e-9):
               self.bead_diameter = bead_diameter
               self.n_bead = n_bead
@@ -22,7 +24,7 @@ class MieCalc:
     def number_of_orders(self):
         size_param = self.size_param()
         return int(np.round(size_param + 4 * size_param**(1/3) + 2.0))
-    
+
     def ab_coeffs(self, num_orders=None):
         nrel = self.nrel()
         size_param = self.size_param()
@@ -30,9 +32,9 @@ class MieCalc:
 
         if num_orders is None:
             n_coeffs = self.number_of_orders()
-        else: 
+        else:
             n_coeffs = int(np.max((np.abs(num_orders), 1)))
-        
+
         # Downward recurrence for psi_n(x)'/psi_n(x) (logarithmic derivative)
         # See Bohren & Huffman, p. 127
         nmx = int(np.ceil(max(abs(y), n_coeffs)) + 15)
@@ -48,14 +50,14 @@ class MieCalc:
         ric_yn, _ = sp.riccati_yn(n_coeffs, size_param)
         ksi_n = psi_n + 1j*ric_yn[1:]
         ksi_n_1 = psi_n_1 + 1j*ric_yn[0:n_coeffs]
-        
+
         Dn = D[0:n_coeffs]
         n = np.arange(1, n_coeffs + 1)
         an = ((Dn/nrel + n/size_param) * psi_n - psi_n_1) / ((Dn/nrel + n/size_param)
                 * ksi_n - ksi_n_1)
         bn = ((nrel * Dn + n/size_param) * psi_n - psi_n_1) / (
             (nrel * Dn + n/size_param) * ksi_n - ksi_n_1)
-        
+
         return an, bn
 
     def cd_coeffs(self, num_orders=None):
@@ -65,7 +67,7 @@ class MieCalc:
 
         if num_orders is None:
             n_coeffs = self.number_of_orders()
-        else: 
+        else:
             n_coeffs = int(np.max((np.abs(num_orders), 1)))
 
         n = np.arange(1, n_coeffs + 1)
@@ -83,22 +85,22 @@ class MieCalc:
         hnx = jnx + 1j*ynx
         hn_1x = jn_1x + 1j*yn_1x
 
-        
-        cn = (jnx * (size_param * hn_1x - n * hnx) - 
-                    hnx * (jn_1x * size_param - n * jnx)) / (jny * 
+
+        cn = (jnx * (size_param * hn_1x - n * hnx) -
+                    hnx * (jn_1x * size_param - n * jnx)) / (jny *
                     (hn_1x * size_param - n * hnx) - hnx * (jn_1y * y - n * jny))
 
-        dn = (nrel * jnx * (size_param * hn_1x - n * hnx) - nrel * hnx * 
+        dn = (nrel * jnx * (size_param * hn_1x - n * hnx) - nrel * hnx *
             (size_param * jn_1x - n * jnx)) / (nrel**2 * jny * (
             size_param * hn_1x - n * hnx) - hnx * (y * jn_1y - n * jny))
 
         return cn, dn
-              
-    def fields_in_focus(self, n_BFP=1.0, 
+
+    def fields_in_focus(self, n_BFP=1.0,
                         focal_length=4.43e-3, NA=1.2,
                         x=0, y=0, z=0, bead_center=(0,0,0),
-                        bfp_sampling_n=31, num_orders=None, 
-                        return_grid=False,  total_field=True, 
+                        bfp_sampling_n=31, num_orders=None,
+                        return_grid=False,  total_field=True,
                         inside_bead=True, verbose=False):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
@@ -118,14 +120,14 @@ class MieCalc:
         if verbose:
             print('Legendre functions')
         self._init_legendre(outside=True)
-        
+
 
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
         if verbose:
             print('External field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field, 
+        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field,
                                         bead_center)
 
         if inside_bead:
@@ -139,10 +141,10 @@ class MieCalc:
                 print('Internal field')
             self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field,
                                             bead_center)
-        
+
         ks = self._k * NA / self.n_medium
         dk = ks / (bfp_sampling_n - 1)
-        phase = 1j * focal_length * (np.exp(-1j * self._k * focal_length) * 
+        phase = 1j * focal_length * (np.exp(-1j * self._k * focal_length) *
                 dk**2 / (2 * np.pi))
         Ex *= phase
         Ey *= phase
@@ -151,16 +153,16 @@ class MieCalc:
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
         Ez = np.squeeze(Ez)
-        
+
         if return_grid:
             X, Y, Z = np.meshgrid(x, y, z)
             X = np.squeeze(X)
             Y = np.squeeze(Y)
-            Z = np.squeeze(Z)    
+            Z = np.squeeze(Z)
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
-        
+
     def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
         # Set up coordinate system around bead
         X, Y, Z = np.meshgrid(x, y, z)
@@ -182,26 +184,26 @@ class MieCalc:
         self._Zout = Zlocal[self._outside]
 
     def _get_mie_coefficients(self, num_orders=None):
-        # Get scattering and internal field coefficients                 
+        # Get scattering and internal field coefficients
         an, bn = self.ab_coeffs(num_orders)
         cn, dn = self.cd_coeffs(num_orders)
-        
+
         self._n_coeffs = an.shape[0]
         self._an = an
         self._bn = bn
         self._cn = cn
         self._dn = dn
-    
+
     def _init_back_focal_plane(self, n_BFP, focal_length, NA, bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
         x_BFP = np.linspace(-focal_length * NA / self.n_medium,
-                            focal_length * NA / self.n_medium, 
+                            focal_length * NA / self.n_medium,
                             num=npupilsamples)
 
         X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
         R_BFP = np.hypot(X_BFP, Y_BFP)
-        
+
         # temporarily Gaussian
         w0 = 0.9 * focal_length * NA / self.n_medium
         Ein = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2)
@@ -224,7 +226,7 @@ class MieCalc:
         # because of the different media, and because of the angle (preservation
         # of power in a beamlet). Finally, incorporate factor 1/kz of the integrand
 
-        self._Einf = (np.sqrt(n_BFP / self.n_medium) * Ein * 
+        self._Einf = (np.sqrt(n_BFP / self.n_medium) * Ein *
                       np.sqrt(np.cos(self._Th)) / self._Kz)
 
         # Get p- and s-polarized parts
@@ -233,8 +235,8 @@ class MieCalc:
 
     def _init_hankel(self):
         # Precompute the spherical Hankel functions and derivatives that only depend
-        # on the r coordinate. These functions will not change for any rotation of 
-        # the coordinate system. 
+        # on the r coordinate. These functions will not change for any rotation of
+        # the coordinate system.
         self._ro = self._R[self._outside]
 
         # Only calculate the spherical bessel function for unique values of k0r
@@ -242,13 +244,13 @@ class MieCalc:
         k0r_unique, inverse = np.unique(self._k0r, return_inverse=True)
         sqrt_x = np.sqrt(0.5 * np.pi / k0r_unique)
         krh_1 = np.sin(self._k0r) - 1j*np.cos(self._k0r)
-        self._sphHankel = np.empty((self._n_coeffs, self._ro.shape[0]), 
+        self._sphHankel = np.empty((self._n_coeffs, self._ro.shape[0]),
                                     dtype='complex128')
         self._krh = np.empty(self._sphHankel.shape, dtype='complex128')
         self._dkrh_dkr = np.empty(self._sphHankel.shape, dtype='complex128')
-        
+
         for L in range(1, self._n_coeffs + 1):
-            self._sphHankel[L - 1,:] = (sqrt_x * (sp.jv(L + 0.5, k0r_unique) + 
+            self._sphHankel[L - 1,:] = (sqrt_x * (sp.jv(L + 0.5, k0r_unique) +
                                         1j * sp.yv(L + 0.5, k0r_unique)))[inverse]
             self._krh[L - 1,:] = self._k0r * self._sphHankel[L - 1,:]
             self._dkrh_dkr[L - 1,:] = krh_1 - L * self._sphHankel[L - 1,:]
@@ -260,18 +262,18 @@ class MieCalc:
         self._ri = self._R[self._inside]
         self._k1r = self._k1 * self._ri
         k1r_unique, inverse = np.unique(self._k1r, return_inverse=True)
-        self._sphBessel = np.zeros((self._n_coeffs, self._ri.shape[0]), 
+        self._sphBessel = np.zeros((self._n_coeffs, self._ri.shape[0]),
                                     dtype='complex128')
         self._jn_over_k1r = np.zeros(self._sphBessel.shape, dtype='complex128')
         self._jn_1 = np.zeros(self._sphBessel.shape, dtype='complex128')
         jprev = np.empty(self._ri.shape[0], dtype='complex128')
-        jprev[self._k1r>0] = (np.sin(self._k1r[self._k1r > 0]) / 
+        jprev[self._k1r>0] = (np.sin(self._k1r[self._k1r > 0]) /
                                 self._k1r[self._k1r > 0])
         jprev[self._k1r == 0] = 1
 
         for L in range(1, self._n_coeffs + 1):
             self._sphBessel[L - 1, :] = sp.spherical_jn(L, k1r_unique)[inverse]
-            self._jn_over_k1r[L - 1, self._k1r > 0] = self._sphBessel[L - 1, 
+            self._jn_over_k1r[L - 1, self._k1r > 0] = self._sphBessel[L - 1,
                                     self._k1r > 0] / self._k1r[self._k1r > 0]
             self._jn_1[L - 1, :] = jprev
             jprev = self._sphBessel[L - 1, :]
@@ -279,7 +281,7 @@ class MieCalc:
         # for n == 1. Then it is 1/3. See https://dlmf.nist.gov/10.52
         # For n > 1 taken care of by np.zeros(...)
         self._jn_over_k1r[0, self._k1r == 0] = 1/3
-        
+
     def _init_legendre(self, outside=True):
 
         s = self._Einf.shape
@@ -292,11 +294,11 @@ class MieCalc:
             cos_th_shape = (s[0], s[1], self._k1r.size)
             r = self._ri
         # Calculating the Legendre polynomials is computationally intense, so
-        # Loop over all cos(theta), in order to find the unique values of 
+        # Loop over all cos(theta), in order to find the unique values of
         # cos(theta)
         # TODO: Consider using parity to shorten calculations by a factor ~2
         cosTs = np.empty(cos_th_shape)
-        
+
         for m in range(s[1]):
             for p in range(s[0]):
                 if self._Einf[p, m] == 0:
@@ -307,14 +309,14 @@ class MieCalc:
                 A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
                 coords = A.T @ local_coords
                 Zvl_s = coords[2,:]
-                
+
                 # Retrieve an array of all values of cos(theta)
                 if outside:
                     cosTs[p, m, :] = Zvl_s / r # cos(theta)
                 else:
                     cosTs[p, m, r > 0] = Zvl_s[r > 0] / r[r > 0]
                     cosTs[p, m, r == 0] = 1
-                
+
 
         cosTs = np.reshape(cosTs, cosTs.size)
         # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
@@ -326,49 +328,49 @@ class MieCalc:
         self._alp = np.zeros((self._n_coeffs, cosT_unique.size))
         self._alp_sin = np.zeros((self._n_coeffs, cosT_unique.size))
         self._alp_deriv = np.zeros((self._n_coeffs, cosT_unique.size))
-        alp_prev = None # unique situation that for n == 1, 
+        alp_prev = None # unique situation that for n == 1,
                         # the previous Assoc. Legendre Poly. isn't required
-        
+
         for L in range(1, self._n_coeffs + 1):
             self._alp[L - 1,:] = associated_legendre(L, cosT_unique)
-            self._alp_sin[L - 1, :] = associated_legendre_over_sin_theta(L, 
-                                    cosT_unique, self._alp[L - 1,:])            
+            self._alp_sin[L - 1, :] = associated_legendre_over_sin_theta(L,
+                                    cosT_unique, self._alp[L - 1,:])
             self._alp_deriv[L - 1, :] = associated_legendre_dtheta(L, cosT_unique,
                                     (self._alp[L - 1,:], alp_prev))
             alp_prev = self._alp[L - 1,:]
-    
-    def _calculate_field_speed_mem(self, Ex, Ey, Ez, internal: bool, 
-                                   total_field: bool, 
+
+    def _calculate_field_speed_mem(self, Ex, Ey, Ez, internal: bool,
+                                   total_field: bool,
                                    bead_center: tuple):
-        # Calculate the internal & external field from precalculated, 
+        # Calculate the internal & external field from precalculated,
         # but compressed, Legendre polynomials
         # Compromise between speed and memory use
         E = np.empty((3, self._R.shape[1]), dtype='complex128')
         if internal:
             r = self._ri
-            local_coords = np.vstack((self._Xin, self._Yin, self._Zin))   
+            local_coords = np.vstack((self._Xin, self._Yin, self._Zin))
             region = np.squeeze(self._inside )
         else:
             r = self._ro
             local_coords = np.vstack((self._Xout, self._Yout, self._Zout))
             region = np.squeeze(self._outside)
-        
+
         # preallocate memory for expanded legendre derivatives
         alp_expanded = np.empty((self._n_coeffs, r.size))
         alp_sin_expanded = np.empty((self._n_coeffs, r.size))
         alp_deriv_expanded = np.empty((self._n_coeffs, r.size))
-    
+
         s = self._Einf.shape
         cosT = np.empty(r.shape)
         for m in range(s[1]):
             for p in range(s[0]):
-            
+
                 A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
                 Yvl_s = coords[1,:]
                 Zvl_s = coords[2,:]
-                
+
                 if internal:
                     cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
                     cosT[r == 0] = 1
@@ -377,30 +379,30 @@ class MieCalc:
                 cosT[cosT > 1] = 1
                 cosT[cosT < -1] = -1
                 phil = np.arctan2(Yvl_s, Xvl_s)
-                
+
                 E[:] = 0
-                
-                # Expand the legendre derivatives from the unique version of 
+
+                # Expand the legendre derivatives from the unique version of
                 # cos(theta)
                 alp_expanded[:] = self._alp[:, self._inverse[p,m]]
                 alp_sin_expanded = self._alp_sin[:, self._inverse[p,m]]
                 alp_deriv_expanded = self._alp_deriv[:, self._inverse[p,m]]
 
                 if internal:
-                    E[:, np.squeeze(self._inside)] = self._internal_field_fixed_r( 
+                    E[:, np.squeeze(self._inside)] = self._internal_field_fixed_r(
                                     alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded, 
+                                    alp_sin_expanded, alp_deriv_expanded,
                                     cosT, phil)
                 else:
                     E[:, np.squeeze(self._outside)] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded, 
+                                alp_expanded, alp_sin_expanded,
                                 alp_deriv_expanded, cosT, phil, total_field)
-                
+
                 E = np.matmul(A, E)
-        
-                E[:, region] *= self._Einf_theta[p,m] * np.exp(1j * 
-                    (self._Kx[p,m] * bead_center[0] + 
-                     self._Ky[p,m] * bead_center[1] + 
+
+                E[:, region] *= self._Einf_theta[p,m] * np.exp(1j *
+                    (self._Kx[p,m] * bead_center[0] +
+                     self._Ky[p,m] * bead_center[1] +
                      self._Kz[p,m] * bead_center[2]))
 
                 Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
@@ -410,7 +412,7 @@ class MieCalc:
                 # phi-polarization
                 A = (self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m]) @
                         self._R_phi(-np.pi/2))
-            
+
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
                 Yvl_s = coords[1,:]
@@ -421,30 +423,30 @@ class MieCalc:
                 phil = np.arctan2(Yvl_s, Xvl_s)
 
                 if internal:
-                    E[:, region] = self._internal_field_fixed_r( 
+                    E[:, region] = self._internal_field_fixed_r(
                                     alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded, 
+                                    alp_sin_expanded, alp_deriv_expanded,
                                     cosT, phil)
                 else:
                     E[:, region] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded, 
+                                alp_expanded, alp_sin_expanded,
                                 alp_deriv_expanded, cosT, phil, total_field)
 
                 E = np.matmul(A, E)
 
-                E[:, region] *= self._Einf_phi[p,m] * np.exp(1j * 
-                    (self._Kx[p,m] * bead_center[0] + 
-                     self._Ky[p,m] * bead_center[1] + 
+                E[:, region] *= self._Einf_phi[p,m] * np.exp(1j *
+                    (self._Kx[p,m] * bead_center[0] +
+                     self._Ky[p,m] * bead_center[1] +
                      self._Kz[p,m] * bead_center[2]))
 
                 Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
                 Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
                 Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
 
-   
-    def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray, 
-                                alp_deriv: np.ndarray, 
-                                cos_theta: np.ndarray, phi: np.ndarray, 
+
+    def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                                alp_deriv: np.ndarray,
+                                cos_theta: np.ndarray, phi: np.ndarray,
                                 total_field=True):
 
         # Radial, theta and phi-oriented fields
@@ -466,13 +468,13 @@ class MieCalc:
         C2 = C1 / (L * (L + 1))
         for L in range(1, self._n_coeffs + 1):
             Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
-        
-            Et += C2[L-1] * (an[L - 1] * 
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] * 
+
+            Et += C2[L-1] * (an[L - 1] *
+                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
                     krh[L - 1,:] * alp_sin[L - 1,:])
 
-            Ep += C2[L-1] * (an[L - 1] * 
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] * 
+            Ep += C2[L-1] * (an[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
                 krh[L - 1,:] * alp_deriv[L - 1,:])
 
         Er *= -np.cos(phi) / (k0r)**2
@@ -489,15 +491,15 @@ class MieCalc:
         else:
             return np.concatenate((Ex, Ey, Ez), axis=0)
 
-    def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray, 
-                          alp_deriv: np.ndarray, 
+    def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                          alp_deriv: np.ndarray,
                           cos_theta: np.ndarray, phi: np.ndarray):
 
         # Radial, theta and phi-oriented fields
         Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
         Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
         Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        
+
         sinT = np.sqrt(1 - cos_theta**2)
         cosP = np.cos(phi)
         sinP = np.sin(phi)
@@ -510,16 +512,16 @@ class MieCalc:
         jn_1 = self._jn_1
 
         for n in range(1, self._n_coeffs + 1):
-            Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] * 
+            Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
                     jn_over_k1r[n - 1, :])
 
-            Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] * 
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] * 
-                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] - 
+            Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
+                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
                                         n * jn_over_k1r[n - 1, :]))
 
-            Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] * 
-                alp_deriv[n - 1, :] * sphBessel[n - 1, :] - 
+            Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
                 1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
                                                     jn_over_k1r[n - 1, :]))
 
@@ -532,14 +534,13 @@ class MieCalc:
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
         Ez = Er * cos_theta - Et * sinT
         return np.concatenate((Ex, Ey, Ez), axis=0)
-        
-    def _R_phi(self, phi):
-        return np.asarray([[np.cos(phi), -np.sin(phi), 0], 
-                           [np.sin(phi), np.cos(phi), 0], 
-                           [0, 0, 1]])
-    
-    def _R_th(self, th):
-        return np.asarray([[np.cos(th), 0, np.sin(th)], 
-                           [0,  1,  0], 
-                           [-np.sin(th), 0, np.cos(th)]])
 
+    def _R_phi(self, phi):
+        return np.asarray([[np.cos(phi), -np.sin(phi), 0],
+                           [np.sin(phi), np.cos(phi), 0],
+                           [0, 0, 1]])
+
+    def _R_th(self, th):
+        return np.asarray([[np.cos(th), 0, np.sin(th)],
+                           [0,  1,  0],
+                           [-np.sin(th), 0, np.cos(th)]])

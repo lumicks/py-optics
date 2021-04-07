@@ -8,16 +8,16 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.11.1
 #   kernelspec:
-#     display_name: Python 3.8 (XPython)
+#     display_name: Python 3
 #     language: python
-#     name: xpython
+#     name: python3
 # ---
 
 # %% tags=[]
 # %matplotlib inline
 import numpy as np
 import matplotlib.pyplot as plt
-import mie_calc as mc
+from pyoptics import mie_calc as mc
 
 # %% [markdown]
 # # Examples of spherical particle in a focus
