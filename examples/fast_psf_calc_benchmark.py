@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
-# %% jupyter={"source_hidden": true} tags=[]
+# %% tags=[]
 from pyoptics import fast_psf_calc as psf
 
-# %% jupyter={"source_hidden": true} tags=[]
+# %% tags=[]
 font = {'family' : 'normal',
         'weight' : 'normal',
         'size'   : 16}
@@ -112,7 +112,7 @@ for field_ref, field_czt, title in [(Ex_ref, Ex, 'Ex'), (Ey_ref, Ey, 'Ey'), (Ez_
     plt.figure(figsize=(20,4))
     plt.subplot(1,2,1)
     plt.plot(xrange, field_ref.real, label='ref')
-    plt.plot(xrange, field_czt.real, label='czt')
+    plt.plot(xrange, field_czt.real, label='plane wave')
     plt.xlabel('z [m]')
     plt.ylabel('E [V/m]')
     plt.gca().set_title(f'real({title})')
@@ -120,7 +120,7 @@ for field_ref, field_czt, title in [(Ex_ref, Ex, 'Ex'), (Ey_ref, Ey, 'Ey'), (Ez_
     plt.subplot(1,2,2)
     plt.gca().set_title(f'imag({title})')
     plt.plot(xrange, field_ref.imag, label='ref')
-    plt.plot(xrange, field_czt.imag, label='czt')
+    plt.plot(xrange, field_czt.imag, label='plane wave')
     plt.xlabel('z [m]')
     plt.ylabel('E [V/m]')
     plt.legend()

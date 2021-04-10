@@ -33,7 +33,7 @@ def focused_gauss(
     not necessarily equally spaced, which is more flexible. Furthermore, the
     direct evaluation  of the transform, that is performed here, could be faster
     for a small number of points, over the overhead of using FFTs. It's mostly
-    used to benchmark  the fast version of this function, which does use FFTs.
+    used to benchmark the fast version of this function, which does use FFTs.
 
     [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
         Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
@@ -47,6 +47,80 @@ def focused_gauss(
       filling_factor: float: filling factor of the Gaussian beam over the
         aperture, defined as w0/R. Here, w0 is the waist of the Gaussian beam
         and R is the radius of the aperture. Range 0...Inf
+      NA: float: Numerical Aperture n_medium * sin(theta_max) of the objective
+      x: np.array: array of x locations for evaluation, in meters
+      y: np.array: array of y locations for evaluation, in meters
+      z: np.array: array of z locations for evaluation, in meters
+        The final locations are determined by the output of
+        numpy.meshgrid(x, y, z)
+      bfp_sampling_n: (Default value = 50) Number of discrete steps with which
+        the back focal plane is sampled, from the center to the edge. The total
+        number of plane waves scales with the square of bfp_sampling_n
+      return_grid: (Default value = False) return the sampling grid
+
+    Returns:
+      Ex: the electric field along x, as a function of (x, y, z)
+      Ey: the electric field along y, as a function of (x, y, z)
+      Ez: the electric field along z, as a function of (x, y, z)
+      If return_grid is True, then also return the sampling grid X, Y and Z
+
+    """
+    w0 = filling_factor * focal_length * NA / n_medium  # See [1]
+
+    def field_func(X_BFP, Y_BFP, *args):
+      Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
+      return (Ein, None)
+    
+    return direct_psf_calc(field_func, lambda_vac, n_bfp, n_medium, 
+        focal_length, NA, x, y, z, bfp_sampling_n, return_grid)
+
+
+def direct_psf_calc(
+    f_input_field, lambda_vac: float, n_bfp: float, n_medium: float, focal_length: float,
+    NA: float, x: np.array, y: np.array, z: np.array, bfp_sampling_n=50, return_grid=False
+):
+    """Calculate the 3-dimensional, vectorial Point Spread Function of an
+    arbitrary input field, using the angular spectrum of plane waves method, 
+    see [1], chapter 3.
+
+    This function correctly incorporates the polarized nature of light in a
+    focus. In other words, the polarization state at the focus includes electric
+    fields in the x, y, and z directions. This is an example of how to use the 
+    function fast_psf_calc(), which takes an arbitrary field distribution on the
+    back focal plane as input.
+
+    This function is not recommended in general, as it's slow. However, the
+    points (x, y, z)  at which the point spread function is to be evaluated are
+    not necessarily equally spaced, which is more flexible. Furthermore, the
+    direct evaluation  of the transform, that is performed here, could be faster
+    for a small number of points, over the overhead of using FFTs. It's mostly
+    used to benchmark  the fast version of this function, which does use FFTs.
+
+    [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+        Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
+
+    Args:
+        f_input_field: function with signature
+        f(X_BFP, Y_BFP, R, Rmax, Theta, Phi), where X_BFP is a grid of x
+        locations in the back focal plane, determined by the focal length and NA
+        of the objective. Y_BFP is the corresponding grid of y locations, and R
+        is the radial distance from the center of the back focal plane. Rmax is
+        the largest distance that falls inside the NA, but R will contain larger
+        numbers as the back focal plane is sampled with a square grid. Theta is
+        defined as the angle with the optical axis (z), and Phi is defined as
+        the angle between the x and y axis. The function must return a tuple
+        (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
+        direction, respectively, at the sample locations in the back focal
+        plane. The fields may be complex, so a phase difference between x and y
+        is possible. If only one polarization is used, the other return value
+        must be None, e.g., y polarization would return (None, E_BFP_y). The
+        fields are post-processed such that any part that falls outside of the
+        NA is set to zero.
+      lambda_vac: float: wavelength of the light, in meters.
+      n_bfp: float: refractive index at the back focal plane of the objective
+      n_medium: float: refractive index of the medium into which the light is
+        focused
+      focal_length: float: focal length of the objective, in meters
       NA: float: Numerical Aperture n_medium * sin(theta_max) of the objective
       x: np.array: array of x locations for evaluation, in meters
       y: np.array: array of y locations for evaluation, in meters
@@ -80,12 +154,12 @@ def focused_gauss(
     # Calculate the minimum sampling of the Back Focal plane according to [2]
     # We take 50x50 plane waves in one quadrant as a minimum, but > 50 is
     # recommended [2]
-    M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
-                (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
+    #M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
+    #            (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
 
-    npupilsamples = (2*M - 1)
+    npupilsamples = 2 * bfp_sampling_n - 1
 
-    dk = ks / (M-1)
+    dk = ks / (bfp_sampling_n - 1)
 
     x_BFP = np.linspace(-focal_length * NA / n_medium,
                         focal_length * NA / n_medium, num=npupilsamples)
@@ -94,50 +168,76 @@ def focused_gauss(
 
 
     R = np.hypot(X_BFP, Y_BFP)
-
-    # Calculate the input field at the Back Focal Plane. Can be anything, but
-    # right now we stick to a Gaussian beam with x polarization
-    w0 = filling_factor * focal_length * NA / n_medium  # See [1]
-    Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
+    Rmax = focal_length * NA / n_medium
 
     # The back focal plane is circular, but our sampling grid is square ->
     # Create a mask: everything outside the NA must be zero
     aperture = R > focal_length * NA / n_medium
 
-    Ein[aperture] = 0
-
     # Calculate the angles theta and phi of the far field with the origin
     # Make the argument complex to avoid a warning by np.arcsin()
-    Th = np.arcsin((R + 0j)/focal_length)
+    Th = np.arcsin((R + 0j)/focal_length).real
     Th[aperture] = 0
     Phi = np.arctan2(Y_BFP, X_BFP)
     Phi[R == 0] = 0
     Phi[aperture] = 0
 
+    Einx, Einy = f_input_field(X_BFP, Y_BFP, R, Rmax, Th, Phi)
+    assert Einx is not None or Einy is not None,\
+           "Either an x-polarized or a y-polarized input field is required"
+    
+    # Precompute some sines and cosines that are repeatedly used
+    cosT = np.cos(Th)
+    sin2P = np.sin(2*Phi)
+    cos2P = np.cos(2*Phi)
+    sinT = np.sin(Th)
+    Kz = k * cosT
+
+    # There is something funky with the definition of phi and Ez_inf in [1],
+    # but the results that we get now are sensible, meaning that curved 
+    # wavefronts have the correct sign for x and z
+    if Einx is not None:
+        Einx[aperture] = 0
+        Einx = np.complex128(Einx)
+        Einx *= np.sqrt(n_bfp / n_medium) * np.sqrt(cosT)/Kz
+        Einfx_x = Einx * 0.5 * ((1 - cos2P) + (1 + cos2P) * cosT)
+        Einfy_x = Einx * 0.5 * sin2P * (cosT - 1)
+        Einfz_x = np.cos(Phi) * sinT * Einx
+    if Einy is not None:
+        Einy[aperture] = 0
+        Einy = np.complex128(Einy)
+        Einy *= np.sqrt(n_bfp / n_medium) * np.sqrt(cosT)/Kz
+        Einfx_y = Einy * 0.5 * sin2P * (cosT - 1)
+        Einfy_y = Einy * 0.5 * ((1 + cos2P) + cosT * (1 - cos2P))
+        Einfz_y = Einy * np.sin(Phi) * sinT
+
+    if Einx is None:
+        Einfx = Einfx_y
+        Einfy = Einfy_y
+        Einfz = Einfz_y
+    elif Einy is None:
+        Einfx = Einfx_x
+        Einfy = Einfy_x
+        Einfz = Einfz_x
+    else:
+        Einfx = Einfx_x + Einfx_y
+        Einfy = Einfy_x + Einfy_y
+        Einfz = Einfz_x + Einfz_y
+
     # Calculate properties of the plane waves
+    # As they come from the negative z-direction, a point at infinity with a 
+    # negative x coordinate leads to a positive value for kx (as the wave is 
+    # traveling towards point (0,0,0)). Similarly, a negative y coordinate also 
+    # leads to a positive value for ky
     Kz = k * np.cos(Th)
     Kp = k * np.sin(Th)
-    Kx = Kp * np.cos(Phi)
-    Ky = Kp * np.sin(Phi)
+    Kx = -Kp * np.cos(Phi)
+    Ky = -Kp * np.sin(Phi)
 
     # Initialize memory for the fields
     Ex = np.zeros(Xe.shape, dtype='complex128')
     Ey = np.zeros(Xe.shape, dtype='complex128')
     Ez = np.zeros(Xe.shape, dtype='complex128')
-
-    # Transform the input wavefront to a spherical one, after refracting on
-    # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
-    # because of the different media, and because of the angle (preservation
-    # of power in a beamlet). Finally, incorporate factor 1/kz of the integrand
-
-    Einf = np.sqrt(n_bfp/n_medium) * Ein*np.sqrt(np.cos(Th)) / Kz
-
-    # After refraction, calculate the x, y and z components of the field at
-    # infinity
-
-    Einfx = 0.5 * ((1 + np.cos(Th)) - (1 - np.cos(Th)) * np.cos(2*Phi)) * Einf
-    Einfy = 0.5 * (-(1 - np.cos(Th)) * np.sin(2*Phi)) * Einf
-    Einfz = -np.cos(Phi) * np.sin(Th) * Einf
 
     # Now the meat: add plane waves from the angles corresponding to the
     # sampling of the back focal plane. This numerically approximates equation
@@ -145,7 +245,7 @@ def focused_gauss(
 
     for m in range(npupilsamples):
         for p in range(npupilsamples):
-          if Ein[p, m] == 0:
+          if aperture[p, m]:  # Skip points outside aperture
             continue
 
           Exp = np.exp(1j * Kx[p, m] * Xe + 1j * Ky[p, m] * Ye +
@@ -154,9 +254,9 @@ def focused_gauss(
           Ey += Einfy[p, m] * Exp
           Ez += Einfz[p, m] * Exp
 
-    Ex *= 1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
-    Ey *= 1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
-    Ez *= 1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
+    Ex *= -1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
+    Ey *= -1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
+    Ez *= -1j * focal_length*np.exp(-1j * k * focal_length) * dk**2/(2*np.pi)
 
     Ex = np.squeeze(Ex)
     Ey = np.squeeze(Ey)
@@ -250,7 +350,6 @@ def focused_gauss_ref(
 
     for z_idx, zz in enumerate(z):
         for idx, rr in enumerate(r):
-
             # These are the integrands as defined in [1]
             def __I00(th):
                 return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
@@ -288,26 +387,26 @@ def focused_gauss_ref(
             def __I02i(th):
                 return np.imag(__I02(th))
 
-            I0[idx] = (1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                      np.exp(-1j * k * f)) * (quad(__I00r, 0, th_max)[0] +
-                                             1j*quad(__I00i, 0, th_max)[0])
-            I1[idx] = (1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
+            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
+                       np.exp(-1j * k * f)) * (quad(__I00r, 0, th_max)[0] +
+                                              1j*quad(__I00i, 0, th_max)[0])
+            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
                        np.exp(-1j * k * f)) * (quad(__I01r, 0, th_max)[0] +
-                                               1j*quad(__I01i, 0, th_max)[0])
-            I2[idx] = (1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
+                                              1j*quad(__I01i, 0, th_max)[0])
+            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
                        np.exp(-1j * k * f)) * (quad(__I02r, 0, th_max)[0] +
-                                               1j*quad(__I02i, 0, th_max)[0])
+                                              1j*quad(__I02i, 0, th_max)[0])
 
         # Transform the results back to the grid
         sx = X.shape
-        I0 = np.reshape(I0[idx_r], sx)
-        I1 = np.reshape(I1[idx_r], sx)
-        I2 = np.reshape(I2[idx_r], sx)
+        I0_ = np.reshape(I0[idx_r], sx)
+        I1_ = np.reshape(I1[idx_r], sx)
+        I2_ = np.reshape(I2[idx_r], sx)
 
         # Calculate the fields
-        Ex[:, :, z_idx] = I0 + I2 * np.cos(2 * phi)
-        Ey[:, :, z_idx] = I2 * np. sin(2 * phi)
-        Ez[:, :, z_idx] = -2j * I1 * np.cos(phi)
+        Ex[:, :, z_idx] = I0_ + I2_ * np.cos(2 * phi)
+        Ey[:, :, z_idx] = I2_ * np. sin(2 * phi)
+        Ez[:, :, z_idx] = -2j * I1_ * np.cos(phi)
 
     return np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez)
 
@@ -324,10 +423,9 @@ def fast_gauss_psf(
 
     This function correctly incorporates the polarized nature of light in a
     focus. In other words, the polarization state at the focus includes electric
-    fields in the x, y, and z directions. The input is taken to be polarized
-    along the x direction. This is an example of how to use the function
-    fast_psf_calc(), which takes an arbitrary field distribution on the back
-    focal plane as input.
+    fields in the x, y, and z directions. This is an example of how to use the 
+    function fast_psf_calc(), which takes an arbitrary field distribution on the
+    back focal plane as input.
 
     Args:
       lambda_vac: float: wavelength of the light, in meters.
@@ -400,9 +498,6 @@ def fast_psf_calc(
       n_medium: float: refractive index of the medium into which the light is
         focused
       focal_length: float: focal length of the objective, in meters
-      filling_factor: float: filling factor of the Gaussian beam over the
-        aperture, defined as w0/R. Here, w0 is the waist of the Gaussian beam
-        and R is the radius of the aperture. Range 0...Inf
       NA: float: Numerical Aperture = n_medium * sin(theta_max) of the objective
       xrange: float: size of the PSF along x, in meters, and centered around
         zero. The algorithm will calculate at x locations [-xrange/2..xrange/2]
@@ -435,12 +530,12 @@ def fast_psf_calc(
     k = 2*np.pi*n_medium / lambda_vac
     ks = k * NA / n_medium
 
-    M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
-                (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
+    #M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
+    #            (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
 
-    npupilsamples = (2*M - 1)
+    npupilsamples = 2*bfp_sampling_n - 1
 
-    dk = ks / (M-1)
+    dk = ks / (bfp_sampling_n - 1)
 
     x_BFP = np.linspace(-focal_length * NA / n_medium,
                         focal_length * NA / n_medium, num=npupilsamples)
@@ -453,7 +548,7 @@ def fast_psf_calc(
 
     # In contrast to MATLAB, arcsin doesn't like its argument to be > 1, unless
     # you make the type complex explicitly
-    Th = np.arcsin((R + 0j) / focal_length)
+    Th = np.arcsin((R + 0j) / focal_length).real
     Th[aperture] = 0
     Phi = np.arctan2(Y_BFP, X_BFP)
     Phi[R == 0] = 0
@@ -476,7 +571,9 @@ def fast_psf_calc(
         Einfx_x = Einx * 0.5 * ((1 - cos2P) + (1 + cos2P) * cosT)
         Einfy_x = Einx * 0.5 * sin2P * (cosT - 1)
         #  TODO: Auxilliary -1 that needs explanation
-        # Current suspicion: definition of theta, phi in [2] - or FFT sign?
+        # Current suspicion: definition of theta, phi in [1]
+        # Funky things going on with phi for far field
+        # Might depend on interpretation of theta - angle with +z or -z axis?
         Einfz_x = np.cos(Phi) * sinT * Einx
     if Einy is not None:
         Einy[aperture] = 0
@@ -484,8 +581,6 @@ def fast_psf_calc(
         Einy *= np.sqrt(n_bfp / n_medium) * np.sqrt(cosT)/Kz
         Einfx_y = Einy * 0.5 * sin2P * (cosT - 1)
         Einfy_y = Einy * 0.5 * ((1 + cos2P) + cosT * (1 - cos2P))
-        #  TODO: Auxilliary -1 that needs explanation
-        # Current suspicion: definition of theta, phi in [2] - or FFT sign?
         Einfz_y = Einy * np.sin(Phi) * sinT
 
     if Einx is None:
@@ -503,7 +598,7 @@ def fast_psf_calc(
 
     Kz = np.reshape(Kz,(npupilsamples, npupilsamples,1))
 
-    Z = np.tile(z, ((2 * M - 1), (2 * M - 1), 1))
+    Z = np.tile(z, ((2 * bfp_sampling_n - 1), (2 * bfp_sampling_n - 1), 1))
     Exp = np.exp(1j * Kz * Z)
 
     Einfx = Einfx.reshape((npupilsamples, npupilsamples, 1))
@@ -533,11 +628,11 @@ def fast_psf_calc(
     # symmetric around point (0,0). Therefore, fix the phases after the
     # transform such that the real and imaginary parts of the fields are what
     # they need to be
-    phase_fix_x = np.reshape((ax*wx**-(np.arange(numpoints_x)))**(M-1),
+    phase_fix_x = np.reshape((ax*wx**-(np.arange(numpoints_x)))**(bfp_sampling_n-1),
                          (numpoints_x, 1, 1))
     phase_fix_step1 = np.tile(phase_fix_x, (1, npupilsamples, Z.shape[2]))
 
-    phase_fix_y = np.reshape((ay*wy**-(np.arange(numpoints_y)))**(M-1),
+    phase_fix_y = np.reshape((ay*wy**-(np.arange(numpoints_y)))**(bfp_sampling_n-1),
                          (numpoints_y, 1, 1))
 
     phase_fix_step2 = np.tile(phase_fix_y, (1, numpoints_x, Z.shape[2]))
@@ -563,9 +658,9 @@ def fast_psf_calc(
                       (1, 0, 2))
 
 
-    Ex *= 1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
-    Ey *= 1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
-    Ez *= 1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
+    Ex *= -1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
+    Ey *= -1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
+    Ez *= -1j*focal_length*np.exp(-1j*k*focal_length)*dk**2 / (2*np.pi)
 
     Ex = np.squeeze(Ex)
     Ey = np.squeeze(Ey)
