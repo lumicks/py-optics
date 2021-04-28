@@ -96,12 +96,30 @@ class MieCalc:
 
         return cn, dn
 
-    def fields_in_focus(self, n_BFP=1.0,
-                        focal_length=4.43e-3, NA=1.2,
+    def fields_gaussian_focus(self, n_BFP=1.0,
+                        focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
                         inside_bead=True, verbose=False):
+        w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
+
+        def field_func(X_BFP, Y_BFP, *args):
+            Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
+            return Ein
+        
+        return self.fields_focus(field_func, n_BFP=n_BFP, 
+            focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
+            bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
+            num_orders=num_orders, return_grid=return_grid, 
+            total_field=total_field, inside_bead=inside_bead, verbose=verbose)
+    
+    def fields_focus(self, f_input_field, n_BFP=1.0,
+                focal_length=4.43e-3, NA=1.2,
+                x=0, y=0, z=0, bead_center=(0,0,0),
+                bfp_sampling_n=31, num_orders=None,
+                return_grid=False,  total_field=True,
+                inside_bead=True, verbose=False):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -113,7 +131,8 @@ class MieCalc:
 
         self._init_local_coordinates(x,y,z, bead_center)
         self._get_mie_coefficients(num_orders)
-        self._init_back_focal_plane(n_BFP, focal_length, NA, bfp_sampling_n)
+        self._init_back_focal_plane(f_input_field, n_BFP, focal_length, NA, 
+                                    bfp_sampling_n)
         if verbose:
             print('Hankel functions')
         self._init_hankel()
@@ -155,7 +174,7 @@ class MieCalc:
         Ez = np.squeeze(Ez)
 
         if return_grid:
-            X, Y, Z = np.meshgrid(x, y, z)
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
@@ -220,7 +239,7 @@ class MieCalc:
         Ez = np.squeeze(Ez)
  
         if return_grid:
-            X, Y, Z = np.meshgrid(x, y, z)
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
@@ -230,7 +249,7 @@ class MieCalc:
         
     def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
         # Set up coordinate system around bead
-        X, Y, Z = np.meshgrid(x, y, z)
+        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
         self._XYZshape = X.shape
 
         # Local coordinate system around the bead
@@ -255,26 +274,25 @@ class MieCalc:
         
         self._n_coeffs = self._an.shape[0]
     
-    def _init_back_focal_plane(self, n_BFP, focal_length, NA, bfp_sampling_n):
+    def _init_back_focal_plane(self, f_input_field, n_BFP, focal_length, NA, 
+                               bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
         x_BFP = np.linspace(-focal_length * NA / self.n_medium,
                             focal_length * NA / self.n_medium,
                             num=npupilsamples)
 
-        X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
+        X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP, indexing='ij')
         R_BFP = np.hypot(X_BFP, Y_BFP)
-
-        # temporarily Gaussian
-        w0 = 0.9 * focal_length * NA / self.n_medium
-        Ein = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2)
-        aperture = R_BFP > focal_length * NA / self.n_medium
-        Ein[aperture] = 0
+        Rmax = focal_length * NA / self.n_medium
+        aperture = R_BFP > Rmax
         self._Th = np.real(np.arcsin((R_BFP + 0j) / focal_length))
         self._Th[aperture] = 0
         self._Phi = np.arctan2(Y_BFP, X_BFP)
         self._Phi[R_BFP == 0] = 0
         self._Phi[aperture] = 0
+        Ein = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
+        Ein[aperture] = 0        
 
         # Calculate properties of the plane waves
         self._Kz = self._k * np.cos(self._Th)
