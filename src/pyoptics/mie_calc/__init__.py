@@ -163,7 +163,7 @@ class MieCalc:
 
         ks = self._k * NA / self.n_medium
         dk = ks / (bfp_sampling_n - 1)
-        phase = 1j * focal_length * (np.exp(-1j * self._k * focal_length) *
+        phase = -1j * focal_length * (np.exp(-1j * self._k * focal_length) *
                 dk**2 / (2 * np.pi))
         Ex *= phase
         Ey *= phase
