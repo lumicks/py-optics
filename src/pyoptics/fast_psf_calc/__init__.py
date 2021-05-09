@@ -160,28 +160,28 @@ def direct_psf_calc(
     npupilsamples = 2 * bfp_sampling_n - 1
 
     dk = ks / (bfp_sampling_n - 1)
-
-    x_BFP = np.linspace(-focal_length * NA / n_medium,
-                        focal_length * NA / n_medium, num=npupilsamples)
-
+    sin_th_max = NA / n_medium
+    x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
     X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
-
-
-    R = np.hypot(X_BFP, Y_BFP)
-    Rmax = focal_length * NA / n_medium
+    sin_th_BFP = np.hypot(X_BFP, Y_BFP)
 
     # The back focal plane is circular, but our sampling grid is square ->
     # Create a mask: everything outside the NA must be zero
-    aperture = R > focal_length * NA / n_medium
+    aperture = sin_th_BFP > sin_th_max
 
     # Calculate the angles theta and phi of the far field with the origin
     # Make the argument complex to avoid a warning by np.arcsin()
-    Th = np.arcsin((R + 0j)/focal_length).real
-    Th[aperture] = 0
+    Th = np.zeros(sin_th_BFP.shape)
+    Th[np.logical_not(aperture)] = np.arcsin(
+        sin_th_BFP[np.logical_not(aperture)])
     Phi = np.arctan2(Y_BFP, X_BFP)
-    Phi[R == 0] = 0
+    Phi[sin_th_BFP == 0] = 0
     Phi[aperture] = 0
 
+    Rmax = sin_th_max * focal_length
+    R = sin_th_BFP * focal_length
+    X_BFP *= Rmax
+    Y_BFP *= Rmax
     Einx, Einy = f_input_field(X_BFP, Y_BFP, R, Rmax, Th, Phi)
     assert Einx is not None or Einy is not None,\
            "Either an x-polarized or a y-polarized input field is required"
@@ -536,23 +536,24 @@ def fast_psf_calc(
     npupilsamples = 2*bfp_sampling_n - 1
 
     dk = ks / (bfp_sampling_n - 1)
-
-    x_BFP = np.linspace(-focal_length * NA / n_medium,
-                        focal_length * NA / n_medium, num=npupilsamples)
-
+    sin_th_max = NA / n_medium
+    x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
     X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP, indexing='ij')
 
-    R = np.hypot(X_BFP, Y_BFP)
-    Rmax = focal_length * NA / n_medium
-    aperture = R > Rmax
+    sin_th_BFP = np.hypot(X_BFP, Y_BFP)
+    Rmax = focal_length * sin_th_max
+    aperture = sin_th_BFP > sin_th_max
 
     # In contrast to MATLAB, arcsin doesn't like its argument to be > 1, unless
     # you make the type complex explicitly
-    Th = np.arcsin((R + 0j) / focal_length).real
-    Th[aperture] = 0
+    Th = np.zeros(sin_th_BFP.shape)
+    Th[np.logical_not(aperture)] = np.arcsin(
+        sin_th_BFP[np.logical_not(aperture)])
     Phi = np.arctan2(Y_BFP, X_BFP)
-    Phi[R == 0] = 0
-
+    Phi[sin_th_BFP == 0] = 0
+    X_BFP *= Rmax
+    Y_BFP *= Rmax
+    R = sin_th_BFP * focal_length
     Einx, Einy = f_input_field(X_BFP, Y_BFP, R, Rmax, Th, Phi)
     assert Einx is not None or Einy is not None,\
            "Either an x-polarized or a y-polarized input field is required"
