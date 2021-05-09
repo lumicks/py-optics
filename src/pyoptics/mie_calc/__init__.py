@@ -1,5 +1,4 @@
 from .legendre import *
-
 import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
@@ -106,7 +105,7 @@ class MieCalc:
 
         def field_func(X_BFP, Y_BFP, *args):
             Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
-            return Ein
+            return Ein, None
         
         return self.fields_focus(field_func, n_BFP=n_BFP, 
             focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
@@ -198,7 +197,8 @@ class MieCalc:
         # (E_theta, E_phi) given by `polarization`
         self._Einf_theta = np.atleast_2d(polarization[0])
         self._Einf_phi = np.atleast_2d(polarization[1])
-        self._Einf = np.ones(self._Einf_phi.shape)
+        self._aperture = np.atleast_2d(False)
+        #self._Einfx = np.ones(self._Einf_phi.shape)
         self._Th = np.atleast_2d(theta)
         self._Phi = np.atleast_2d(phi)
         self._Kz = np.zeros(self._Einf_phi.shape)
@@ -278,21 +278,24 @@ class MieCalc:
                                bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
-        x_BFP = np.linspace(-focal_length * NA / self.n_medium,
-                            focal_length * NA / self.n_medium,
-                            num=npupilsamples)
-
-        X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP, indexing='ij')
-        R_BFP = np.hypot(X_BFP, Y_BFP)
-        Rmax = focal_length * NA / self.n_medium
-        aperture = R_BFP > Rmax
-        self._Th = np.real(np.arcsin((R_BFP + 0j) / focal_length))
-        self._Th[aperture] = 0
+        sin_th_max = NA / self.n_medium
+        Rmax = sin_th_max * focal_length
+        x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
+        X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
+        sin_th_BFP = np.hypot(X_BFP, Y_BFP)
+        
+        self._aperture = sin_th_BFP > sin_th_max
+        self._Th = np.zeros(sin_th_BFP.shape)
+        self._Th[np.logical_not(self._aperture)] = np.arcsin(
+            sin_th_BFP[np.logical_not(self._aperture)])
+        #self._Th[self._aperture] = 0
         self._Phi = np.arctan2(Y_BFP, X_BFP)
-        self._Phi[R_BFP == 0] = 0
-        self._Phi[aperture] = 0
-        Ein = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
-        Ein[aperture] = 0        
+        self._Phi[sin_th_BFP == 0] = 0
+        self._Phi[self._aperture] = 0
+        
+        X_BFP *= Rmax
+        Y_BFP *= Rmax
+        R_BFP = sin_th_BFP * focal_length
 
         # Calculate properties of the plane waves
         self._Kz = self._k * np.cos(self._Th)
@@ -300,17 +303,33 @@ class MieCalc:
         self._Kx = self._Kp * np.cos(self._Phi)
         self._Ky = self._Kp * np.sin(self._Phi)
 
+        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
+        
         # Transform the input wavefront to a spherical one, after refracting on
         # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
         # because of the different media, and because of the angle (preservation
         # of power in a beamlet). Finally, incorporate factor 1/kz of the integrand
+        if Einx is not None:
+            Einx[self._aperture] = 0  
+            Einx = np.complex128(Einx)
+            self._Einfx = (np.sqrt(n_BFP / self.n_medium) * Einx *
+                        np.sqrt(np.cos(self._Th)) / self._Kz)
+        else:
+            self._Einfx = 0
 
-        self._Einf = (np.sqrt(n_BFP / self.n_medium) * Ein *
-                      np.sqrt(np.cos(self._Th)) / self._Kz)
+        if Einy is not None:
+            Einy[self._aperture] = 0
+            Einy = np.complex128(Einy)
+            self._Einfy = (np.sqrt(n_BFP / self.n_medium) * Einy *
+                        np.sqrt(np.cos(self._Th)) / self._Kz)
+        else:
+            self._Einfy = 0
 
         # Get p- and s-polarized parts
-        self._Einf_theta = self._Einf * np.cos(self._Phi)
-        self._Einf_phi = self._Einf * np.sin(self._Phi)
+        self._Einf_theta = (self._Einfx * np.cos(self._Phi) + 
+            self._Einfy * np.sin(self._Phi))
+        self._Einf_phi = (self._Einfy * np.cos(self._Phi) + 
+            self._Einfx * -np.sin(self._Phi))
 
     def _init_hankel(self):
         # Precompute the spherical Hankel functions and derivatives that only depend
@@ -363,7 +382,7 @@ class MieCalc:
 
     def _init_legendre(self, outside=True):
 
-        s = self._Einf.shape
+        s = self._Einf_phi.shape
         if outside:
             local_coords = np.vstack((self._Xout, self._Yout, self._Zout))
             cos_th_shape = (s[0], s[1], self._k0r.size)
@@ -380,7 +399,7 @@ class MieCalc:
 
         for m in range(s[1]):
             for p in range(s[0]):
-                if self._Einf[p, m] == 0:
+                if self._aperture[p, m]:
                     continue
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
@@ -439,12 +458,13 @@ class MieCalc:
         alp_sin_expanded = np.empty((self._n_coeffs, r.size))
         alp_deriv_expanded = np.empty((self._n_coeffs, r.size))
 
-        s = self._Einf.shape
+        s = self._Einf_theta.shape
         cosT = np.empty(r.shape)
         for m in range(s[1]):
             for p in range(s[0]):
-
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
+                if self._aperture[p, m]:  # Skip points outside aperture
+                    continue
+                A = self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m])
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
                 Yvl_s = coords[1,:]
@@ -489,8 +509,8 @@ class MieCalc:
                 Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
 
                 # phi-polarization
-                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m]) @
-                        self._R_phi(-np.pi/2))
+                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
+                        self._R_phi(np.pi/2))
 
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
