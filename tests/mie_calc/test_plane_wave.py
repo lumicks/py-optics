@@ -78,12 +78,6 @@ def test_plane_wave_direct(
             np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
 
-# %%
-#xy_eval = np.linspace(-1064e-9, 1064e-9, 21)
-#mie = mc.MieCalc(1e-9, 1.33, 1.33, 1064e-9)
-#Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x=xy_eval, y=0, z=xy_eval, theta=np.pi/4, phi=0,
-#                                                        polarization=(1,0), return_grid=True, verbose=True)
-
 
 # %%
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -184,24 +178,3 @@ def test_plane_wave_bfp(
             np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
 
-
-# %%
-Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z = test_plane_wave_bfp(1.0, 0.9, 4.43e-3)
-
-# %%
-import matplotlib.pyplot as plt
-
-# %%
-plt.figure(figsize=(10,10))
-plt.quiver(Z,X,Ez.real, Ex.real)
-#plt.colorbar()
-plt.show()
-plt.figure(figsize=(10,10))
-plt.quiver(Z,X,Ezpw.real, Expw.real)
-#plt.colorbar()
-plt.show()
-
-# %%
-np.amax(np.abs(Eypw))
-
-# %%
