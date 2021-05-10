@@ -443,16 +443,19 @@ class MieCalc:
         # Calculate the internal & external field from precalculated,
         # but compressed, Legendre polynomials
         # Compromise between speed and memory use
-        E = np.empty((3, self._R.shape[1]), dtype='complex128')
         if internal:
             r = self._ri
             local_coords = np.vstack((self._Xin, self._Yin, self._Zin))
-            region = np.squeeze(self._inside )
+            region = np.atleast_1d(np.squeeze(self._inside))
         else:
             r = self._ro
             local_coords = np.vstack((self._Xout, self._Yout, self._Zout))
-            region = np.squeeze(self._outside)
-
+            region = np.atleast_1d(np.squeeze(self._outside))
+        if r.size == 0:
+            return
+            
+        E = np.empty((3, self._R.shape[1]), dtype='complex128')
+        
         # preallocate memory for expanded legendre derivatives
         alp_expanded = np.empty((self._n_coeffs, r.size))
         alp_sin_expanded = np.empty((self._n_coeffs, r.size))
@@ -488,12 +491,12 @@ class MieCalc:
                 alp_deriv_expanded = self._alp_deriv[:, self._inverse[p,m]]
 
                 if internal:
-                    E[:, np.squeeze(self._inside)] = self._internal_field_fixed_r(
+                    E[:, region] = self._internal_field_fixed_r(
                                     alp_expanded,
                                     alp_sin_expanded, alp_deriv_expanded,
                                     cosT, phil)
                 else:
-                    E[:, np.squeeze(self._outside)] = self._scattered_field_fixed_r(
+                    E[:, region] = self._scattered_field_fixed_r(
                                 alp_expanded, alp_sin_expanded,
                                 alp_deriv_expanded, cosT, phil, total_field)
 
