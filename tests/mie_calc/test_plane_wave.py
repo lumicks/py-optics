@@ -64,7 +64,7 @@ def test_plane_wave_direct(
             Ezpw = np.sin(theta[p,m]) * Exp
             
             #return [Expw, Eypw, Ezpw, Ex, Ey, Ez]
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw])
+            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
             
             Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
@@ -163,7 +163,7 @@ def test_plane_wave_bfp(
             Ezpw = np.sin(theta) * Exp
             
             #try:
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw])
+            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
             #finally:
             #    return Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z
