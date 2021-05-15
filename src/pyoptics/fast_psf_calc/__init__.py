@@ -156,7 +156,6 @@ def direct_psf_calc(
     # recommended [2]
     #M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
     #            (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
-
     npupilsamples = 2 * bfp_sampling_n - 1
 
     dk = ks / (bfp_sampling_n - 1)
