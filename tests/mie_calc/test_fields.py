@@ -15,10 +15,12 @@
 import numpy as np
 import numpy.testing
 import pytest
+import os
 
 import pyoptics.mie_calc as mc
 
 
+# + [markdown] jupyter={"source_hidden": true} tags=[]
 # Reference data sets are calculated by miepy 0.5.0, and created with the following code:
 #
 #     import numpy as np
@@ -73,34 +75,36 @@ import pyoptics.mie_calc as mc
 #     create_ref_data(n_bead=0.1+2j, bead_diam=0.2e-6, n_medium=1.33, filename='ref3')
 #     create_ref_data(n_bead=1.0, bead_diam=2e-6, filename='ref4')
 #     create_ref_data(n_bead=1.33+1e-3j, bead_diam=0.8e-6, filename='ref5')
+# -
 
-def test_mie_nearfield(datarange=range(1,5)):
+@pytest.mark.parametrize('dataset',[1,2,3,4])
+def test_mie_nearfield(dataset):
+    path = os.path.abspath(os.path.dirname(__file__))
 
-    for d in datarange:
-        data = np.load(f'ref{d}.npz')
-        try:
-            Exr = data['Ex']
-            Eyr = data['Ey']
-            Ezr = data['Ez']
-            x = data['x']
-            y = data['y']
-            z = data['z']
-            n_bead = data['n_bead']
-            n_medium = data['n_medium']
-            bead_diam = data['bead_diam']
-            lambda_vac = data['lambda_vac']
-            num_pts = data['num_pts']
-            num_orders = data['num_orders']
-        finally:
-            data.close()
+    data = np.load(os.path.join(path, f'ref{dataset}.npz'))
+    try:
+        Exr = data['Ex']
+        Eyr = data['Ey']
+        Ezr = data['Ez']
+        x = data['x']
+        y = data['y']
+        z = data['z']
+        n_bead = data['n_bead']
+        n_medium = data['n_medium']
+        bead_diam = data['bead_diam']
+        lambda_vac = data['lambda_vac']
+        num_pts = data['num_pts']
+        num_orders = data['num_orders']
+    finally:
+        data.close()
 
-        mie = mc.MieCalc(bead_diam, n_bead, n_medium, lambda_vac)
-        Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x, y, z, num_orders=num_orders, return_grid=True, inside_bead=True, total_field=False)
-        err_x = Ex - Exr
-        err_y = Ey - Eyr
-        err_z = Ez - Ezr
-        
-        np.testing.assert_allclose(Ex, Exr, rtol=1e-3)
-        np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
-        np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
+    mie = mc.MieCalc(bead_diam, n_bead, n_medium, lambda_vac)
+    Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x, y, z, num_orders=num_orders, return_grid=True, inside_bead=True, total_field=False)
+    err_x = Ex - Exr
+    err_y = Ey - Eyr
+    err_z = Ez - Ezr
+
+    np.testing.assert_allclose(Ex, Exr, rtol=1e-3)
+    np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
+    np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
 
