@@ -1,5 +1,4 @@
 from .legendre import *
-
 import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
@@ -96,12 +95,30 @@ class MieCalc:
 
         return cn, dn
 
-    def fields_in_focus(self, n_BFP=1.0,
-                        focal_length=4.43e-3, NA=1.2,
+    def fields_gaussian_focus(self, n_BFP=1.0,
+                        focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
                         inside_bead=True, verbose=False):
+        w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
+
+        def field_func(X_BFP, Y_BFP, *args):
+            Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
+            return Ein, None
+        
+        return self.fields_focus(field_func, n_BFP=n_BFP, 
+            focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
+            bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
+            num_orders=num_orders, return_grid=return_grid, 
+            total_field=total_field, inside_bead=inside_bead, verbose=verbose)
+    
+    def fields_focus(self, f_input_field, n_BFP=1.0,
+                focal_length=4.43e-3, NA=1.2,
+                x=0, y=0, z=0, bead_center=(0,0,0),
+                bfp_sampling_n=31, num_orders=None,
+                return_grid=False,  total_field=True,
+                inside_bead=True, verbose=False):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -113,7 +130,8 @@ class MieCalc:
 
         self._init_local_coordinates(x,y,z, bead_center)
         self._get_mie_coefficients(num_orders)
-        self._init_back_focal_plane(n_BFP, focal_length, NA, bfp_sampling_n)
+        self._init_back_focal_plane(f_input_field, n_BFP, focal_length, NA, 
+                                    bfp_sampling_n)
         if verbose:
             print('Hankel functions')
         self._init_hankel()
@@ -144,7 +162,7 @@ class MieCalc:
 
         ks = self._k * NA / self.n_medium
         dk = ks / (bfp_sampling_n - 1)
-        phase = 1j * focal_length * (np.exp(-1j * self._k * focal_length) *
+        phase = -1j * focal_length * (np.exp(-1j * self._k * focal_length) *
                 dk**2 / (2 * np.pi))
         Ex *= phase
         Ey *= phase
@@ -155,7 +173,7 @@ class MieCalc:
         Ez = np.squeeze(Ez)
 
         if return_grid:
-            X, Y, Z = np.meshgrid(x, y, z)
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
@@ -163,9 +181,75 @@ class MieCalc:
         else:
             return Ex, Ey, Ez
 
+    def fields_plane_wave(self, x, y, z, theta=0, phi=0, polarization=(1,0), 
+                         num_orders=None, return_grid=False, 
+                         total_field=True, inside_bead=True, verbose=False):
+    
+        x = np.atleast_1d(x)
+        y = np.atleast_1d(y)
+        z = np.atleast_1d(z)
+
+        self._init_local_coordinates(x,y,z, (0,0,0))
+        self._get_mie_coefficients(num_orders)
+
+        # Abuse the back focal plane to contain a single pixel/plane wave, at 
+        # angles theta and phi and with amplitude and polarization 
+        # (E_theta, E_phi) given by `polarization`
+        self._Einf_theta = np.atleast_2d(polarization[0])
+        self._Einf_phi = np.atleast_2d(polarization[1])
+        self._aperture = np.atleast_2d(False)
+        #self._Einfx = np.ones(self._Einf_phi.shape)
+        self._Th = np.atleast_2d(theta)
+        self._Phi = np.atleast_2d(phi)
+        self._Kz = np.zeros(self._Einf_phi.shape)
+        self._Ky = np.zeros(self._Einf_phi.shape)
+        self._Kx = np.zeros(self._Einf_phi.shape)
+        
+        if verbose:
+            print('Hankel functions')
+        self._init_hankel()
+        if verbose:
+            print('Legendre functions')
+        self._init_legendre(outside=True)
+        
+        Ex = np.zeros(self._XYZshape, dtype='complex128')
+        Ey = np.zeros(self._XYZshape, dtype='complex128')
+        Ez = np.zeros(self._XYZshape, dtype='complex128')
+        
+        if verbose:
+            print('External field')
+        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field, 
+                                             bead_center=(0,0,0))
+
+        if inside_bead:
+            if verbose:
+                print('Bessel functions')
+            self._init_bessel()
+            if verbose:
+                print('Legendre functions')
+            self._init_legendre(outside=False)
+            if verbose:
+                print('Internal field')
+            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field, 
+                                             bead_center=(0,0,0))
+        
+
+        Ex = np.squeeze(Ex)
+        Ey = np.squeeze(Ey)
+        Ez = np.squeeze(Ez)
+ 
+        if return_grid:
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+            X = np.squeeze(X)
+            Y = np.squeeze(Y)
+            Z = np.squeeze(Z)
+            return Ex, Ey, Ez, X, Y, Z
+        else:
+            return Ex, Ey, Ez
+        
     def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
         # Set up coordinate system around bead
-        X, Y, Z = np.meshgrid(x, y, z)
+        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
         self._XYZshape = X.shape
 
         # Local coordinate system around the bead
@@ -184,36 +268,34 @@ class MieCalc:
         self._Zout = Zlocal[self._outside]
 
     def _get_mie_coefficients(self, num_orders=None):
-        # Get scattering and internal field coefficients
-        an, bn = self.ab_coeffs(num_orders)
-        cn, dn = self.cd_coeffs(num_orders)
-
-        self._n_coeffs = an.shape[0]
-        self._an = an
-        self._bn = bn
-        self._cn = cn
-        self._dn = dn
-
-    def _init_back_focal_plane(self, n_BFP, focal_length, NA, bfp_sampling_n):
+        # Get scattering and internal field coefficients                 
+        self._an, self._bn = self.ab_coeffs(num_orders)
+        self._cn, self._dn = self.cd_coeffs(num_orders)
+        
+        self._n_coeffs = self._an.shape[0]
+    
+    def _init_back_focal_plane(self, f_input_field, n_BFP, focal_length, NA, 
+                               bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
-        x_BFP = np.linspace(-focal_length * NA / self.n_medium,
-                            focal_length * NA / self.n_medium,
-                            num=npupilsamples)
-
+        sin_th_max = NA / self.n_medium
+        Rmax = sin_th_max * focal_length
+        x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
         X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
-        R_BFP = np.hypot(X_BFP, Y_BFP)
-
-        # temporarily Gaussian
-        w0 = 0.9 * focal_length * NA / self.n_medium
-        Ein = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2)
-        aperture = R_BFP > focal_length * NA / self.n_medium
-        Ein[aperture] = 0
-        self._Th = np.real(np.arcsin((R_BFP + 0j) / focal_length))
-        self._Th[aperture] = 0
+        sin_th_BFP = np.hypot(X_BFP, Y_BFP)
+        
+        self._aperture = sin_th_BFP > sin_th_max
+        self._Th = np.zeros(sin_th_BFP.shape)
+        self._Th[np.logical_not(self._aperture)] = np.arcsin(
+            sin_th_BFP[np.logical_not(self._aperture)])
+        #self._Th[self._aperture] = 0
         self._Phi = np.arctan2(Y_BFP, X_BFP)
-        self._Phi[R_BFP == 0] = 0
-        self._Phi[aperture] = 0
+        self._Phi[sin_th_BFP == 0] = 0
+        self._Phi[self._aperture] = 0
+        
+        X_BFP *= focal_length
+        Y_BFP *= focal_length
+        R_BFP = sin_th_BFP * focal_length
 
         # Calculate properties of the plane waves
         self._Kz = self._k * np.cos(self._Th)
@@ -221,17 +303,33 @@ class MieCalc:
         self._Kx = self._Kp * np.cos(self._Phi)
         self._Ky = self._Kp * np.sin(self._Phi)
 
+        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
+        
         # Transform the input wavefront to a spherical one, after refracting on
         # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
         # because of the different media, and because of the angle (preservation
         # of power in a beamlet). Finally, incorporate factor 1/kz of the integrand
+        if Einx is not None:
+            Einx[self._aperture] = 0  
+            Einx = np.complex128(Einx)
+            self._Einfx = (np.sqrt(n_BFP / self.n_medium) * Einx *
+                        np.sqrt(np.cos(self._Th)) / self._Kz)
+        else:
+            self._Einfx = 0
 
-        self._Einf = (np.sqrt(n_BFP / self.n_medium) * Ein *
-                      np.sqrt(np.cos(self._Th)) / self._Kz)
+        if Einy is not None:
+            Einy[self._aperture] = 0
+            Einy = np.complex128(Einy)
+            self._Einfy = (np.sqrt(n_BFP / self.n_medium) * Einy *
+                        np.sqrt(np.cos(self._Th)) / self._Kz)
+        else:
+            self._Einfy = 0
 
         # Get p- and s-polarized parts
-        self._Einf_theta = self._Einf * np.cos(self._Phi)
-        self._Einf_phi = self._Einf * np.sin(self._Phi)
+        self._Einf_theta = (self._Einfx * np.cos(self._Phi) + 
+            self._Einfy * np.sin(self._Phi))
+        self._Einf_phi = (self._Einfy * np.cos(self._Phi) + 
+            self._Einfx * -np.sin(self._Phi))
 
     def _init_hankel(self):
         # Precompute the spherical Hankel functions and derivatives that only depend
@@ -284,7 +382,7 @@ class MieCalc:
 
     def _init_legendre(self, outside=True):
 
-        s = self._Einf.shape
+        s = self._Einf_phi.shape
         if outside:
             local_coords = np.vstack((self._Xout, self._Yout, self._Zout))
             cos_th_shape = (s[0], s[1], self._k0r.size)
@@ -301,7 +399,7 @@ class MieCalc:
 
         for m in range(s[1]):
             for p in range(s[0]):
-                if self._Einf[p, m] == 0:
+                if self._aperture[p, m]:
                     continue
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
@@ -345,27 +443,31 @@ class MieCalc:
         # Calculate the internal & external field from precalculated,
         # but compressed, Legendre polynomials
         # Compromise between speed and memory use
-        E = np.empty((3, self._R.shape[1]), dtype='complex128')
         if internal:
             r = self._ri
             local_coords = np.vstack((self._Xin, self._Yin, self._Zin))
-            region = np.squeeze(self._inside )
+            region = np.atleast_1d(np.squeeze(self._inside))
         else:
             r = self._ro
             local_coords = np.vstack((self._Xout, self._Yout, self._Zout))
-            region = np.squeeze(self._outside)
-
+            region = np.atleast_1d(np.squeeze(self._outside))
+        if r.size == 0:
+            return
+            
+        E = np.empty((3, self._R.shape[1]), dtype='complex128')
+        
         # preallocate memory for expanded legendre derivatives
         alp_expanded = np.empty((self._n_coeffs, r.size))
         alp_sin_expanded = np.empty((self._n_coeffs, r.size))
         alp_deriv_expanded = np.empty((self._n_coeffs, r.size))
 
-        s = self._Einf.shape
+        s = self._Einf_theta.shape
         cosT = np.empty(r.shape)
         for m in range(s[1]):
             for p in range(s[0]):
-
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
+                if self._aperture[p, m]:  # Skip points outside aperture
+                    continue
+                A = self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m])
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
                 Yvl_s = coords[1,:]
@@ -389,12 +491,12 @@ class MieCalc:
                 alp_deriv_expanded = self._alp_deriv[:, self._inverse[p,m]]
 
                 if internal:
-                    E[:, np.squeeze(self._inside)] = self._internal_field_fixed_r(
+                    E[:, region] = self._internal_field_fixed_r(
                                     alp_expanded,
                                     alp_sin_expanded, alp_deriv_expanded,
                                     cosT, phil)
                 else:
-                    E[:, np.squeeze(self._outside)] = self._scattered_field_fixed_r(
+                    E[:, region] = self._scattered_field_fixed_r(
                                 alp_expanded, alp_sin_expanded,
                                 alp_deriv_expanded, cosT, phil, total_field)
 
@@ -410,8 +512,8 @@ class MieCalc:
                 Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
 
                 # phi-polarization
-                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m]) @
-                        self._R_phi(-np.pi/2))
+                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
+                        self._R_phi(np.pi/2))
 
                 coords = A.T @ local_coords
                 Xvl_s = coords[0,:]
