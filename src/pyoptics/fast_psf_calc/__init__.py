@@ -179,8 +179,8 @@ def direct_psf_calc(
 
     Rmax = sin_th_max * focal_length
     R = sin_th_BFP * focal_length
-    X_BFP *= Rmax
-    Y_BFP *= Rmax
+    X_BFP *= focal_length
+    Y_BFP *= focal_length
     Einx, Einy = f_input_field(X_BFP, Y_BFP, R, Rmax, Th, Phi)
     assert Einx is not None or Einy is not None,\
            "Either an x-polarized or a y-polarized input field is required"
@@ -550,8 +550,8 @@ def fast_psf_calc(
         sin_th_BFP[np.logical_not(aperture)])
     Phi = np.arctan2(Y_BFP, X_BFP)
     Phi[sin_th_BFP == 0] = 0
-    X_BFP *= Rmax
-    Y_BFP *= Rmax
+    X_BFP *= focal_length
+    Y_BFP *= focal_length
     R = sin_th_BFP * focal_length
     Einx, Einy = f_input_field(X_BFP, Y_BFP, R, Rmax, Th, Phi)
     assert Einx is not None or Einy is not None,\

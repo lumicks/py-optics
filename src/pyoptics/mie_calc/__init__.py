@@ -293,8 +293,8 @@ class MieCalc:
         self._Phi[sin_th_BFP == 0] = 0
         self._Phi[self._aperture] = 0
         
-        X_BFP *= Rmax
-        Y_BFP *= Rmax
+        X_BFP *= focal_length
+        Y_BFP *= focal_length
         R_BFP = sin_th_BFP * focal_length
 
         # Calculate properties of the plane waves
