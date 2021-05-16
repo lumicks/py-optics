@@ -132,3 +132,4 @@ dmypy.json
 .virtual_documents
 .vscode
 *.ipynb
+*.npz

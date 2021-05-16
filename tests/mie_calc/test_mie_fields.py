@@ -55,3 +55,15 @@ def test_mie_nearfield(dataset):
     np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
     np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
 
+
+@pytest.mark.parametrize('bead_diameter, n_bead',[(4e-6, 1.5),(0.2e-6, 0.1 + 2j)])
+def test_mie_nearfield_polarizations(bead_diameter, n_bead):
+    
+    x = np.linspace(-bead_diameter, bead_diameter, 99)
+    mie = mc.MieCalc(bead_diameter, n_bead, n_medium=1.33, lambda_vac=1064e-9)
+    Ext, Eyt, Ezt = mie.fields_plane_wave(x=x, y=x, z=x, return_grid=False, inside_bead=True, total_field=True)
+    Exp, Eyp, Ezp, X, Y, Z = mie.fields_plane_wave(x=x, y=x, z=x, polarization=(0,1), return_grid=True, inside_bead=True, total_field=True)
+    
+    np.testing.assert_allclose(Ext, np.rot90(Eyp), rtol=1e-8, atol=1e-14)
+    np.testing.assert_allclose(Eyt, Exp, rtol=1e-8, atol=1e-14)
+    np.testing.assert_allclose(np.rot90(Ezt), Ezp, rtol=1e-8, atol=1e-14)
