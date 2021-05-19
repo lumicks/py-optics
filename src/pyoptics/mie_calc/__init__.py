@@ -300,8 +300,8 @@ class MieCalc:
         # Calculate properties of the plane waves
         self._Kz = self._k * np.cos(self._Th)
         self._Kp = self._k * np.sin(self._Th)
-        self._Kx = self._Kp * np.cos(self._Phi)
-        self._Ky = self._Kp * np.sin(self._Phi)
+        self._Kx = -self._Kp * np.cos(self._Phi)
+        self._Ky = -self._Kp * np.sin(self._Phi)
 
         Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
         
