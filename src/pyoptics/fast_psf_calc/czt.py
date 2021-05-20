@@ -1,8 +1,7 @@
 """Chirp Z transforms"""
 
-import mkl_fft._numpy_fft
+from mkl_fft._numpy_fft import fft, ifft
 import numpy as np
-
 
 def init_czt(x, M, w, a):
     """Initialize auxilliary vectors that can be precomputed in order to perform a chirp-z
@@ -46,7 +45,7 @@ def init_czt(x, M, w, a):
     v[0: M] = 1 / ww[0: M]
     v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
 
-    V = mkl_fft._numpy_fft.fft(v, L, axis=0)
+    V = fft(v, L, axis=0)
     V = np.reshape(V, (L, *tile_shape))
     V = np.tile(V, expand_shape)
 
@@ -79,11 +78,11 @@ def exec_czt(x, precomputed):
     xshape, M, L, anww, V, ww = precomputed
 
     y = anww * x
-    Y = mkl_fft._numpy_fft.fft(y, L, axis=0)
+    Y = fft(y, L, axis=0)
 
     G = Y * V
 
-    g = mkl_fft._numpy_fft.ifft(G, L, axis=0)
+    g = ifft(G, L, axis=0)
     g = g[0:M] * ww
 
     if len(xshape) == 1:
@@ -130,19 +129,17 @@ def czt(x, M, w, a):
     anww = an * ww[0:N]
     anww = anww.reshape((N, *tile_shape))
     y = np.tile(anww, expand_shape) * x
-
-    # pyfftw.interfaces.cache.enable()
-    Y = mkl_fft._numpy_fft.fft(y, L, axis=0, threads=2)
+    Y = fft(y, L, axis=0)
 
     v = np.zeros(L, dtype='complex128')
     v[0: M] = 1 / ww[0: M]
     v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
 
-    V = mkl_fft._numpy_fft.fft(v, L, axis=0)
+    V = fft(v, L, axis=0)
     V = np.reshape(V, (L, *tile_shape))
     G = Y * np.tile(V, expand_shape)
 
-    g = mkl_fft._numpy_fft.ifft(G, L, axis=0, threads=2)
+    g = ifft(G, L, axis=0)
     ww = ww.reshape((ww.shape[0], *tile_shape))
     g = g[0:M] * np.tile(ww[0:M], expand_shape)
 
