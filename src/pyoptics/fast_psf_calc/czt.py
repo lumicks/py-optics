@@ -1,6 +1,6 @@
 """Chirp Z transforms"""
 
-import pyfftw
+import mkl_fft._numpy_fft
 import numpy as np
 
 
@@ -31,7 +31,7 @@ def init_czt(x, M, w, a):
     expand_shape = (1, *newshape[1:])
     tile_shape = [1] * (len(newshape)-1)
 
-    L = pyfftw.next_fast_len(M + N  -1)  # 1 << ((M + N - 1) - 1).bit_length()
+    L =  1 << ((M + N - 1) - 1).bit_length()  # pyfftw.next_fast_len(M + N  -1)
 
     k = np.arange(np.max((M, N))).T
     ww = w**(k**2 / 2)
@@ -40,13 +40,13 @@ def init_czt(x, M, w, a):
     anww = anww.reshape((N, *tile_shape))
     anww = np.tile(anww, expand_shape)
 
-    pyfftw.interfaces.cache.enable()
+    # pyfftw.interfaces.cache.enable()
 
     v = np.zeros(L, dtype='complex128')
     v[0: M] = 1 / ww[0: M]
     v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
 
-    V = pyfftw.interfaces.numpy_fft.fft(v, L, axis=0)
+    V = mkl_fft._numpy_fft.fft(v, L, axis=0)
     V = np.reshape(V, (L, *tile_shape))
     V = np.tile(V, expand_shape)
 
@@ -79,11 +79,11 @@ def exec_czt(x, precomputed):
     xshape, M, L, anww, V, ww = precomputed
 
     y = anww * x
-    Y = pyfftw.interfaces.numpy_fft.fft(y, L, axis=0)
+    Y = mkl_fft._numpy_fft.fft(y, L, axis=0)
 
     G = Y * V
 
-    g = pyfftw.interfaces.numpy_fft.ifft(G, L, axis=0)
+    g = mkl_fft._numpy_fft.ifft(G, L, axis=0)
     g = g[0:M] * ww
 
     if len(xshape) == 1:
@@ -122,7 +122,7 @@ def czt(x, M, w, a):
     expand_shape = (1, *newshape[1:])
     tile_shape = [1] * (len(newshape)-1)
 
-    L = pyfftw.next_fast_len(M + N  -1)  # 1 << ((M + N - 1) - 1).bit_length()
+    L = 1 << ((M + N - 1) - 1).bit_length()
 
     k = np.arange(np.max((M, N))).T
     ww = w**(k**2 / 2)
@@ -131,18 +131,18 @@ def czt(x, M, w, a):
     anww = anww.reshape((N, *tile_shape))
     y = np.tile(anww, expand_shape) * x
 
-    pyfftw.interfaces.cache.enable()
-    Y = pyfftw.interfaces.numpy_fft.fft(y, L, axis=0, threads=2)
+    # pyfftw.interfaces.cache.enable()
+    Y = mkl_fft._numpy_fft.fft(y, L, axis=0, threads=2)
 
     v = np.zeros(L, dtype='complex128')
     v[0: M] = 1 / ww[0: M]
     v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
 
-    V = pyfftw.interfaces.numpy_fft.fft(v, L, axis=0)
+    V = mkl_fft._numpy_fft.fft(v, L, axis=0)
     V = np.reshape(V, (L, *tile_shape))
     G = Y * np.tile(V, expand_shape)
 
-    g = pyfftw.interfaces.numpy_fft.ifft(G, L, axis=0, threads=2)
+    g = mkl_fft._numpy_fft.ifft(G, L, axis=0, threads=2)
     ww = ww.reshape((ww.shape[0], *tile_shape))
     g = g[0:M] * np.tile(ww[0:M], expand_shape)
 
