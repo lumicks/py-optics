@@ -39,8 +39,6 @@ def init_czt(x, M, w, a):
     anww = anww.reshape((N, *tile_shape))
     anww = np.tile(anww, expand_shape)
 
-    # pyfftw.interfaces.cache.enable()
-
     v = np.zeros(L, dtype='complex128')
     v[0: M] = 1 / ww[0: M]
     v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
