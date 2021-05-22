@@ -3,6 +3,7 @@ import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
 
+_PROP = (4*np.pi*1e-7 * 299792458)**-1
 
 class MieCalc:
     def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
@@ -636,6 +637,97 @@ class MieCalc:
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
         Ez = Er * cos_theta - Et * sinT
         return np.concatenate((Ex, Ey, Ez), axis=0)
+
+    def _scattered_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                                alp_deriv: np.ndarray,
+                                cos_theta: np.ndarray, phi: np.ndarray,
+                                total_field=True):
+        
+        # Radial, theta and phi-oriented fields
+        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+        sinT = np.sqrt(1 - cos_theta**2)
+        cosP = np.cos(phi)
+        sinP = np.sin(phi)
+
+        an = self._an
+        bn = self._bn
+        krh = self._krh
+        dkrh_dkr = self._dkrh_dkr
+        k0r = self._k0r
+        L = np.arange(start=1, stop=self._n_coeffs + 1)
+        C1 = 1j**(L + 1) * (2 * L + 1)
+        C2 = C1 / (L * (L + 1))
+        for L in range(1, self._n_coeffs + 1):
+            Hr += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
+
+            Ht += C2[L-1] * (an[L - 1] *
+                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
+                    krh[L - 1,:] * alp_sin[L - 1,:])
+
+            Hp += C2[L-1] * (an[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
+                krh[L - 1,:] * alp_deriv[L - 1,:])
+
+        Hr *= -np.cos(phi) / (k0r)**2 * self.n_medium * _PROP
+        Ht *= -np.cos(phi) / (k0r) * self.n_medium * _PROP
+        Hp *= np.sin(phi) / (k0r) * self.n_medium * _PROP
+        # Cartesian components
+        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+        Hz = Hr * cos_theta - Ht * sinT
+        if total_field:
+            # Incident field (x-polarized)
+            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium * _PROP
+            return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
+        else:
+            return np.concatenate((Hx, Hy, Hz), axis=0)
+
+    def _internal_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                          alp_deriv: np.ndarray,
+                          cos_theta: np.ndarray, phi: np.ndarray):
+
+        # Radial, theta and phi-oriented fields
+        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+        sinT = np.sqrt(1 - cos_theta**2)
+        cosP = np.cos(phi)
+        sinP = np.sin(phi)
+
+        #short hand for readability:
+        cn = self._cn
+        dn = self._dn
+        sphBessel = self._sphBessel
+        jn_over_k1r = self._jn_over_k1r
+        jn_1 = self._jn_1
+
+        for n in range(1, self._n_coeffs + 1):
+            Hr += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
+                    jn_over_k1r[n - 1, :])
+
+            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
+                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                        n * jn_over_k1r[n - 1, :]))
+
+            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+                1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                    jn_over_k1r[n - 1, :]))
+
+
+        Hr *= -np.cos(phi)
+        Ht *= -np.cos(phi)
+        Hp *= -np.sin(phi)
+        # Cartesian components
+        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+        Hz = Hr * cos_theta - Ht * sinT
+        return np.concatenate((Hx, Hy, Hz), axis=0)
 
     def _R_phi(self, phi):
         return np.asarray([[np.cos(phi), -np.sin(phi), 0],
