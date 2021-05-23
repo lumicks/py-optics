@@ -3,7 +3,7 @@ import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
 
-_PROP = (4*np.pi*1e-7 * 299792458)**-1
+_C = 299792458
 
 class MieCalc:
     def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
@@ -468,83 +468,58 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m])
-                coords = A.T @ local_coords
-                Xvl_s = coords[0,:]
-                Yvl_s = coords[1,:]
-                Zvl_s = coords[2,:]
-
-                if internal:
-                    cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
-                    cosT[r == 0] = 1
-                else:
-                    cosT = Zvl_s / r
-                cosT[cosT > 1] = 1
-                cosT[cosT < -1] = -1
-                phil = np.arctan2(Yvl_s, Xvl_s)
-
-                E[:] = 0
-
-                # Expand the legendre derivatives from the unique version of
-                # cos(theta)
-                alp_expanded[:] = self._alp[:, self._inverse[p,m]]
-                alp_sin_expanded = self._alp_sin[:, self._inverse[p,m]]
-                alp_deriv_expanded = self._alp_deriv[:, self._inverse[p,m]]
-
-                if internal:
-                    E[:, region] = self._internal_field_fixed_r(
-                                    alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded,
-                                    cosT, phil)
-                else:
-                    E[:, region] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded,
-                                alp_deriv_expanded, cosT, phil, total_field)
-
-                E = np.matmul(A, E)
-
-                E[:, region] *= self._Einf_theta[p,m] * np.exp(1j *
-                    (self._Kx[p,m] * bead_center[0] +
-                     self._Ky[p,m] * bead_center[1] +
-                     self._Kz[p,m] * bead_center[2]))
-
-                Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
-                Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
-                Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
-
-                # phi-polarization
-                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
+                matrices = (self._R_phi(self._Phi[p,m]) @ 
+                    self._R_th(-self._Th[p,m]), 
+                    self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
                         self._R_phi(np.pi/2))
 
-                coords = A.T @ local_coords
-                Xvl_s = coords[0,:]
-                Yvl_s = coords[1,:]
-                Zvl_s = coords[2,:]
+                for polarization in range(2):
+                
+                    A = matrices[polarization]
+                    coords = A.T @ local_coords
+                    Xvl_s = coords[0,:]
+                    Yvl_s = coords[1,:]
+                    Zvl_s = coords[2,:]
 
-                # cosT is still valid from the previous time, but phil is not as
-                # X and Y got swapped and a sign got flipped
-                phil = np.arctan2(Yvl_s, Xvl_s)
+                    if polarization == 0:
+                        if internal:
+                            cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
+                            cosT[r == 0] = 1
+                        else:
+                            cosT = Zvl_s / r
+                        cosT[cosT > 1] = 1
+                        cosT[cosT < -1] = -1
+                    
+                        # Expand the legendre derivatives from the unique version of
+                        # cos(theta)
+                        alp_expanded[:] = self._alp[:, self._inverse[p,m]]
+                        alp_sin_expanded[:] = self._alp_sin[:, self._inverse[p,m]]
+                        alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
+                    
+                    phil = np.arctan2(Yvl_s, Xvl_s)
 
-                if internal:
-                    E[:, region] = self._internal_field_fixed_r(
-                                    alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded,
-                                    cosT, phil)
-                else:
-                    E[:, region] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded,
-                                alp_deriv_expanded, cosT, phil, total_field)
+                    E[:] = 0
 
-                E = np.matmul(A, E)
+                    if internal:
+                        E[:, region] = self._internal_field_fixed_r(
+                                        alp_expanded,
+                                        alp_sin_expanded, alp_deriv_expanded,
+                                        cosT, phil)
+                    else:
+                        E[:, region] = self._scattered_field_fixed_r(
+                                    alp_expanded, alp_sin_expanded,
+                                    alp_deriv_expanded, cosT, phil, total_field)
 
-                E[:, region] *= self._Einf_phi[p,m] * np.exp(1j *
-                    (self._Kx[p,m] * bead_center[0] +
-                     self._Ky[p,m] * bead_center[1] +
-                     self._Kz[p,m] * bead_center[2]))
+                    E = np.matmul(A, E)
 
-                Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
-                Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
-                Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
+                    E[:, region] *= self._Einf_theta[p,m] * np.exp(1j *
+                        (self._Kx[p,m] * bead_center[0] +
+                        self._Ky[p,m] * bead_center[1] +
+                        self._Kz[p,m] * bead_center[2]))
+
+                    Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
+                    Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
+                    Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
 
 
     def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
@@ -658,29 +633,29 @@ class MieCalc:
         dkrh_dkr = self._dkrh_dkr
         k0r = self._k0r
         L = np.arange(start=1, stop=self._n_coeffs + 1)
-        C1 = 1j**(L + 1) * (2 * L + 1)
+        C1 = 1j**L * (2 * L + 1)
         C2 = C1 / (L * (L + 1))
         for L in range(1, self._n_coeffs + 1):
-            Hr += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
+            Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
-            Ht += C2[L-1] * (an[L - 1] *
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
+            Ht += C2[L-1] * (1j* bn[L - 1] *
+                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
                     krh[L - 1,:] * alp_sin[L - 1,:])
 
-            Hp += C2[L-1] * (an[L - 1] *
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
+            Hp += C2[L-1] * (1j * bn[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
                 krh[L - 1,:] * alp_deriv[L - 1,:])
 
-        Hr *= -np.cos(phi) / (k0r)**2 * self.n_medium * _PROP
-        Ht *= -np.cos(phi) / (k0r) * self.n_medium * _PROP
-        Hp *= np.sin(phi) / (k0r) * self.n_medium * _PROP
+        Hr *= np.sin(phi) / (k0r)**2 * self.n_medium / _C
+        Ht *= np.sin(phi) / (k0r) * self.n_medium / _C
+        Hp *= np.cos(phi) / (k0r) * self.n_medium / _C
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
         Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
         Hz = Hr * cos_theta - Ht * sinT
         if total_field:
-            # Incident field (x-polarized)
-            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium * _PROP
+            # Incident field (E field x-polarized)
+            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / _C
             return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
         else:
             return np.concatenate((Hx, Hy, Hz), axis=0)
@@ -706,23 +681,23 @@ class MieCalc:
         jn_1 = self._jn_1
 
         for n in range(1, self._n_coeffs + 1):
-            Hr += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
+            Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
                     jn_over_k1r[n - 1, :])
 
-            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
+            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
                     alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
                                         n * jn_over_k1r[n - 1, :]))
 
-            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
                 alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-                1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
                                                     jn_over_k1r[n - 1, :]))
 
 
-        Hr *= -np.cos(phi)
-        Ht *= -np.cos(phi)
-        Hp *= -np.sin(phi)
+        Hr *= np.sin(phi) * self.n_bead / _C
+        Ht *= -np.sin(phi) * self.n_bead / _C
+        Hp *= np.cos(phi) * self.n_bead / _C
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
         Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
