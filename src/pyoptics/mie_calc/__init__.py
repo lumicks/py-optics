@@ -468,13 +468,13 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                matrices = (self._R_phi(self._Phi[p,m]) @ 
+                matrices = [self._R_phi(self._Phi[p,m]) @ 
                     self._R_th(-self._Th[p,m]), 
                     self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
-                        self._R_phi(np.pi/2))
+                        self._R_phi(np.pi/2)]
 
                 for polarization in range(2):
-                
+                    E[:] = 0
                     A = matrices[polarization]
                     coords = A.T @ local_coords
                     Xvl_s = coords[0,:]
@@ -486,7 +486,7 @@ class MieCalc:
                             cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
                             cosT[r == 0] = 1
                         else:
-                            cosT = Zvl_s / r
+                            cosT[:] = Zvl_s / r
                         cosT[cosT > 1] = 1
                         cosT[cosT < -1] = -1
                     
@@ -497,8 +497,6 @@ class MieCalc:
                         alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
                     
                     phil = np.arctan2(Yvl_s, Xvl_s)
-
-                    E[:] = 0
 
                     if internal:
                         E[:, region] = self._internal_field_fixed_r(
