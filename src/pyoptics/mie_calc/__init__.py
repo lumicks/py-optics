@@ -119,7 +119,7 @@ class MieCalc:
                 x=0, y=0, z=0, bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None,
                 return_grid=False,  total_field=True,
-                inside_bead=True, verbose=False):
+                inside_bead=True, H_field=False, verbose=False):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -144,10 +144,19 @@ class MieCalc:
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
+        if H_field:
+            Hx = np.zeros(self._XYZshape, dtype='complex128')
+            Hy = np.zeros(self._XYZshape, dtype='complex128')
+            Hz = np.zeros(self._XYZshape, dtype='complex128')
+        else:
+            Hx = 0
+            Hy = 0
+            Hz = 0
+            
         if verbose:
             print('External field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field,
-                                        bead_center)
+        self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, internal=False,
+            total_field=total_field, H_field=H_field, bead_center=bead_center)
 
         if inside_bead:
             if verbose:
@@ -158,8 +167,9 @@ class MieCalc:
             self._init_legendre(outside=False)
             if verbose:
                 print('Internal field')
-            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field,
-                                            bead_center)
+            self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, 
+                internal=True, total_field=total_field, H_field=H_field, 
+                bead_center=bead_center)
 
         ks = self._k * NA / self.n_medium
         dk = ks / (bfp_sampling_n - 1)
@@ -169,15 +179,31 @@ class MieCalc:
         Ey *= phase
         Ez *= phase
 
+        Hx *= phase
+        Hy *= phase
+        Hz *= phase
+
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
         Ez = np.squeeze(Ez)
+
+        Hx = np.squeeze(Hx)
+        Hy = np.squeeze(Hy)
+        Hz = np.squeeze(Hz)
 
         if return_grid:
             X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
+
+        if H_field:
+            if return_grid:
+                return Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z
+            else:
+                return Ex, Ey, Ez, Hx, Hy, Hz
+
+        if return_grid:
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
@@ -438,8 +464,10 @@ class MieCalc:
                                     (self._alp[L - 1,:], alp_prev))
             alp_prev = self._alp[L - 1,:]
 
-    def _calculate_field_speed_mem(self, Ex, Ey, Ez, internal: bool,
+    def _calculate_field_speed_mem(self, Ex, Ey, Ez, Hx, Hy, Hz, 
+                                   internal: bool,
                                    total_field: bool,
+                                   H_field: bool,
                                    bead_center: tuple):
         # Calculate the internal & external field from precalculated,
         # but compressed, Legendre polynomials
@@ -456,6 +484,8 @@ class MieCalc:
             return
             
         E = np.empty((3, self._R.shape[1]), dtype='complex128')
+        if H_field:
+            H = np.empty((3, self._R.shape[1]), dtype='complex128')
         
         # preallocate memory for expanded legendre derivatives
         alp_expanded = np.empty((self._n_coeffs, r.size))
@@ -472,9 +502,9 @@ class MieCalc:
                     self._R_th(-self._Th[p,m]), 
                     self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
                         self._R_phi(np.pi/2)]
+                E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
 
                 for polarization in range(2):
-                    E[:] = 0
                     A = matrices[polarization]
                     coords = A.T @ local_coords
                     Xvl_s = coords[0,:]
@@ -497,7 +527,8 @@ class MieCalc:
                         alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
                     
                     phil = np.arctan2(Yvl_s, Xvl_s)
-
+                    
+                    E[:] = 0
                     if internal:
                         E[:, region] = self._internal_field_fixed_r(
                                         alp_expanded,
@@ -508,9 +539,8 @@ class MieCalc:
                                     alp_expanded, alp_sin_expanded,
                                     alp_deriv_expanded, cosT, phil, total_field)
 
-                    E = np.matmul(A, E)
-
-                    E[:, region] *= self._Einf_theta[p,m] * np.exp(1j *
+                    E = np.matmul(A, E)             
+                    E[:, region] *= E0[polarization] * np.exp(1j *
                         (self._Kx[p,m] * bead_center[0] +
                         self._Ky[p,m] * bead_center[1] +
                         self._Kz[p,m] * bead_center[2]))
@@ -518,6 +548,29 @@ class MieCalc:
                     Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
                     Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
                     Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
+
+                    if H_field:
+                        H[:] = 0
+                        if internal:
+                            H[:, region] = self._internal_H_field_fixed_r(
+                                        alp_expanded,
+                                        alp_sin_expanded, alp_deriv_expanded,
+                                        cosT, phil)
+                        else:
+                            H[:, region] = self._scattered_H_field_fixed_r(
+                                    alp_expanded, alp_sin_expanded,
+                                    alp_deriv_expanded, cosT, phil, total_field)
+
+                        H = np.matmul(A, H)
+                        H[:, region] *= E0[polarization] * np.exp(1j *
+                            (self._Kx[p,m] * bead_center[0] +
+                            self._Ky[p,m] * bead_center[1] +
+                            self._Kz[p,m] * bead_center[2]))
+
+                        Hx[:,:,:] += np.reshape(H[0,:], self._XYZshape)
+                        Hy[:,:,:] += np.reshape(H[1,:], self._XYZshape)
+                        Hz[:,:,:] += np.reshape(H[2,:], self._XYZshape)
+
 
 
     def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
