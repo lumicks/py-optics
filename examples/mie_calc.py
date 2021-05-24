@@ -174,7 +174,7 @@ plt.show()
 num_ord = mie.number_of_orders()
 print(f'Number of orders is {num_ord}')
 Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), num_orders=np.min((num_ord//2,1)),
+                                         bead_center=(0,0,0), num_orders=np.max((num_ord//2,1)),
                                          bfp_sampling_n=9, return_grid=True)
 
 # %%
@@ -218,5 +218,3 @@ plt.title('|E| (scattered)')
 plt.xlabel('Z [m]')
 plt.ylabel('X [m]')
 plt.show()
-
-# %%
