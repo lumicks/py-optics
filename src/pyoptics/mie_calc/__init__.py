@@ -101,7 +101,7 @@ class MieCalc:
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
-                        inside_bead=True, verbose=False):
+                        inside_bead=True, H_field=False, verbose=False):
         w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
 
         def field_func(X_BFP, Y_BFP, *args):
@@ -112,7 +112,8 @@ class MieCalc:
             focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
             bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
             num_orders=num_orders, return_grid=return_grid, 
-            total_field=total_field, inside_bead=inside_bead, verbose=verbose)
+            total_field=total_field, inside_bead=inside_bead, H_field=H_field,
+            verbose=verbose)
     
     def fields_focus(self, f_input_field, n_BFP=1.0,
                 focal_length=4.43e-3, NA=1.2,
@@ -179,17 +180,9 @@ class MieCalc:
         Ey *= phase
         Ez *= phase
 
-        Hx *= phase
-        Hy *= phase
-        Hz *= phase
-
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
         Ez = np.squeeze(Ez)
-
-        Hx = np.squeeze(Hx)
-        Hy = np.squeeze(Hy)
-        Hz = np.squeeze(Hz)
 
         if return_grid:
             X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
@@ -198,6 +191,13 @@ class MieCalc:
             Z = np.squeeze(Z)
 
         if H_field:
+            Hx *= phase
+            Hy *= phase
+            Hz *= phase
+            Hx = np.squeeze(Hx)
+            Hy = np.squeeze(Hy)
+            Hz = np.squeeze(Hz)
+
             if return_grid:
                 return Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z
             else:
@@ -210,7 +210,9 @@ class MieCalc:
 
     def fields_plane_wave(self, x, y, z, theta=0, phi=0, polarization=(1,0), 
                          num_orders=None, return_grid=False, 
-                         total_field=True, inside_bead=True, verbose=False):
+                         total_field=True, inside_bead=True, H_field=False,
+                         verbose=False
+                         ):
     
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
@@ -242,11 +244,20 @@ class MieCalc:
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
+
+        if H_field:
+            Hx = np.zeros(self._XYZshape, dtype='complex128')
+            Hy = np.zeros(self._XYZshape, dtype='complex128')
+            Hz = np.zeros(self._XYZshape, dtype='complex128')
+        else:
+            Hx = 0
+            Hy = 0
+            Hz = 0
         
         if verbose:
             print('External field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field, 
-                                             bead_center=(0,0,0))
+        self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, False, 
+            total_field, H_field, bead_center=(0,0,0))
 
         if inside_bead:
             if verbose:
@@ -257,19 +268,31 @@ class MieCalc:
             self._init_legendre(outside=False)
             if verbose:
                 print('Internal field')
-            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field, 
-                                             bead_center=(0,0,0))
+            self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, True, 
+                total_field, H_field, bead_center=(0,0,0))
         
 
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
         Ez = np.squeeze(Ez)
- 
+
         if return_grid:
             X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
+
+        if H_field:
+            Hx = np.squeeze(Hx)
+            Hy = np.squeeze(Hy)
+            Hz = np.squeeze(Hz)
+            
+            if return_grid:
+                return Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z
+            else:
+                return Ex, Ey, Ez, Hx, Hy, Hz
+
+        if return_grid:
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
@@ -696,10 +719,13 @@ class MieCalc:
             Hp += C2[L-1] * (1j * bn[L - 1] *
                 dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
                 krh[L - 1,:] * alp_deriv[L - 1,:])
-
-        Hr *= np.sin(phi) / (k0r)**2 * self.n_medium / _C
-        Ht *= np.sin(phi) / (k0r) * self.n_medium / _C
-        Hp *= np.cos(phi) / (k0r) * self.n_medium / _C
+        
+        # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
+        # but our associated Legendre polynomials do include it
+        Hr *= -np.sin(phi) / (k0r)**2 * self.n_medium / _C
+        Ht *= -np.sin(phi) / (k0r) * self.n_medium / _C
+        Hp *= -np.cos(phi) / (k0r) * self.n_medium / _C
+        
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
         Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
