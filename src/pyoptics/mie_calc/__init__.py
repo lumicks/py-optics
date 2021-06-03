@@ -1,9 +1,13 @@
+from numpy.core.fromnumeric import size
 from .legendre import *
+from  .lebedev_laikov import *
 import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
 
 _C = 299792458
+_MU0 = 4 * np.pi * 1e-7
+_EPS0 = (_C**2 * _MU0)**-1
 
 class MieCalc:
     def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
@@ -101,7 +105,8 @@ class MieCalc:
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
-                        inside_bead=True, H_field=False, verbose=False):
+                        inside_bead=True, H_field=False, verbose=False, 
+                        grid=True):
         w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
 
         def field_func(X_BFP, Y_BFP, *args):
@@ -113,14 +118,14 @@ class MieCalc:
             bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
             num_orders=num_orders, return_grid=return_grid, 
             total_field=total_field, inside_bead=inside_bead, H_field=H_field,
-            verbose=verbose)
+            verbose=verbose, grid=grid)
     
     def fields_focus(self, f_input_field, n_BFP=1.0,
                 focal_length=4.43e-3, NA=1.2,
                 x=0, y=0, z=0, bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None,
                 return_grid=False,  total_field=True,
-                inside_bead=True, H_field=False, verbose=False):
+                inside_bead=True, H_field=False, verbose=False, grid=True):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -130,7 +135,7 @@ class MieCalc:
         #if M > bfp_sampling_n:
         #    print('bfp_sampling_n lower than recommendation for convergence')
 
-        self._init_local_coordinates(x,y,z, bead_center)
+        self._init_local_coordinates(x,y,z, bead_center, grid=grid)
         self._get_mie_coefficients(num_orders)
         self._init_back_focal_plane(f_input_field, n_BFP, focal_length, NA, 
                                     bfp_sampling_n)
@@ -296,10 +301,71 @@ class MieCalc:
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
+    
+
+    def forces_focused_fields(self, f_input_field, n_BFP=1.0,
+                focal_length=4.43e-3, NA=1.2,
+                bead_center=(0,0,0),
+                bfp_sampling_n=31, num_orders=None,
+                verbose=False
+                ):
         
-    def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
-        # Set up coordinate system around bead
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        self._get_mie_coefficients(num_orders)
+        x, y, z, w = get_integration_locations(get_nearest_order(
+            self._n_coeffs
+        ))
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+        z = np.asarray(z)
+        w = np.asarray(w)
+
+        xb = x * self.bead_diameter + bead_center[0]
+        yb = y * self.bead_diameter + bead_center[1]
+        zb = z * self.bead_diameter + bead_center[2]
+
+        Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
+            f_input_field, n_BFP, focal_length, NA, xb, yb, zb,
+            bead_center, bfp_sampling_n, num_orders, return_grid=False,
+            total_field=True, inside_bead=False, H_field=True, verbose=verbose,
+            grid=False
+        )
+        _eps = _EPS0 * self.n_medium**2
+        _mu = _MU0
+        E2 = np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2
+        H2 = np.abs(Hx)**2 + np.abs(Hy)**2 + np.abs(Hz)**2
+        F = np.zeros((3,1), dtype='complex128')
+        for k in np.arange(x.size):
+            T = np.asarray([[_eps * (Ex[k]**2 - E2[k] / 2) + _mu * (Hx[k]**2 - H2[k] / 2),
+                _eps * Ex[k] * Ey[k] + _mu * Hx[k] * Hy[k],
+                _eps * Ex[k] * Ez[k] + _mu * Hx[k] * Hz[k]],
+               [_eps * Ex[k] * Ey[k] + _mu * Hx[k] * Hy[k],
+                _eps * (Ey[k]**2 - E2[k] / 2) + _mu * (Hy[k]**2 - H2[k] / 2),
+                _eps * Ey[k] * Ez[k] + _mu * Hy[k] * Hz[k]],
+               [_eps * Ex[k] * Ez[k] + _mu * Hx[k] * Hz[k],
+                _eps * Ey[k] * Ez[k] + _mu * Hy[k] * Hz[k],
+                _eps * (Ez[k]**2 - E2[k] / 2) + _mu * (Hz[k]**2 - H2[k] / 2)]
+            ])
+
+            F += (T @ np.asarray([[x[k]], [y[k]], [z[k]]]) * w[k] * 
+                self.bead_diameter**2 * 4 * np.pi)
+
+        return 0.5 * F.real
+        
+    def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
+        grid=True
+        ):
+        """Set up coordinate system around bead"""
+        # Set up a meshgrid, or take the list of x, y and z points as 
+        # coordinates
+        if grid:    
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        else:
+            assert x.size == y.size == z.size,\
+                'x, y and z need to be of the same length'
+            X = np.atleast_3d(x)
+            Y = np.atleast_3d(y)
+            Z = np.atleast_3d(z)
         self._XYZshape = X.shape
 
         # Local coordinate system around the bead
