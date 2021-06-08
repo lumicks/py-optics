@@ -307,7 +307,7 @@ class MieCalc:
                 focal_length=4.43e-3, NA=1.2,
                 bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None,
-                verbose=False
+                verbose=False, space_factor=1
                 ):
         
         self._get_mie_coefficients(num_orders)
@@ -319,10 +319,10 @@ class MieCalc:
         y = np.asarray(y)
         z = np.asarray(z)
         w = np.asarray(w)
-
-        xb = x * self.bead_diameter + bead_center[0]
-        yb = y * self.bead_diameter + bead_center[1]
-        zb = z * self.bead_diameter + bead_center[2]
+      
+        xb = x * self.bead_diameter * space_factor + bead_center[0]
+        yb = y * self.bead_diameter * space_factor + bead_center[1]
+        zb = z * self.bead_diameter * space_factor + bead_center[2]
 
         Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
             f_input_field, n_BFP, focal_length, NA, xb, yb, zb,
@@ -332,25 +332,41 @@ class MieCalc:
         )
         _eps = _EPS0 * self.n_medium**2
         _mu = _MU0
-        E2 = np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2
-        H2 = np.abs(Hx)**2 + np.abs(Hy)**2 + np.abs(Hz)**2
-        F = np.zeros((3,1), dtype='complex128')
+        
+        Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
+        Te12 = _eps * np.real(Ex * np.conj(Ey))
+        Te13 = _eps * np.real(Ex * np.conj(Ez))
+        Te22 = _eps * 0.5 * (np.abs(Ey)**2 - np.abs(Ex)**2 - np.abs(Ez)**2)
+        Te23 = _eps * np.real(Ey * np.conj(Ez))
+        Te33 = _eps * 0.5 * (np.abs(Ez)**2 - np.abs(Ey)**2 - np.abs(Ex)**2)
+        Th11 = _mu * 0.5 * (np.abs(Hx)**2 - np.abs(Hy)**2 - np.abs(Hz)**2)
+        Th12 = _mu * np.real(Hx * np.conj(Hy))
+        Th13 = _mu * np.real(Hx * np.conj(Hz))
+        Th22 = _mu * 0.5 * (np.abs(Hy)**2 - np.abs(Hx)**2 - np.abs(Hz)**2)
+        Th23 = _mu * np.real(Hy * np.conj(Hz))
+        Th33 = _mu * 0.5 * (np.abs(Hz)**2 - np.abs(Hy)**2 - np.abs(Hx)**2)
+        F = np.zeros((3, 1))
+        n = np.empty((3, 1))
+
         for k in np.arange(x.size):
-            T = np.asarray([[_eps * (Ex[k]**2 - E2[k] / 2) + _mu * (Hx[k]**2 - H2[k] / 2),
-                _eps * Ex[k] * Ey[k] + _mu * Hx[k] * Hy[k],
-                _eps * Ex[k] * Ez[k] + _mu * Hx[k] * Hz[k]],
-               [_eps * Ex[k] * Ey[k] + _mu * Hx[k] * Hy[k],
-                _eps * (Ey[k]**2 - E2[k] / 2) + _mu * (Hy[k]**2 - H2[k] / 2),
-                _eps * Ey[k] * Ez[k] + _mu * Hy[k] * Hz[k]],
-               [_eps * Ex[k] * Ez[k] + _mu * Hx[k] * Hz[k],
-                _eps * Ey[k] * Ez[k] + _mu * Hy[k] * Hz[k],
-                _eps * (Ez[k]**2 - E2[k] / 2) + _mu * (Hz[k]**2 - H2[k] / 2)]
-            ])
+            
+            TE = np.asarray([
+               [ Te11[k], Te12[k], Te13[k]],
+               [ Te12[k], Te22[k], Te23[k]],
+               [ Te13[k], Te23[k], Te33[k]]])
 
-            F += (T @ np.asarray([[x[k]], [y[k]], [z[k]]]) * w[k] * 
-                self.bead_diameter**2 * 4 * np.pi)
+            TH = np.asarray([
+               [ Th11[k], Th12[k], Th13[k]],
+               [ Th12[k], Th22[k], Th23[k]],
+               [ Th13[k], Th23[k], Th33[k]]])
 
-        return 0.5 * F.real
+            T = TE + TH
+            n[0] = x[k]
+            n[1] = y[k]
+            n[2] = z[k]
+            F += T @ n * w[k]
+
+        return F * (self.bead_diameter * space_factor)**2 * 2 * np.pi
         
     def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
         grid=True
