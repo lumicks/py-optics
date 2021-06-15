@@ -100,6 +100,61 @@ class MieCalc:
 
         return cn, dn
 
+    
+    def extinction_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        C = 2 * (1 + np.arange(self._n_coeffs)) + 1
+        return 2 * self.size_param()**-2 * np.sum(C * (self._an + 
+            self._bn).real)
+
+
+    def scattering_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        C = 2 * (1 + np.arange(self._n_coeffs)) + 1
+        return 2 * self.size_param()**-2 * np.sum(C * 
+            (np.abs(self._an)**2 + np.abs(self._bn)**2))
+
+    
+    def pressure_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        n = 1 + np.arange(self._n_coeffs)
+        C = 2 * n + 1
+        C1 = n * (n + 2)/(n + 1)
+        C2 = C/(n * (n + 1))
+        an_1 = np.zeros(self._an.shape, dtype='complex128')
+        bn_1 = np.zeros(self._an.shape, dtype='complex128')
+        an_1[0:-2] = self._an[1:-1]
+        bn_1[0:-2] = self._bn[1:-1]
+
+        return self.extinction_eff(num_orders) - 4 * self.size_param()**-2 * np.sum(C1 *
+            (self._an * np.conj(an_1) + self._bn * np.conj(bn_1)).real + 
+            C2 * (self._an * np.conj(self._bn)).real)
+           
+
+
+    def fields_dipole(self, px, n_medium, x, y, z):
+        k = self._k
+
+        R = np.hypot(np.hypot(x, y), z)
+        Ex = 1 + 1/(k**2*R)*(-k**2*x**2/R + (2*x**2 - y**2 - z**2)*(1/R**3 - 1j*k/R**2))
+        Ey = x*y/(k**2*R)*(3/R**3 - 3j*k/R**2 - k**2/R)
+        Ez = x*z/(k**2*R)*(3/R**3 - 3j*k/R**2 - k**2/R)
+        
+        prefactor = px * k**2 * np.exp(1j*k*R)/(4*np.pi*R*_EPS0*n_medium**2)
+        Ex *= prefactor
+        Ey *= prefactor
+        Ez *= prefactor
+        
+        Hy = 1j*k*z/R - z/R**2
+        Hz = y/R**2 - 1j*k*y/R
+        
+        prefactor *= (1j*_C*k/n_medium*_MU0)**-1
+        
+        Hy *= prefactor
+        Hz *= prefactor
+    
+        return Ex, Ey, Ez, Hy, Hz
+
     def fields_gaussian_focus(self, n_BFP=1.0,
                         focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
                         x=0, y=0, z=0, bead_center=(0,0,0),
@@ -367,6 +422,71 @@ class MieCalc:
             F += T @ n * w[k]
 
         return F * (self.bead_diameter * space_factor)**2 * 2 * np.pi
+    
+    def forces_dipole(self, E0, num_orders=3):
+        _eps = _EPS0 * self.n_medium**2
+        _mu = _MU0
+
+        x, y, z, w = get_integration_locations(get_nearest_order(
+            num_orders
+        ))
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+        z = np.asarray(z)
+        w = np.asarray(w)
+      
+        xb = x * self.bead_diameter
+        yb = y * self.bead_diameter
+        zb = z * self.bead_diameter
+
+        self._get_mie_coefficients()
+        a1 = self._an[0]
+        alpha = _eps * 6j * np.pi * a1 / self._k**3
+
+        Ex, Ey, Ez, Hy, Hz = self.fields_dipole(E0*alpha,
+            self.n_medium, xb,yb,zb)
+        
+        Ex += E0*np.exp(1j*self._k*zb)
+        Hy += self.n_medium / (_C * _MU0) * E0*np.exp(1j*self._k*zb)
+        
+        Hx = np.zeros(Hy.shape)
+        
+        Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
+        Te12 = _eps * np.real(Ex * np.conj(Ey))
+        Te13 = _eps * np.real(Ex * np.conj(Ez))
+        Te22 = _eps * 0.5 * (np.abs(Ey)**2 - np.abs(Ex)**2 - np.abs(Ez)**2)
+        Te23 = _eps * np.real(Ey * np.conj(Ez))
+        Te33 = _eps * 0.5 * (np.abs(Ez)**2 - np.abs(Ey)**2 - np.abs(Ex)**2)
+        Th11 = _mu * 0.5 * (np.abs(Hx)**2 - np.abs(Hy)**2 - np.abs(Hz)**2)
+        Th12 = _mu * np.real(Hx * np.conj(Hy))
+        Th13 = _mu * np.real(Hx * np.conj(Hz))
+        Th22 = _mu * 0.5 * (np.abs(Hy)**2 - np.abs(Hx)**2 - np.abs(Hz)**2)
+        Th23 = _mu * np.real(Hy * np.conj(Hz))
+        Th33 = _mu * 0.5 * (np.abs(Hz)**2 - np.abs(Hy)**2 - np.abs(Hx)**2)
+        F = np.zeros((3, 1))
+        n = np.empty((3, 1))
+
+        for k in np.arange(x.size):
+            
+            TE = np.asarray([
+               [ Te11[k], Te12[k], Te13[k]],
+               [ Te12[k], Te22[k], Te23[k]],
+               [ Te13[k], Te23[k], Te33[k]]])
+
+            TH = np.asarray([
+               [ Th11[k], Th12[k], Th13[k]],
+               [ Th12[k], Th22[k], Th23[k]],
+               [ Th13[k], Th23[k], Th33[k]]])
+
+            T = TE + TH
+            n[0] = x[k]
+            n[1] = y[k]
+            n[2] = z[k]
+            F += T @ n * w[k]
+
+        return F * (self.bead_diameter)**2 * 2 * np.pi
+        #return F * 2 * np.pi
         
     def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
         grid=True
@@ -804,9 +924,9 @@ class MieCalc:
         
         # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
         # but our associated Legendre polynomials do include it
-        Hr *= -np.sin(phi) / (k0r)**2 * self.n_medium / _C
-        Ht *= -np.sin(phi) / (k0r) * self.n_medium / _C
-        Hp *= -np.cos(phi) / (k0r) * self.n_medium / _C
+        Hr *= -np.sin(phi) / (k0r)**2 * self.n_medium / (_C * _MU0)
+        Ht *= -np.sin(phi) / (k0r) * self.n_medium / (_C * _MU0)
+        Hp *= -np.cos(phi) / (k0r) * self.n_medium / (_C * _MU0)
         
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
@@ -814,7 +934,7 @@ class MieCalc:
         Hz = Hr * cos_theta - Ht * sinT
         if total_field:
             # Incident field (E field x-polarized)
-            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / _C
+            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / (_C * _MU0)
             return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
         else:
             return np.concatenate((Hx, Hy, Hz), axis=0)
@@ -854,9 +974,9 @@ class MieCalc:
                                                     jn_over_k1r[n - 1, :]))
 
 
-        Hr *= np.sin(phi) * self.n_bead / _C
-        Ht *= -np.sin(phi) * self.n_bead / _C
-        Hp *= np.cos(phi) * self.n_bead / _C
+        Hr *= np.sin(phi) * self.n_bead / (_C * _MU0)
+        Ht *= -np.sin(phi) * self.n_bead / (_C * _MU0)
+        Hp *= np.cos(phi) * self.n_bead / (_C * _MU0)
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
         Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
