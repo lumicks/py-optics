@@ -1,4 +1,4 @@
-from numpy.core.fromnumeric import size
+#from numpy.core.fromnumeric import size
 from .legendre import *
 from  .lebedev_laikov import *
 import numpy as np
@@ -132,9 +132,9 @@ class MieCalc:
            
 
 
-    def fields_dipole(self, px, n_medium, x, y, z):
+    def fields_dipole_x(self, px, x, y, z):
         k = self._k
-
+        n_medium = self.n_medium
         R = np.hypot(np.hypot(x, y), z)
         Ex = 1 + 1/(k**2*R)*(-k**2*x**2/R + (2*x**2 - y**2 - z**2)*(1/R**3 - 1j*k/R**2))
         Ey = x*y/(k**2*R)*(3/R**3 - 3j*k/R**2 - k**2/R)
@@ -153,7 +153,92 @@ class MieCalc:
         Hy *= prefactor
         Hz *= prefactor
     
-        return Ex, Ey, Ez, Hy, Hz
+        return Ex, Ey, Ez, np.zeros(Hy.shape), Hy, Hz
+    
+    def fields_dipole_y(self, py, x, y, z):
+
+        Ex, Ez, Ey, Hx, Hz, Hy = self.fields_dipole_z(py, x, -z, y)
+        Ez *= -1
+        Hz *= -1
+        return Ex, Ey, Ez, Hx, Hy, Hz
+
+    def fields_dipole_z(self, pz, x, y, z):
+        rho = np.hypot(x,y)
+        r = np.hypot(rho,z)
+        cosT = z/r
+        sinT = (1-cosT**2)**0.5
+                
+        cosP = x/rho
+        sinP = y/rho
+
+        _eps = _EPS0*self.n_medium**2
+        eta = (_MU0/_eps)**0.5
+        k = self._k
+        w = _C * (k / self.n_medium)
+        I0l = 1j*w*pz
+        
+        
+        Er =  eta*I0l*cosT / (2*np.pi * r**2) * (1 + 1/(1j*k*r)) * np.exp(-1j*k*r)
+        Et = 1j * eta * k *I0l *sinT/(4*np.pi*r)*(1 + (1j*k*r)**-1 - (k*r)**-2) * np.exp(-1j*k*r)
+
+        Hp = 1j*k*I0l*sinT/(4*np.pi*r)*(1+(1j*k*r)**-1)*np.exp(-1j*k*r)
+
+        Ex = Er * sinT * cosP + Et * cosT * cosP
+        Ey = Er * sinT * sinP + Et * cosT * sinP
+        Ez = Er * cosT - Et * sinT
+
+        Hx = - Hp * sinP
+        Hy = Hp * cosP
+        Hz = np.zeros(Hp.shape)
+
+        Ex = np.conj(Ex)
+        Ey = np.conj(Ey)
+        Ez = np.conj(Ez)
+
+        Hx = np.conj(Hx)
+        Hy = np.conj(Hy)
+
+        return Ex, Ey, Ez, Hx, Hy, Hz
+
+    
+    def fields_dipole(self, p, x, y, z):
+        
+        r = np.hypot(np.hypot(x,y),z)
+
+        nx = x/r
+        ny = y/r
+        nz = z/r
+        px = p[0]
+        py = p[1]
+        pz = p[2]
+
+        nxp_x = ny*pz - nz*py
+        nxp_y = nz*px - nx*pz
+        nxp_z = nx*py - ny*px
+
+        nxpxn_x = nxp_y*nz-nxp_z*ny
+        nxpxn_y = nxp_z*nx-nxp_x*nz
+        nxpxn_z = nxp_x*ny-nxp_y*nx
+
+        ndotp = nx*px + ny*py + nz*pz
+
+        prefactor = np.exp(1j*self._k*r)/(4*np.pi*_EPS0*self.n_medium**2*r)
+
+        Ex = prefactor * (self._k**2 * nxpxn_x +
+            (3 * nx * ndotp - px) * (r**-2 - 1j*self._k/r))
+        Ey = prefactor * (self._k**2 * nxpxn_y +
+            (3 * ny * ndotp - py) * (r**-2 - 1j*self._k/r))
+        Ez = prefactor * (self._k**2 * nxpxn_z +
+            (3 * nz * ndotp - pz) * (r**-2 - 1j*self._k/r))
+        
+        prefactor = _C*self._k**2*np.exp(1j*self._k*r)/(4*np.pi*r)*(1 - 
+            (1j*self._k*r)**-1)
+
+        Hx = prefactor * nxp_x
+        Hy = prefactor * nxp_y
+        Hz = prefactor * nxp_z
+        
+        return Ex, Ey, Ez, Hx, Hy, Hz   
 
     def fields_gaussian_focus(self, n_BFP=1.0,
                         focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
@@ -423,7 +508,7 @@ class MieCalc:
 
         return F * (self.bead_diameter * space_factor)**2 * 2 * np.pi
     
-    def forces_dipole(self, E0, num_orders=3):
+    def forces_dipole(self, E0=(1,0), theta=0, phi=0, num_orders=3):
         _eps = _EPS0 * self.n_medium**2
         _mu = _MU0
 
@@ -440,17 +525,40 @@ class MieCalc:
         yb = y * self.bead_diameter
         zb = z * self.bead_diameter
 
+        nz = np.cos(theta)
+        nx = -np.sin(theta) * np.cos(phi)
+        ny = -np.sin(theta) * np.sin(phi)
+
         self._get_mie_coefficients()
         a1 = self._an[0]
         alpha = _eps * 6j * np.pi * a1 / self._k**3
 
-        Ex, Ey, Ez, Hy, Hz = self.fields_dipole(E0*alpha,
-            self.n_medium, xb,yb,zb)
+        E = E0[0] * np.asarray([np.cos(theta)*np.cos(phi), 
+            np.cos(theta)*np.sin(phi), np.sin(theta)])
+
+        Ex, Ey, Ez, Hx, Hy, Hz = self.fields_dipole(E*alpha, xb,yb,zb)
+        print(E)
+        #Ex, Ey, Ez, Hy, Hz = self.fields_dipole_x(E0[0]*alpha, xb,yb,zb)
+        #Hx = np.zeros(Ex.shape)
+
+        # kx = 0
+        # ky = 0
+        phase = np.exp(1j*self._k*(nx * xb + ny * yb + nz * zb))
         
-        Ex += E0*np.exp(1j*self._k*zb)
-        Hy += self.n_medium / (_C * _MU0) * E0*np.exp(1j*self._k*zb)
+        Expw = E[0] * phase
+        Eypw = E[1] * phase
+        Ezpw = E[2] * phase
         
-        Hx = np.zeros(Hy.shape)
+        prefactor = self.n_medium * (_C * _MU0)**-1
+        Hxpw = (ny*Ezpw - nz*Eypw) * prefactor
+        Hypw = (nz*Expw - nx*Ezpw) * prefactor
+        Hzpw = (nx*Eypw - ny*Expw) * prefactor
+        Ex += Expw
+        Ey += Eypw
+        Ez += Ezpw
+        Hx += Hxpw  #self.n_medium / (_C * _MU0) * E0[0]*phase
+        Hy += Hypw  #self.n_medium / (_C * _MU0) * E0[0]*phase
+        Hz += Hzpw  #self.n_medium / (_C * _MU0) * E0[0]*phase
         
         Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
         Te12 = _eps * np.real(Ex * np.conj(Ey))
