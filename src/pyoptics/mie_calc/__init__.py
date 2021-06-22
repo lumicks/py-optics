@@ -175,6 +175,7 @@ class MieCalc:
         eta = (_MU0/_eps)**0.5
         k = self._k
         w = _C * (k / self.n_medium)
+        
         I0l = 1j*w*pz
         
         
@@ -764,8 +765,8 @@ class MieCalc:
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
                 # however, cos(theta) is the same for phi polarization!
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
-                coords = A.T @ local_coords
+                A = self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m])
+                coords = A @ local_coords
                 Zvl_s = coords[2,:]
 
                 # Retrieve an array of all values of cos(theta)
@@ -831,15 +832,13 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                matrices = [self._R_phi(self._Phi[p,m]) @ 
-                    self._R_th(-self._Th[p,m]), 
-                    self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
-                        self._R_phi(np.pi/2)]
+                matrices = [self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m]),
+                    self._R_phi(-np.pi/2) @ self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m])]
                 E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
-
+            
                 for polarization in range(2):
                     A = matrices[polarization]
-                    coords = A.T @ local_coords
+                    coords = A @ local_coords
                     Xvl_s = coords[0,:]
                     Yvl_s = coords[1,:]
                     Zvl_s = coords[2,:]
@@ -859,20 +858,28 @@ class MieCalc:
                         alp_sin_expanded[:] = self._alp_sin[:, self._inverse[p,m]]
                         alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
                     
-                    phil = np.arctan2(Yvl_s, Xvl_s)
+                    rho_l = np.hypot(Xvl_s, Yvl_s)
+                    cosP = np.empty(rho_l.shape)
+                    sinP = np.empty(rho_l.shape)
+                    where = rho_l > 0
+                    cosP[where] = Xvl_s[where]/rho_l[where]
+                    sinP[where] = Yvl_s[where]/rho_l[where]
+                    cosP[rho_l == 0] = 1
+                    sinP[rho_l == 0] = 0
                     
                     E[:] = 0
                     if internal:
                         E[:, region] = self._internal_field_fixed_r(
                                         alp_expanded,
                                         alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, phil)
+                                        cosT, cosP, sinP)
                     else:
                         E[:, region] = self._scattered_field_fixed_r(
                                     alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, phil, total_field)
+                                    alp_deriv_expanded, cosT, cosP, sinP,
+                                    total_field)
 
-                    E = np.matmul(A, E)             
+                    E = np.matmul(A.T, E)             
                     E[:, region] *= E0[polarization] * np.exp(1j *
                         (self._Kx[p,m] * bead_center[0] +
                         self._Ky[p,m] * bead_center[1] +
@@ -888,11 +895,12 @@ class MieCalc:
                             H[:, region] = self._internal_H_field_fixed_r(
                                         alp_expanded,
                                         alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, phil)
+                                        cosT, cosP, sinP)
                         else:
                             H[:, region] = self._scattered_H_field_fixed_r(
                                     alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, phil, total_field)
+                                    alp_deriv_expanded, cosT, cosP, sinP,
+                                    total_field)
 
                         H = np.matmul(A, H)
                         H[:, region] *= E0[polarization] * np.exp(1j *
@@ -908,7 +916,8 @@ class MieCalc:
 
     def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                                 alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, phi: np.ndarray,
+                                cos_theta: np.ndarray, cosP: np.ndarray,
+                                sinP: np.ndarray,
                                 total_field=True):
 
         # Radial, theta and phi-oriented fields
@@ -916,9 +925,7 @@ class MieCalc:
         Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
         Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
+        sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
         an = self._an
         bn = self._bn
@@ -939,9 +946,9 @@ class MieCalc:
                 dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
                 krh[L - 1,:] * alp_deriv[L - 1,:])
 
-        Er *= -np.cos(phi) / (k0r)**2
-        Et *= -np.cos(phi) / (k0r)
-        Ep *= np.sin(phi) / (k0r)
+        Er *= -cosP / (k0r)**2
+        Et *= -cosP / (k0r)
+        Ep *= sinP / (k0r)
         # Cartesian components
         Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
@@ -955,7 +962,8 @@ class MieCalc:
 
     def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                           alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, phi: np.ndarray):
+                          cos_theta: np.ndarray, cosP: np.ndarray,
+                          sinP: np.ndarray):
 
         # Radial, theta and phi-oriented fields
         Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
@@ -963,9 +971,7 @@ class MieCalc:
         Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
         sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
-
+        
         #short hand for readability:
         cn = self._cn
         dn = self._dn
@@ -988,9 +994,9 @@ class MieCalc:
                                                     jn_over_k1r[n - 1, :]))
 
 
-        Er *= -np.cos(phi)
-        Et *= -np.cos(phi)
-        Ep *= -np.sin(phi)
+        Er *= -cosP
+        Et *= -cosP
+        Ep *= -sinP
         # Cartesian components
         Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
@@ -999,7 +1005,8 @@ class MieCalc:
 
     def _scattered_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                                 alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, phi: np.ndarray,
+                                cos_theta: np.ndarray, cosP: np.ndarray,
+                                sinP: np.ndarray,
                                 total_field=True):
         
         # Radial, theta and phi-oriented fields
@@ -1008,8 +1015,6 @@ class MieCalc:
         Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
         sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
 
         an = self._an
         bn = self._bn
@@ -1032,9 +1037,9 @@ class MieCalc:
         
         # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
         # but our associated Legendre polynomials do include it
-        Hr *= -np.sin(phi) / (k0r)**2 * self.n_medium / (_C * _MU0)
-        Ht *= -np.sin(phi) / (k0r) * self.n_medium / (_C * _MU0)
-        Hp *= -np.cos(phi) / (k0r) * self.n_medium / (_C * _MU0)
+        Hr *= -sinP / (k0r)**2 * self.n_medium / (_C * _MU0)
+        Ht *= -sinP / (k0r) * self.n_medium / (_C * _MU0)
+        Hp *= -cosP / (k0r) * self.n_medium / (_C * _MU0)
         
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
@@ -1049,7 +1054,8 @@ class MieCalc:
 
     def _internal_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                           alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, phi: np.ndarray):
+                          cos_theta: np.ndarray, cosP: np.ndarray,
+                          sinP: np.ndarray):
 
         # Radial, theta and phi-oriented fields
         Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
@@ -1057,8 +1063,6 @@ class MieCalc:
         Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
         sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
 
         #short hand for readability:
         cn = self._cn
@@ -1082,9 +1086,9 @@ class MieCalc:
                                                     jn_over_k1r[n - 1, :]))
 
 
-        Hr *= np.sin(phi) * self.n_bead / (_C * _MU0)
-        Ht *= -np.sin(phi) * self.n_bead / (_C * _MU0)
-        Hp *= np.cos(phi) * self.n_bead / (_C * _MU0)
+        Hr *= sinP * self.n_bead / (_C * _MU0)
+        Ht *= -sinP * self.n_bead / (_C * _MU0)
+        Hp *= cosP * self.n_bead / (_C * _MU0)
         # Cartesian components
         Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
         Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
