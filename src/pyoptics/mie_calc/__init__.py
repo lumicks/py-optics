@@ -374,8 +374,10 @@ class MieCalc:
         self._Einf_phi = np.atleast_2d(polarization[1])
         self._aperture = np.atleast_2d(False)
         #self._Einfx = np.ones(self._Einf_phi.shape)
-        self._Th = np.atleast_2d(theta)
-        self._Phi = np.atleast_2d(phi)
+        self._cosT = np.atleast_2d(np.cos(theta))
+        self._sinT = np.atleast_2d(np.sin(theta))
+        self._cosP = np.atleast_2d(np.cos(phi))
+        self._sinP = np.atleast_2d(np.sin(phi))
         self._Kz = np.zeros(self._Einf_phi.shape)
         self._Ky = np.zeros(self._Einf_phi.shape)
         self._Kx = np.zeros(self._Einf_phi.shape)
@@ -643,28 +645,35 @@ class MieCalc:
         Rmax = sin_th_max * focal_length
         x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
         X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
-        sin_th_BFP = np.hypot(X_BFP, Y_BFP)
+        self._sinT = np.hypot(X_BFP, Y_BFP)
         
-        self._aperture = sin_th_BFP > sin_th_max
-        self._Th = np.zeros(sin_th_BFP.shape)
-        self._Th[np.logical_not(self._aperture)] = np.arcsin(
-            sin_th_BFP[np.logical_not(self._aperture)])
-        #self._Th[self._aperture] = 0
-        self._Phi = np.arctan2(Y_BFP, X_BFP)
-        self._Phi[sin_th_BFP == 0] = 0
-        self._Phi[self._aperture] = 0
+        self._aperture = self._sinT > sin_th_max
+        self._cosT = np.ones(self._sinT.shape)
+        self._cosT[np.logical_not(self._aperture)] = (1 - 
+            self._sinT[np.logical_not(self._aperture)]**2)
+        
+        self._cosP = np.empty(self._sinT.shape)
+        self._sinP = np.empty(self._sinT.shape)
+        region = self._sinT > 0
+        self._cosP[region] = X_BFP[region] / self._sinT[region]
+        self._cosP[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+        self._sinP[region] = Y_BFP[region] / self._sinT[region]
+        self._sinP[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
+        self._sinP[self._aperture] = 0
+        self._cosP[self._aperture] = 0
         
         X_BFP *= focal_length
         Y_BFP *= focal_length
-        R_BFP = sin_th_BFP * focal_length
+        R_BFP = self._sinT * focal_length
 
         # Calculate properties of the plane waves
-        self._Kz = self._k * np.cos(self._Th)
-        self._Kp = self._k * np.sin(self._Th)
-        self._Kx = -self._Kp * np.cos(self._Phi)
-        self._Ky = -self._Kp * np.sin(self._Phi)
+        self._Kz = self._k * self._cosT
+        self._Kp = self._k * self._sinT
+        self._Kx = -self._Kp * self._cosP
+        self._Ky = -self._Kp * self._sinP
 
-        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
+        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._cosT, 
+            self._cosP, self._sinP)
         
         # Transform the input wavefront to a spherical one, after refracting on
         # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
@@ -674,7 +683,7 @@ class MieCalc:
             Einx[self._aperture] = 0  
             Einx = np.complex128(Einx)
             self._Einfx = (np.sqrt(n_BFP / self.n_medium) * Einx *
-                        np.sqrt(np.cos(self._Th)) / self._Kz)
+                        np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfx = 0
 
@@ -682,15 +691,15 @@ class MieCalc:
             Einy[self._aperture] = 0
             Einy = np.complex128(Einy)
             self._Einfy = (np.sqrt(n_BFP / self.n_medium) * Einy *
-                        np.sqrt(np.cos(self._Th)) / self._Kz)
+                        np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfy = 0
 
         # Get p- and s-polarized parts
-        self._Einf_theta = (self._Einfx * np.cos(self._Phi) + 
-            self._Einfy * np.sin(self._Phi))
-        self._Einf_phi = (self._Einfy * np.cos(self._Phi) + 
-            self._Einfx * -np.sin(self._Phi))
+        self._Einf_theta = (self._Einfx * self._cosP + 
+            self._Einfy * self._sinP)
+        self._Einf_phi = (self._Einfy * self._cosP + 
+            self._Einfx * -self._sinP)
 
     def _init_hankel(self):
         # Precompute the spherical Hankel functions and derivatives that only depend
@@ -765,7 +774,8 @@ class MieCalc:
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
                 # however, cos(theta) is the same for phi polarization!
-                A = self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m])
+                A = (self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]))
                 coords = A @ local_coords
                 Zvl_s = coords[2,:]
 
@@ -832,8 +842,11 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                matrices = [self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m]),
-                    self._R_phi(-np.pi/2) @ self._R_th(self._Th[p,m]) @ self._R_phi(-self._Phi[p,m])]
+                matrices = [self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]),
+                    self._R_phi(0, -1) @ 
+                    self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m])]
                 E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
             
                 for polarization in range(2):
@@ -1095,12 +1108,12 @@ class MieCalc:
         Hz = Hr * cos_theta - Ht * sinT
         return np.concatenate((Hx, Hy, Hz), axis=0)
 
-    def _R_phi(self, phi):
-        return np.asarray([[np.cos(phi), -np.sin(phi), 0],
-                           [np.sin(phi), np.cos(phi), 0],
+    def _R_phi(self, cos_phi, sin_phi):
+        return np.asarray([[cos_phi, -sin_phi, 0],
+                           [sin_phi, cos_phi, 0],
                            [0, 0, 1]])
 
-    def _R_th(self, th):
-        return np.asarray([[np.cos(th), 0, np.sin(th)],
+    def _R_th(self, cos_th, sin_th):
+        return np.asarray([[cos_th, 0, sin_th],
                            [0,  1,  0],
-                           [-np.sin(th), 0, np.cos(th)]])
+                           [-sin_th, 0, cos_th]])
