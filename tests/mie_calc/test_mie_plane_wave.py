@@ -64,7 +64,9 @@ def test_plane_wave_direct(
             Ezpw = np.sin(theta[p,m]) * Exp
             
             #return [Expw, Eypw, Ezpw, Ex, Ey, Ez]
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
+            np.testing.assert_allclose(Ex, Expw, atol=1e-14)
+            np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
+            np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
             
             Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
@@ -75,7 +77,9 @@ def test_plane_wave_direct(
             
             
             # Ezpw == 0, but Ez has some numerical rounding errors. Therefore specify an absolute tolerance that is acceptable
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
+            np.testing.assert_allclose(Ex, Expw, atol=1e-14)
+            np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
+            np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
 
 
@@ -86,8 +90,9 @@ def test_plane_wave_bfp(
     focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9
 ):
     global skip
-    global theta
-    global phi
+    global costheta
+    global cosphi
+    global sinphi
     
     num_pts = 21
     
@@ -101,48 +106,54 @@ def test_plane_wave_bfp(
     M = 2 * bfp_sampling_n - 1
     for p in range(M):
         for m in range(M):
-            theta = 0
-            phi = 0
+            costheta = 0
+            cosphi = 0
+            sinphi = 0
             skip = False
             
-            def input_field_Etheta(X_BFP, Y_BFP, R, Rmax, Theta, Phi):
+            def input_field_Etheta(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi):
                 #Create an input field that is theta-polarized with 1 V/m after refraction by the lens and propagation to the focal plane
                 global skip
-                global theta
-                global phi
+                global costheta
+                global cosphi
+                global sinphi
                 Ex = np.zeros(X_BFP.shape, dtype='complex128')
                 Ey = np.zeros(X_BFP.shape, dtype='complex128')
                 if R[p, m] >  Rmax:
                     skip = True
                     return (Ex, Ey)
 
-                correction = k*np.cos(Theta[p,m]) *(n_medium/n_bfp)**0.5 * np.cos(Theta[p,m])**-0.5
-                Expoint = np.cos(Phi[p,m])
-                Eypoint = np.sin(Phi[p,m])
+                correction = k*cosTheta[p,m] *(n_medium/n_bfp)**0.5 * cosTheta[p,m]**-0.5
+                Expoint = cosPhi[p,m]
+                Eypoint = sinPhi[p,m]
 
                 Ex[p, m] = Expoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
                 Ey[p, m] = Eypoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
-                theta = Theta[p, m]
-                phi = Phi[p, m]
-                
+                costheta = cosTheta[p, m]
+                cosphi = cosPhi[p, m]
+                sinphi = sinPhi[p, m]
+                print(p,m)
                 return (Ex, Ey)
             
-            def input_field_Ephi(X_BFP, Y_BFP, R, Rmax, Theta, Phi):
+            def input_field_Ephi(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi):
                 #Create an input field that is phi-polarized with 1 V/m after refraction by the lens and propagation to the focal plane
                 global skip 
-                global theta
-                global phi
+                global costheta
+                global cosphi
+                global sinphi
                 Ex = np.zeros(X_BFP.shape, dtype='complex128')
                 Ey = np.zeros(X_BFP.shape, dtype='complex128')
-                correction = k*np.cos(Theta[p,m]) *(n_medium/n_bfp)**0.5 * np.cos(Theta[p,m])**-0.5
-                Expoint = -np.sin(Phi[p,m]) 
-                Eypoint = np.cos(Phi[p,m]) 
-                Ex[p, m] = Expoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
-                Ey[p, m] = Eypoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
-                theta = Theta[p, m]
-                phi = Phi[p, m]
                 if R[p, m] >  Rmax:
                     skip = True
+                correction = k*cosTheta[p,m] *(n_medium/n_bfp)**0.5 * cosTheta[p,m]**-0.5
+                Expoint = -sinPhi[p,m]
+                Eypoint = cosPhi[p,m] 
+                Ex[p, m] = Expoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
+                Ey[p, m] = Eypoint * correction * 2 * np.pi / (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
+                costheta = cosTheta[p, m]
+                cosphi = cosPhi[p, m]
+                sinphi = sinPhi[p,m]
+                
                 return (Ex, Ey)
             
             mie = mc.MieCalc(1e-9, n_medium, n_medium, lambda_vac)
@@ -152,29 +163,33 @@ def test_plane_wave_bfp(
             if skip:
                 continue
 
-            kz = k * np.cos(theta)
-            kx = - k * np.sin(theta) * np.cos(phi)
-            ky = - k * np.sin(theta) * np.sin(phi)
+            kz = k * costheta
+            kx = - k * (1-costheta**2)**0.5 * cosphi
+            ky = - k * (1-costheta**2)**0.5 * sinphi
             
             # Check convention, +1j for k vector as we use -1j for time phasor
             Exp = np.exp(1j * (kx * X + ky * Y + kz * Z))
-            Expw = np.cos(theta) * np.cos(phi) * Exp
-            Eypw = np.cos(theta) * np.sin(phi) * Exp
-            Ezpw = np.sin(theta) * Exp
+            Expw = costheta * cosphi * Exp
+            Eypw = costheta * sinphi * Exp
+            Ezpw = (1-costheta**2)**0.5 * Exp
             
-            #try:
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
+            np.testing.assert_allclose(Ex, Expw, atol=1e-14)
+            np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
+            np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
-            #finally:
-            #    return Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z
+#             finally:
+#                 print(costheta, cosphi, sinphi)
+#                 return Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z, Exp
             
             Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Ephi, n_BFP=n_bfp, focal_length=focal_length, 
                                                        NA=NA, x=xy_eval, y=0, z=z_eval, 
                                                       bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False)
-            Expw = -np.sin(phi) * Exp
-            Eypw = np.cos(phi) * Exp
-            Ezpw = np.zeros(Ex.shape) * Exp
+            Expw = -sinphi * Exp
+            Eypw = cosphi * Exp
+            Ezpw = np.zeros(Ex.shape)
             # Ezpw == 0, but Ez has some numerical rounding errors. Therefore specify an absolute tolerance that is acceptable
-            np.testing.assert_allclose([Ex, Ey,Ez], [Expw, Eypw, Ezpw], atol=1e-14)
+            np.testing.assert_allclose(Ex, Expw, atol=1e-14)
+            np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
+            np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
 
