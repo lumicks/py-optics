@@ -400,61 +400,6 @@ class MieCalc:
             F += T @ n * w[k]
 
         return F * (self.bead_diameter)**2 * 2 * np.pi
-    
-    def forces_dipole(self, E0=(1,0), theta=0, phi=0, num_orders=3):
-        _eps = _EPS0 * self.n_medium**2
-        _mu = _MU0
-
-        x, y, z, w = get_integration_locations(get_nearest_order(
-            num_orders
-        ))
-
-        x = np.asarray(x)
-        y = np.asarray(y)
-        z = np.asarray(z)
-        w = np.asarray(w)
-      
-        xb = x * self.bead_diameter
-        yb = y * self.bead_diameter
-        zb = z * self.bead_diameter
-
-        Ex, Ey, Ez, Hx, Hy, Hz = self.fields_plane_wave(xb, yb, zb, theta=theta,
-            phi=phi, polarization=E0, num_orders=1, H_field=True, grid=False)
-         
-        Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
-        Te12 = _eps * np.real(Ex * np.conj(Ey))
-        Te13 = _eps * np.real(Ex * np.conj(Ez))
-        Te22 = _eps * 0.5 * (np.abs(Ey)**2 - np.abs(Ex)**2 - np.abs(Ez)**2)
-        Te23 = _eps * np.real(Ey * np.conj(Ez))
-        Te33 = _eps * 0.5 * (np.abs(Ez)**2 - np.abs(Ey)**2 - np.abs(Ex)**2)
-        Th11 = _mu * 0.5 * (np.abs(Hx)**2 - np.abs(Hy)**2 - np.abs(Hz)**2)
-        Th12 = _mu * np.real(Hx * np.conj(Hy))
-        Th13 = _mu * np.real(Hx * np.conj(Hz))
-        Th22 = _mu * 0.5 * (np.abs(Hy)**2 - np.abs(Hx)**2 - np.abs(Hz)**2)
-        Th23 = _mu * np.real(Hy * np.conj(Hz))
-        Th33 = _mu * 0.5 * (np.abs(Hz)**2 - np.abs(Hy)**2 - np.abs(Hx)**2)
-        F = np.zeros((3, 1))
-        n = np.empty((3, 1))
-
-        for k in np.arange(x.size):
-            
-            TE = np.asarray([
-               [ Te11[k], Te12[k], Te13[k]],
-               [ Te12[k], Te22[k], Te23[k]],
-               [ Te13[k], Te23[k], Te33[k]]])
-
-            TH = np.asarray([
-               [ Th11[k], Th12[k], Th13[k]],
-               [ Th12[k], Th22[k], Th23[k]],
-               [ Th13[k], Th23[k], Th33[k]]])
-
-            T = TE + TH
-            n[0] = x[k]
-            n[1] = y[k]
-            n[2] = z[k]
-            F += T @ n * w[k]
-
-        return F * (self.bead_diameter)**2 * 2 * np.pi
 
 
     def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
