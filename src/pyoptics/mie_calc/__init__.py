@@ -177,7 +177,6 @@ class MieCalc:
             print('Legendre functions')
         self._init_legendre(outside=True)
 
-
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
@@ -308,7 +307,6 @@ class MieCalc:
                 print('Internal field')
             self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, True, 
                 total_field, H_field, bead_center=(0,0,0))
-        
 
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
@@ -339,14 +337,18 @@ class MieCalc:
     def forces_focused_fields(self, f_input_field, n_BFP=1.0,
                 focal_length=4.43e-3, NA=1.2,
                 bead_center=(0,0,0),
-                bfp_sampling_n=31, num_orders=None,
+                bfp_sampling_n=31, num_orders=None, integration_orders=None,
                 verbose=False
                 ):
-        
+
         self._get_mie_coefficients(num_orders)
-        x, y, z, w = get_integration_locations(get_nearest_order(
-            self._n_coeffs
-        ))
+        if integration_orders is None:
+            x, y, z, w = get_integration_locations(get_nearest_order(
+                self._n_coeffs))
+        else:
+            x, y, z, w = get_integration_locations(get_nearest_order(
+                np.amax((1,int(integration_orders)))
+                ))
 
         x = np.asarray(x)
         y = np.asarray(y)
@@ -365,7 +367,7 @@ class MieCalc:
         )
         _eps = _EPS0 * self.n_medium**2
         _mu = _MU0
-        
+
         Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
         Te12 = _eps * np.real(Ex * np.conj(Ey))
         Te13 = _eps * np.real(Ex * np.conj(Ez))

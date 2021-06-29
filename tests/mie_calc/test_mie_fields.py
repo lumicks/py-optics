@@ -27,6 +27,7 @@ import pyoptics.mie_calc as mc
 @pytest.mark.parametrize('dataset',[1, 2, 3, 4, 5])
 def test_mie_nearfield(dataset):
     C = 299792458
+    MU0 = 4 * np.pi * 1e-7
     path = os.path.abspath(os.path.dirname(__file__))
 
     data = np.load(os.path.join(path, f'ref{dataset}.npz'))
@@ -55,9 +56,9 @@ def test_mie_nearfield(dataset):
     np.testing.assert_allclose(Ex, Exr, rtol=1e-3)
     np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
     np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
-    np.testing.assert_allclose(Hx*C, Hxr, rtol=1e-3)
-    np.testing.assert_allclose(Hy*C, Hyr, rtol=1e-3)
-    np.testing.assert_allclose(Hz*C, Hzr, rtol=1e-3)
+    np.testing.assert_allclose(Hx*C*MU0, Hxr, rtol=1e-3)
+    np.testing.assert_allclose(Hy*C*MU0, Hyr, rtol=1e-3)
+    np.testing.assert_allclose(Hz*C*MU0, Hzr, rtol=1e-3)
 
 
 @pytest.mark.parametrize('bead_diameter, n_bead',[(4e-6, 1.5),(0.2e-6, 0.1 + 2j)])
