@@ -1,8 +1,13 @@
+#from numpy.core.fromnumeric import size
 from .legendre import *
+from  .lebedev_laikov import *
 import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
 
+_C = 299792458
+_MU0 = 4 * np.pi * 1e-7
+_EPS0 = (_C**2 * _MU0)**-1
 
 class MieCalc:
     def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
@@ -95,12 +100,44 @@ class MieCalc:
 
         return cn, dn
 
+    
+    def extinction_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        C = 2 * (1 + np.arange(self._n_coeffs)) + 1
+        return 2 * self.size_param()**-2 * np.sum(C * (self._an + 
+            self._bn).real)
+
+
+    def scattering_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        C = 2 * (1 + np.arange(self._n_coeffs)) + 1
+        return 2 * self.size_param()**-2 * np.sum(C * 
+            (np.abs(self._an)**2 + np.abs(self._bn)**2))
+
+    
+    def pressure_eff(self, num_orders=None):
+        self._get_mie_coefficients(num_orders=num_orders)
+        n = 1 + np.arange(self._n_coeffs)
+        C = 2 * n + 1
+        C1 = n * (n + 2)/(n + 1)
+        C2 = C/(n * (n + 1))
+        an_1 = np.zeros(self._an.shape, dtype='complex128')
+        bn_1 = np.zeros(self._an.shape, dtype='complex128')
+        an_1[0:-2] = self._an[1:-1]
+        bn_1[0:-2] = self._bn[1:-1]
+
+        return self.extinction_eff(num_orders) - 4 * self.size_param()**-2 * np.sum(C1 *
+            (self._an * np.conj(an_1) + self._bn * np.conj(bn_1)).real + 
+            C2 * (self._an * np.conj(self._bn)).real)
+
+
     def fields_gaussian_focus(self, n_BFP=1.0,
                         focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
-                        inside_bead=True, verbose=False):
+                        inside_bead=True, H_field=False, verbose=False, 
+                        grid=True):
         w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
 
         def field_func(X_BFP, Y_BFP, *args):
@@ -111,14 +148,15 @@ class MieCalc:
             focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
             bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
             num_orders=num_orders, return_grid=return_grid, 
-            total_field=total_field, inside_bead=inside_bead, verbose=verbose)
+            total_field=total_field, inside_bead=inside_bead, H_field=H_field,
+            verbose=verbose, grid=grid)
     
     def fields_focus(self, f_input_field, n_BFP=1.0,
                 focal_length=4.43e-3, NA=1.2,
                 x=0, y=0, z=0, bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None,
                 return_grid=False,  total_field=True,
-                inside_bead=True, verbose=False):
+                inside_bead=True, H_field=False, verbose=False, grid=True):
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -128,7 +166,7 @@ class MieCalc:
         #if M > bfp_sampling_n:
         #    print('bfp_sampling_n lower than recommendation for convergence')
 
-        self._init_local_coordinates(x,y,z, bead_center)
+        self._init_local_coordinates(x,y,z, bead_center, grid=grid)
         self._get_mie_coefficients(num_orders)
         self._init_back_focal_plane(f_input_field, n_BFP, focal_length, NA, 
                                     bfp_sampling_n)
@@ -139,14 +177,22 @@ class MieCalc:
             print('Legendre functions')
         self._init_legendre(outside=True)
 
-
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
+        if H_field:
+            Hx = np.zeros(self._XYZshape, dtype='complex128')
+            Hy = np.zeros(self._XYZshape, dtype='complex128')
+            Hz = np.zeros(self._XYZshape, dtype='complex128')
+        else:
+            Hx = 0
+            Hy = 0
+            Hz = 0
+            
         if verbose:
             print('External field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field,
-                                        bead_center)
+        self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, internal=False,
+            total_field=total_field, H_field=H_field, bead_center=bead_center)
 
         if inside_bead:
             if verbose:
@@ -157,8 +203,9 @@ class MieCalc:
             self._init_legendre(outside=False)
             if verbose:
                 print('Internal field')
-            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field,
-                                            bead_center)
+            self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, 
+                internal=True, total_field=total_field, H_field=H_field, 
+                bead_center=bead_center)
 
         ks = self._k * NA / self.n_medium
         dk = ks / (bfp_sampling_n - 1)
@@ -177,19 +224,36 @@ class MieCalc:
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
+
+        if H_field:
+            Hx *= phase
+            Hy *= phase
+            Hz *= phase
+            Hx = np.squeeze(Hx)
+            Hy = np.squeeze(Hy)
+            Hz = np.squeeze(Hz)
+
+            if return_grid:
+                return Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z
+            else:
+                return Ex, Ey, Ez, Hx, Hy, Hz
+
+        if return_grid:
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
 
     def fields_plane_wave(self, x, y, z, theta=0, phi=0, polarization=(1,0), 
                          num_orders=None, return_grid=False, 
-                         total_field=True, inside_bead=True, verbose=False):
+                         total_field=True, inside_bead=True, H_field=False,
+                         verbose=False, grid=True
+                         ):
     
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
 
-        self._init_local_coordinates(x,y,z, (0,0,0))
+        self._init_local_coordinates(x,y,z, (0,0,0), grid=grid)
         self._get_mie_coefficients(num_orders)
 
         # Abuse the back focal plane to contain a single pixel/plane wave, at 
@@ -199,8 +263,10 @@ class MieCalc:
         self._Einf_phi = np.atleast_2d(polarization[1])
         self._aperture = np.atleast_2d(False)
         #self._Einfx = np.ones(self._Einf_phi.shape)
-        self._Th = np.atleast_2d(theta)
-        self._Phi = np.atleast_2d(phi)
+        self._cosT = np.atleast_2d(np.cos(theta))
+        self._sinT = np.atleast_2d(np.sin(theta))
+        self._cosP = np.atleast_2d(np.cos(phi))
+        self._sinP = np.atleast_2d(np.sin(phi))
         self._Kz = np.zeros(self._Einf_phi.shape)
         self._Ky = np.zeros(self._Einf_phi.shape)
         self._Kx = np.zeros(self._Einf_phi.shape)
@@ -215,11 +281,20 @@ class MieCalc:
         Ex = np.zeros(self._XYZshape, dtype='complex128')
         Ey = np.zeros(self._XYZshape, dtype='complex128')
         Ez = np.zeros(self._XYZshape, dtype='complex128')
+
+        if H_field:
+            Hx = np.zeros(self._XYZshape, dtype='complex128')
+            Hy = np.zeros(self._XYZshape, dtype='complex128')
+            Hz = np.zeros(self._XYZshape, dtype='complex128')
+        else:
+            Hx = 0
+            Hy = 0
+            Hz = 0
         
         if verbose:
             print('External field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, False, total_field, 
-                                             bead_center=(0,0,0))
+        self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, False, 
+            total_field, H_field, bead_center=(0,0,0))
 
         if inside_bead:
             if verbose:
@@ -230,26 +305,119 @@ class MieCalc:
             self._init_legendre(outside=False)
             if verbose:
                 print('Internal field')
-            self._calculate_field_speed_mem(Ex, Ey, Ez, True, total_field, 
-                                             bead_center=(0,0,0))
-        
+            self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, True, 
+                total_field, H_field, bead_center=(0,0,0))
 
         Ex = np.squeeze(Ex)
         Ey = np.squeeze(Ey)
         Ez = np.squeeze(Ez)
- 
+
         if return_grid:
             X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
             X = np.squeeze(X)
             Y = np.squeeze(Y)
             Z = np.squeeze(Z)
+
+        if H_field:
+            Hx = np.squeeze(Hx)
+            Hy = np.squeeze(Hy)
+            Hz = np.squeeze(Hz)
+            
+            if return_grid:
+                return Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z
+            else:
+                return Ex, Ey, Ez, Hx, Hy, Hz
+
+        if return_grid:
             return Ex, Ey, Ez, X, Y, Z
         else:
             return Ex, Ey, Ez
-        
-    def _init_local_coordinates(self, x=0, y=0, z=0, bead_center=(0,0,0)):
-        # Set up coordinate system around bead
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+    
+
+    def forces_focused_fields(self, f_input_field, n_BFP=1.0,
+                focal_length=4.43e-3, NA=1.2,
+                bead_center=(0,0,0),
+                bfp_sampling_n=31, num_orders=None, integration_orders=None,
+                verbose=False
+                ):
+
+        self._get_mie_coefficients(num_orders)
+        if integration_orders is None:
+            x, y, z, w = get_integration_locations(get_nearest_order(
+                self._n_coeffs))
+        else:
+            x, y, z, w = get_integration_locations(get_nearest_order(
+                np.amax((1,int(integration_orders)))
+                ))
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+        z = np.asarray(z)
+        w = np.asarray(w)
+      
+        xb = x * self.bead_diameter + bead_center[0]
+        yb = y * self.bead_diameter + bead_center[1]
+        zb = z * self.bead_diameter + bead_center[2]
+
+        Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
+            f_input_field, n_BFP, focal_length, NA, xb, yb, zb,
+            bead_center, bfp_sampling_n, num_orders, return_grid=False,
+            total_field=True, inside_bead=False, H_field=True, verbose=verbose,
+            grid=False
+        )
+        _eps = _EPS0 * self.n_medium**2
+        _mu = _MU0
+
+        Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
+        Te12 = _eps * np.real(Ex * np.conj(Ey))
+        Te13 = _eps * np.real(Ex * np.conj(Ez))
+        Te22 = _eps * 0.5 * (np.abs(Ey)**2 - np.abs(Ex)**2 - np.abs(Ez)**2)
+        Te23 = _eps * np.real(Ey * np.conj(Ez))
+        Te33 = _eps * 0.5 * (np.abs(Ez)**2 - np.abs(Ey)**2 - np.abs(Ex)**2)
+        Th11 = _mu * 0.5 * (np.abs(Hx)**2 - np.abs(Hy)**2 - np.abs(Hz)**2)
+        Th12 = _mu * np.real(Hx * np.conj(Hy))
+        Th13 = _mu * np.real(Hx * np.conj(Hz))
+        Th22 = _mu * 0.5 * (np.abs(Hy)**2 - np.abs(Hx)**2 - np.abs(Hz)**2)
+        Th23 = _mu * np.real(Hy * np.conj(Hz))
+        Th33 = _mu * 0.5 * (np.abs(Hz)**2 - np.abs(Hy)**2 - np.abs(Hx)**2)
+        F = np.zeros((3, 1))
+        n = np.empty((3, 1))
+
+        for k in np.arange(x.size):
+            
+            TE = np.asarray([
+               [ Te11[k], Te12[k], Te13[k]],
+               [ Te12[k], Te22[k], Te23[k]],
+               [ Te13[k], Te23[k], Te33[k]]])
+
+            TH = np.asarray([
+               [ Th11[k], Th12[k], Th13[k]],
+               [ Th12[k], Th22[k], Th23[k]],
+               [ Th13[k], Th23[k], Th33[k]]])
+
+            T = TE + TH
+            n[0] = x[k]
+            n[1] = y[k]
+            n[2] = z[k]
+            F += T @ n * w[k]
+
+        return F * (self.bead_diameter)**2 * 2 * np.pi
+
+
+    def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
+        grid=True
+        ):
+        """Set up coordinate system around bead"""
+        # Set up a meshgrid, or take the list of x, y and z points as 
+        # coordinates
+        if grid:
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        else:
+            assert x.size == y.size == z.size,\
+                'x, y and z need to be of the same length'
+            X = np.atleast_3d(x)
+            Y = np.atleast_3d(y)
+            Z = np.atleast_3d(z)
         self._XYZshape = X.shape
 
         # Local coordinate system around the bead
@@ -282,28 +450,35 @@ class MieCalc:
         Rmax = sin_th_max * focal_length
         x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
         X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
-        sin_th_BFP = np.hypot(X_BFP, Y_BFP)
+        self._sinT = np.hypot(X_BFP, Y_BFP)
         
-        self._aperture = sin_th_BFP > sin_th_max
-        self._Th = np.zeros(sin_th_BFP.shape)
-        self._Th[np.logical_not(self._aperture)] = np.arcsin(
-            sin_th_BFP[np.logical_not(self._aperture)])
-        #self._Th[self._aperture] = 0
-        self._Phi = np.arctan2(Y_BFP, X_BFP)
-        self._Phi[sin_th_BFP == 0] = 0
-        self._Phi[self._aperture] = 0
+        self._aperture = self._sinT > sin_th_max
+        self._cosT = np.ones(self._sinT.shape)
+        self._cosT[np.logical_not(self._aperture)] = (1 - 
+            self._sinT[np.logical_not(self._aperture)]**2)**0.5
+        
+        self._cosP = np.empty(self._sinT.shape)
+        self._sinP = np.empty(self._sinT.shape)
+        region = self._sinT > 0
+        self._cosP[region] = X_BFP[region] / self._sinT[region]
+        self._cosP[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+        self._sinP[region] = Y_BFP[region] / self._sinT[region]
+        self._sinP[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
+        self._sinP[self._aperture] = 0
+        self._cosP[self._aperture] = 1
         
         X_BFP *= focal_length
         Y_BFP *= focal_length
-        R_BFP = sin_th_BFP * focal_length
+        R_BFP = self._sinT * focal_length
 
         # Calculate properties of the plane waves
-        self._Kz = self._k * np.cos(self._Th)
-        self._Kp = self._k * np.sin(self._Th)
-        self._Kx = -self._Kp * np.cos(self._Phi)
-        self._Ky = -self._Kp * np.sin(self._Phi)
+        self._Kz = self._k * self._cosT
+        self._Kp = self._k * self._sinT
+        self._Kx = -self._Kp * self._cosP
+        self._Ky = -self._Kp * self._sinP
 
-        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._Th, self._Phi)
+        Einx, Einy = f_input_field(X_BFP, Y_BFP, R_BFP, Rmax, self._cosT, 
+            self._cosP, self._sinP)
         
         # Transform the input wavefront to a spherical one, after refracting on
         # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
@@ -313,7 +488,7 @@ class MieCalc:
             Einx[self._aperture] = 0  
             Einx = np.complex128(Einx)
             self._Einfx = (np.sqrt(n_BFP / self.n_medium) * Einx *
-                        np.sqrt(np.cos(self._Th)) / self._Kz)
+                        np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfx = 0
 
@@ -321,15 +496,15 @@ class MieCalc:
             Einy[self._aperture] = 0
             Einy = np.complex128(Einy)
             self._Einfy = (np.sqrt(n_BFP / self.n_medium) * Einy *
-                        np.sqrt(np.cos(self._Th)) / self._Kz)
+                        np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfy = 0
 
         # Get p- and s-polarized parts
-        self._Einf_theta = (self._Einfx * np.cos(self._Phi) + 
-            self._Einfy * np.sin(self._Phi))
-        self._Einf_phi = (self._Einfy * np.cos(self._Phi) + 
-            self._Einfx * -np.sin(self._Phi))
+        self._Einf_theta = (self._Einfx * self._cosP + 
+            self._Einfy * self._sinP)
+        self._Einf_phi = (self._Einfy * self._cosP + 
+            self._Einfx * -self._sinP)
 
     def _init_hankel(self):
         # Precompute the spherical Hankel functions and derivatives that only depend
@@ -404,8 +579,9 @@ class MieCalc:
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
                 # however, cos(theta) is the same for phi polarization!
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(self._Th[p,m])
-                coords = A.T @ local_coords
+                A = (self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]))
+                coords = A @ local_coords
                 Zvl_s = coords[2,:]
 
                 # Retrieve an array of all values of cos(theta)
@@ -437,8 +613,10 @@ class MieCalc:
                                     (self._alp[L - 1,:], alp_prev))
             alp_prev = self._alp[L - 1,:]
 
-    def _calculate_field_speed_mem(self, Ex, Ey, Ez, internal: bool,
+    def _calculate_field_speed_mem(self, Ex, Ey, Ez, Hx, Hy, Hz, 
+                                   internal: bool,
                                    total_field: bool,
+                                   H_field: bool,
                                    bead_center: tuple):
         # Calculate the internal & external field from precalculated,
         # but compressed, Legendre polynomials
@@ -455,6 +633,8 @@ class MieCalc:
             return
             
         E = np.empty((3, self._R.shape[1]), dtype='complex128')
+        if H_field:
+            H = np.empty((3, self._R.shape[1]), dtype='complex128')
         
         # preallocate memory for expanded legendre derivatives
         alp_expanded = np.empty((self._n_coeffs, r.size))
@@ -467,88 +647,94 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                A = self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m])
-                coords = A.T @ local_coords
-                Xvl_s = coords[0,:]
-                Yvl_s = coords[1,:]
-                Zvl_s = coords[2,:]
+                matrices = [self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]),
+                    self._R_phi(0, -1) @ 
+                    self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    self._R_phi(self._cosP[p,m], -self._sinP[p,m])]
+                E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
+            
+                for polarization in range(2):
+                    A = matrices[polarization]
+                    coords = A @ local_coords
+                    Xvl_s = coords[0,:]
+                    Yvl_s = coords[1,:]
+                    Zvl_s = coords[2,:]
 
-                if internal:
-                    cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
-                    cosT[r == 0] = 1
-                else:
-                    cosT = Zvl_s / r
-                cosT[cosT > 1] = 1
-                cosT[cosT < -1] = -1
-                phil = np.arctan2(Yvl_s, Xvl_s)
+                    if polarization == 0:
+                        if internal:
+                            cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
+                            cosT[r == 0] = 1
+                        else:
+                            cosT[:] = Zvl_s / r
+                        cosT[cosT > 1] = 1
+                        cosT[cosT < -1] = -1
+                    
+                        # Expand the legendre derivatives from the unique version of
+                        # cos(theta)
+                        alp_expanded[:] = self._alp[:, self._inverse[p,m]]
+                        alp_sin_expanded[:] = self._alp_sin[:, self._inverse[p,m]]
+                        alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
+                    
+                    rho_l = np.hypot(Xvl_s, Yvl_s)
+                    cosP = np.empty(rho_l.shape)
+                    sinP = np.empty(rho_l.shape)
+                    where = rho_l > 0
+                    cosP[where] = Xvl_s[where]/rho_l[where]
+                    sinP[where] = Yvl_s[where]/rho_l[where]
+                    cosP[rho_l == 0] = 1
+                    sinP[rho_l == 0] = 0
+                    
+                    E[:] = 0
+                    if internal:
+                        E[:, region] = self._internal_field_fixed_r(
+                                        alp_expanded,
+                                        alp_sin_expanded, alp_deriv_expanded,
+                                        cosT, cosP, sinP)
+                    else:
+                        E[:, region] = self._scattered_field_fixed_r(
+                                    alp_expanded, alp_sin_expanded,
+                                    alp_deriv_expanded, cosT, cosP, sinP,
+                                    total_field)
 
-                E[:] = 0
+                    E = np.matmul(A.T, E)
+                    E[:, region] *= E0[polarization] * np.exp(1j *
+                        (self._Kx[p,m] * bead_center[0] +
+                        self._Ky[p,m] * bead_center[1] +
+                        self._Kz[p,m] * bead_center[2]))
 
-                # Expand the legendre derivatives from the unique version of
-                # cos(theta)
-                alp_expanded[:] = self._alp[:, self._inverse[p,m]]
-                alp_sin_expanded = self._alp_sin[:, self._inverse[p,m]]
-                alp_deriv_expanded = self._alp_deriv[:, self._inverse[p,m]]
+                    Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
+                    Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
+                    Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
 
-                if internal:
-                    E[:, region] = self._internal_field_fixed_r(
-                                    alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded,
-                                    cosT, phil)
-                else:
-                    E[:, region] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded,
-                                alp_deriv_expanded, cosT, phil, total_field)
+                    if H_field:
+                        H[:] = 0
+                        if internal:
+                            H[:, region] = self._internal_H_field_fixed_r(
+                                        alp_expanded,
+                                        alp_sin_expanded, alp_deriv_expanded,
+                                        cosT, cosP, sinP)
+                        else:
+                            H[:, region] = self._scattered_H_field_fixed_r(
+                                    alp_expanded, alp_sin_expanded,
+                                    alp_deriv_expanded, cosT, cosP, sinP,
+                                    total_field)
 
-                E = np.matmul(A, E)
+                        H = np.matmul(A.T, H)
+                        H[:, region] *= E0[polarization] * np.exp(1j *
+                            (self._Kx[p,m] * bead_center[0] +
+                            self._Ky[p,m] * bead_center[1] +
+                            self._Kz[p,m] * bead_center[2]))
 
-                E[:, region] *= self._Einf_theta[p,m] * np.exp(1j *
-                    (self._Kx[p,m] * bead_center[0] +
-                     self._Ky[p,m] * bead_center[1] +
-                     self._Kz[p,m] * bead_center[2]))
-
-                Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
-                Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
-                Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
-
-                # phi-polarization
-                A = (self._R_phi(self._Phi[p,m]) @ self._R_th(-self._Th[p,m]) @
-                        self._R_phi(np.pi/2))
-
-                coords = A.T @ local_coords
-                Xvl_s = coords[0,:]
-                Yvl_s = coords[1,:]
-                Zvl_s = coords[2,:]
-
-                # cosT is still valid from the previous time, but phil is not as
-                # X and Y got swapped and a sign got flipped
-                phil = np.arctan2(Yvl_s, Xvl_s)
-
-                if internal:
-                    E[:, region] = self._internal_field_fixed_r(
-                                    alp_expanded,
-                                    alp_sin_expanded, alp_deriv_expanded,
-                                    cosT, phil)
-                else:
-                    E[:, region] = self._scattered_field_fixed_r(
-                                alp_expanded, alp_sin_expanded,
-                                alp_deriv_expanded, cosT, phil, total_field)
-
-                E = np.matmul(A, E)
-
-                E[:, region] *= self._Einf_phi[p,m] * np.exp(1j *
-                    (self._Kx[p,m] * bead_center[0] +
-                     self._Ky[p,m] * bead_center[1] +
-                     self._Kz[p,m] * bead_center[2]))
-
-                Ex[:,:,:] += np.reshape(E[0,:], self._XYZshape)
-                Ey[:,:,:] += np.reshape(E[1,:], self._XYZshape)
-                Ez[:,:,:] += np.reshape(E[2,:], self._XYZshape)
+                        Hx[:,:,:] += np.reshape(H[0,:], self._XYZshape)
+                        Hy[:,:,:] += np.reshape(H[1,:], self._XYZshape)
+                        Hz[:,:,:] += np.reshape(H[2,:], self._XYZshape)
 
 
     def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                                 alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, phi: np.ndarray,
+                                cos_theta: np.ndarray, cosP: np.ndarray,
+                                sinP: np.ndarray,
                                 total_field=True):
 
         # Radial, theta and phi-oriented fields
@@ -556,9 +742,7 @@ class MieCalc:
         Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
         Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
+        sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
         an = self._an
         bn = self._bn
@@ -579,9 +763,9 @@ class MieCalc:
                 dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
                 krh[L - 1,:] * alp_deriv[L - 1,:])
 
-        Er *= -np.cos(phi) / (k0r)**2
-        Et *= -np.cos(phi) / (k0r)
-        Ep *= np.sin(phi) / (k0r)
+        Er *= -cosP / (k0r)**2
+        Et *= -cosP / (k0r)
+        Ep *= sinP / (k0r)
         # Cartesian components
         Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
@@ -595,7 +779,8 @@ class MieCalc:
 
     def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
                           alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, phi: np.ndarray):
+                          cos_theta: np.ndarray, cosP: np.ndarray,
+                          sinP: np.ndarray):
 
         # Radial, theta and phi-oriented fields
         Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
@@ -603,9 +788,7 @@ class MieCalc:
         Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
         sinT = np.sqrt(1 - cos_theta**2)
-        cosP = np.cos(phi)
-        sinP = np.sin(phi)
-
+        
         #short hand for readability:
         cn = self._cn
         dn = self._dn
@@ -628,21 +811,113 @@ class MieCalc:
                                                     jn_over_k1r[n - 1, :]))
 
 
-        Er *= -np.cos(phi)
-        Et *= -np.cos(phi)
-        Ep *= -np.sin(phi)
+        Er *= -cosP
+        Et *= -cosP
+        Ep *= -sinP
         # Cartesian components
         Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
         Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
         Ez = Er * cos_theta - Et * sinT
         return np.concatenate((Ex, Ey, Ez), axis=0)
 
-    def _R_phi(self, phi):
-        return np.asarray([[np.cos(phi), -np.sin(phi), 0],
-                           [np.sin(phi), np.cos(phi), 0],
+    def _scattered_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                                alp_deriv: np.ndarray,
+                                cos_theta: np.ndarray, cosP: np.ndarray,
+                                sinP: np.ndarray,
+                                total_field=True):
+        
+        # Radial, theta and phi-oriented fields
+        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+        sinT = np.sqrt(1 - cos_theta**2)
+
+        an = self._an
+        bn = self._bn
+        krh = self._krh
+        dkrh_dkr = self._dkrh_dkr
+        k0r = self._k0r
+        L = np.arange(start=1, stop=self._n_coeffs + 1)
+        C1 = 1j**L * (2 * L + 1)
+        C2 = C1 / (L * (L + 1))
+        for L in range(1, self._n_coeffs + 1):
+            Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
+
+            Ht += C2[L-1] * (1j* bn[L - 1] *
+                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
+                    krh[L - 1,:] * alp_sin[L - 1,:])
+
+            Hp += C2[L-1] * (1j * bn[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
+                krh[L - 1,:] * alp_deriv[L - 1,:])
+        
+        # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
+        # but our associated Legendre polynomials do include it
+        Hr *= -sinP / (k0r)**2 * self.n_medium / (_C * _MU0)
+        Ht *= -sinP / (k0r) * self.n_medium / (_C * _MU0)
+        Hp *= -cosP / (k0r) * self.n_medium / (_C * _MU0)
+        
+        # Cartesian components
+        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+        Hz = Hr * cos_theta - Ht * sinT
+        if total_field:
+            # Incident field (E field x-polarized)
+            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / (_C * _MU0)
+            return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
+        else:
+            return np.concatenate((Hx, Hy, Hz), axis=0)
+
+    def _internal_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
+                          alp_deriv: np.ndarray,
+                          cos_theta: np.ndarray, cosP: np.ndarray,
+                          sinP: np.ndarray):
+
+        # Radial, theta and phi-oriented fields
+        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+        sinT = np.sqrt(1 - cos_theta**2)
+
+        #short hand for readability:
+        cn = self._cn
+        dn = self._dn
+        sphBessel = self._sphBessel
+        jn_over_k1r = self._jn_over_k1r
+        jn_1 = self._jn_1
+
+        for n in range(1, self._n_coeffs + 1):
+            Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
+                    jn_over_k1r[n - 1, :])
+
+            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
+                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                        n * jn_over_k1r[n - 1, :]))
+
+            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+                1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                    jn_over_k1r[n - 1, :]))
+
+
+        Hr *= sinP * self.n_bead / (_C * _MU0)
+        Ht *= -sinP * self.n_bead / (_C * _MU0)
+        Hp *= cosP * self.n_bead / (_C * _MU0)
+        # Cartesian components
+        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+        Hz = Hr * cos_theta - Ht * sinT
+        return np.concatenate((Hx, Hy, Hz), axis=0)
+
+    def _R_phi(self, cos_phi, sin_phi):
+        return np.asarray([[cos_phi, -sin_phi, 0],
+                           [sin_phi, cos_phi, 0],
                            [0, 0, 1]])
 
-    def _R_th(self, th):
-        return np.asarray([[np.cos(th), 0, np.sin(th)],
+    def _R_th(self, cos_th, sin_th):
+        return np.asarray([[cos_th, 0, sin_th],
                            [0,  1,  0],
-                           [-np.sin(th), 0, np.cos(th)]])
+                           [-sin_th, 0, cos_th]])

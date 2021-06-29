@@ -4,6 +4,8 @@ import miepy
 def create_ref_data(n_bead=1.5, n_medium=1.33, bead_diam=1e-6,
     lambda_vac=1064e-9, num_pts=100, filename = 'data'):
 
+    print(f"calculating results for {filename}")
+
     bead = miepy.constant_material(n_bead**2, 1.0)
     medium = miepy.constant_material(n_medium**2, 1.0)
 
@@ -20,6 +22,7 @@ def create_ref_data(n_bead=1.5, n_medium=1.33, bead_diam=1e-6,
     Th = np.arccos(Z/R)
     Ph = np.arctan2(Y,X)
 
+    print("calculating E field")
     E_func = sphere.E_field(index=0)
     E = E_func(R,Th,Ph).squeeze()
     Th = np.squeeze(Th)
@@ -41,7 +44,30 @@ def create_ref_data(n_bead=1.5, n_medium=1.33, bead_diam=1e-6,
     Ey = np.squeeze(Ey)
     Ez = np.squeeze(Ez)
 
-    np.savez_compressed(filename, x=x, y=y, z=z, Ex=Ex, Ey=Ey, Ez=Ez, 
+    print("calculating H field")
+    H_func = sphere.H_field(index=0)
+    H = H_func(R,Th,Ph).squeeze()
+    Th = np.squeeze(Th)
+    Ph = np.squeeze(Ph)
+
+    sinT = np.sin(Th)
+    cos_theta = np.cos(Th)
+    sinP = np.sin(Ph)
+    cosP = np.cos(Ph)
+
+    Hr = H[0,:,:]
+    Ht = H[1,:,:]
+    Hp = H[2,:,:]
+    Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+    Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+    Hz = Hr * cos_theta - Ht * sinT
+
+    Hx = np.squeeze(Hx)
+    Hy = np.squeeze(Hy)
+    Hz = np.squeeze(Hz)
+
+    np.savez_compressed(filename, x=x, y=y, z=z, Ex=Ex, Ey=Ey, Ez=Ez,
+        Hx=Hx, Hy=Hy, Hz=Hz, 
         num_pts=num_pts, num_orders=lmax, n_bead=n_bead, n_medium = n_medium,
         bead_diam=bead_diam, lambda_vac=lambda_vac)
 

@@ -24,8 +24,10 @@ import pyoptics.mie_calc as mc
 # Reference data sets are calculated by miepy 0.5.0, by the script `generate_benchmark_fields.py`
 # -
 
-@pytest.mark.parametrize('dataset',[1,2,3,4])
+@pytest.mark.parametrize('dataset',[1, 2, 3, 4, 5])
 def test_mie_nearfield(dataset):
+    C = 299792458
+    MU0 = 4 * np.pi * 1e-7
     path = os.path.abspath(os.path.dirname(__file__))
 
     data = np.load(os.path.join(path, f'ref{dataset}.npz'))
@@ -33,6 +35,9 @@ def test_mie_nearfield(dataset):
         Exr = data['Ex']
         Eyr = data['Ey']
         Ezr = data['Ez']
+        Hxr = data['Hx']
+        Hyr = data['Hy']
+        Hzr = data['Hz']
         x = data['x']
         y = data['y']
         z = data['z']
@@ -46,14 +51,14 @@ def test_mie_nearfield(dataset):
         data.close()
 
     mie = mc.MieCalc(bead_diam, n_bead, n_medium, lambda_vac)
-    Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x, y, z, num_orders=num_orders, return_grid=True, inside_bead=True, total_field=False)
-    err_x = Ex - Exr
-    err_y = Ey - Eyr
-    err_z = Ez - Ezr
-
+    Ex, Ey, Ez, Hx, Hy, Hz, X, Y, Z = mie.fields_plane_wave(x, y, z, num_orders=num_orders, return_grid=True, inside_bead=True, H_field=True, total_field=False)
+    
     np.testing.assert_allclose(Ex, Exr, rtol=1e-3)
     np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
     np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
+    np.testing.assert_allclose(Hx*C*MU0, Hxr, rtol=1e-3)
+    np.testing.assert_allclose(Hy*C*MU0, Hyr, rtol=1e-3)
+    np.testing.assert_allclose(Hz*C*MU0, Hzr, rtol=1e-3)
 
 
 @pytest.mark.parametrize('bead_diameter, n_bead',[(4e-6, 1.5),(0.2e-6, 0.1 + 2j)])
