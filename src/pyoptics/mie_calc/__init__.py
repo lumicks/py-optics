@@ -355,9 +355,9 @@ class MieCalc:
         z = np.asarray(z)
         w = np.asarray(w)
       
-        xb = x * self.bead_diameter + bead_center[0]
-        yb = y * self.bead_diameter + bead_center[1]
-        zb = z * self.bead_diameter + bead_center[2]
+        xb = x * self.bead_diameter * 0.51 + bead_center[0]
+        yb = y * self.bead_diameter * 0.51 + bead_center[1]
+        zb = z * self.bead_diameter * 0.51 + bead_center[2]
 
         Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
             f_input_field, n_BFP, focal_length, NA, xb, yb, zb,
@@ -401,7 +401,7 @@ class MieCalc:
             n[2] = z[k]
             F += T @ n * w[k]
 
-        return F * (self.bead_diameter)**2 * 2 * np.pi
+        return F * (self.bead_diameter * 0.51)**2 * 2 * np.pi
 
 
     def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
