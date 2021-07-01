@@ -1,9 +1,8 @@
-#from numpy.core.fromnumeric import size
 from .legendre import *
 from  .lebedev_laikov import *
 import numpy as np
 import scipy.special as sp
-from scipy.special import jv, yv
+from numba import njit, prange
 
 """References:
     1. Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
@@ -963,8 +962,8 @@ class MieCalc:
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
                 # however, cos(theta) is the same for phi polarization!
-                A = (self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]))
+                A = (_R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m]))
                 coords = A @ local_coords
                 Zvl_s = coords[2,:]
 
@@ -1031,11 +1030,11 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                matrices = [self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]),
-                    self._R_phi(0, -1) @ 
-                    self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m])]
+                matrices = [_R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m]),
+                    _R_phi(0, -1) @ 
+                    _R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m])]
                 E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
             
                 for polarization in range(2):
@@ -1071,15 +1070,18 @@ class MieCalc:
                     
                     E[:] = 0
                     if internal:
-                        E[:, region] = self._internal_field_fixed_r(
-                                        alp_expanded,
-                                        alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, cosP, sinP)
+                        E[:, region] = _internal_field_fixed_r(self._cn,
+                            self._dn, self._sphBessel, self._jn_over_k1r, 
+                            self._jn_1, 
+                            alp_expanded,
+                            alp_sin_expanded, alp_deriv_expanded,
+                            cosT, cosP, sinP)
                     else:
-                        E[:, region] = self._scattered_field_fixed_r(
-                                    alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, cosP, sinP,
-                                    total_field)
+                        E[:, region] = _scattered_field_fixed_r(self._an,
+                            self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                            alp_expanded, alp_sin_expanded,
+                            alp_deriv_expanded, cosT, cosP, sinP,
+                            total_field)
 
                     E = np.matmul(A.T, E)
                     E[:, region] *= E0[polarization] * np.exp(1j *
@@ -1094,15 +1096,18 @@ class MieCalc:
                     if H_field:
                         H[:] = 0
                         if internal:
-                            H[:, region] = self._internal_H_field_fixed_r(
-                                        alp_expanded,
-                                        alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, cosP, sinP)
+                            H[:, region] = _internal_H_field_fixed_r(self._cn,
+                                self._dn, self._sphBessel, self._jn_over_k1r,
+                                self._jn_1,
+                                alp_expanded,
+                                alp_sin_expanded, alp_deriv_expanded,
+                                cosT, cosP, sinP, self.n_bead)
                         else:
-                            H[:, region] = self._scattered_H_field_fixed_r(
-                                    alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, cosP, sinP,
-                                    total_field)
+                            H[:, region] = _scattered_H_field_fixed_r(self._an,
+                                self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                                alp_expanded, alp_sin_expanded,
+                                alp_deriv_expanded, cosT, cosP, sinP, 
+                                self.n_medium, total_field)
 
                         H = np.matmul(A.T, H)
                         H[:, region] *= E0[polarization] * np.exp(1j *
@@ -1115,193 +1120,183 @@ class MieCalc:
                         Hz[:,:,:] += np.reshape(H[2,:], self._XYZshape)
 
 
-    def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                                alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, cosP: np.ndarray,
-                                sinP: np.ndarray,
-                                total_field=True):
+@njit(cache=True)
+def _scattered_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray, 
+                            dkrh_dkr: np.ndarray, k0r: np.ndarray, 
+                            alp: np.ndarray, alp_sin: np.ndarray,
+                            alp_deriv: np.ndarray,
+                            cos_theta: np.ndarray, cosP: np.ndarray,
+                            sinP: np.ndarray,
+                            total_field=True):
 
-        # Radial, theta and phi-oriented fields
-        Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    # Radial, theta and phi-oriented fields
+    Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
+    sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
-        an = self._an
-        bn = self._bn
-        krh = self._krh
-        dkrh_dkr = self._dkrh_dkr
-        k0r = self._k0r
-        L = np.arange(start=1, stop=self._n_coeffs + 1)
-        C1 = 1j**(L + 1) * (2 * L + 1)
-        C2 = C1 / (L * (L + 1))
-        for L in range(1, self._n_coeffs + 1):
-            Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
+    L = np.arange(start=1, stop=an.size + 1)
+    C1 = 1j**(L + 1) * (2 * L + 1)
+    C2 = C1 / (L * (L + 1))
+    for L in prange(1, an.size + 1):
+        Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
-            Et += C2[L-1] * (an[L - 1] *
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
-                    krh[L - 1,:] * alp_sin[L - 1,:])
+        Et += C2[L-1] * (an[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
+                krh[L - 1,:] * alp_sin[L - 1,:])
 
-            Ep += C2[L-1] * (an[L - 1] *
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
-                krh[L - 1,:] * alp_deriv[L - 1,:])
+        Ep += C2[L-1] * (an[L - 1] *
+            dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
+            krh[L - 1,:] * alp_deriv[L - 1,:])
 
-        Er *= -cosP / (k0r)**2
-        Et *= -cosP / (k0r)
-        Ep *= sinP / (k0r)
-        # Cartesian components
-        Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
-        Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
-        Ez = Er * cos_theta - Et * sinT
-        if total_field:
-            # Incident field (x-polarized)
-            Ei = np.exp(1j * k0r * cos_theta)
-            return np.concatenate((Ex + Ei, Ey, Ez), axis=0)
-        else:
-            return np.concatenate((Ex, Ey, Ez), axis=0)
-
-    def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                          alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, cosP: np.ndarray,
-                          sinP: np.ndarray):
-
-        # Radial, theta and phi-oriented fields
-        Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-
-        sinT = np.sqrt(1 - cos_theta**2)
-        
-        #short hand for readability:
-        cn = self._cn
-        dn = self._dn
-        sphBessel = self._sphBessel
-        jn_over_k1r = self._jn_over_k1r
-        jn_1 = self._jn_1
-
-        for n in range(1, self._n_coeffs + 1):
-            Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
-                    jn_over_k1r[n - 1, :])
-
-            Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
-                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
-                                        n * jn_over_k1r[n - 1, :]))
-
-            Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
-                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-                1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
-                                                    jn_over_k1r[n - 1, :]))
-
-
-        Er *= -cosP
-        Et *= -cosP
-        Ep *= -sinP
-        # Cartesian components
-        Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
-        Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
-        Ez = Er * cos_theta - Et * sinT
+    Er *= -cosP / (k0r)**2
+    Et *= -cosP / (k0r)
+    Ep *= sinP / (k0r)
+    # Cartesian components
+    Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
+    Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
+    Ez = Er * cos_theta - Et * sinT
+    if total_field:
+        # Incident field (x-polarized)
+        Ei = np.exp(1j * k0r * cos_theta)
+        return np.concatenate((Ex + Ei, Ey, Ez), axis=0)
+    else:
         return np.concatenate((Ex, Ey, Ez), axis=0)
 
-    def _scattered_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                                alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, cosP: np.ndarray,
-                                sinP: np.ndarray,
-                                total_field=True):
-        
-        # Radial, theta and phi-oriented fields
-        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)
+@njit(cache=True)
+def _internal_field_fixed_r(cn: np.ndarray, dn: np.ndarray, 
+    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray, 
+    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
+    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray):
 
-        an = self._an
-        bn = self._bn
-        krh = self._krh
-        dkrh_dkr = self._dkrh_dkr
-        k0r = self._k0r
-        L = np.arange(start=1, stop=self._n_coeffs + 1)
-        C1 = 1j**L * (2 * L + 1)
-        C2 = C1 / (L * (L + 1))
-        for L in range(1, self._n_coeffs + 1):
-            Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
+    # Radial, theta and phi-oriented fields
+    Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-            Ht += C2[L-1] * (1j* bn[L - 1] *
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
-                    krh[L - 1,:] * alp_sin[L - 1,:])
+    sinT = np.sqrt(1 - cos_theta**2)
+    
+    for n in prange(1, cn.size + 1):
+        Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
+                jn_over_k1r[n - 1, :])
 
-            Hp += C2[L-1] * (1j * bn[L - 1] *
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
-                krh[L - 1,:] * alp_deriv[L - 1,:])
-        
-        # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
-        # but our associated Legendre polynomials do include it
-        Hr *= -sinP / (k0r)**2 * self.n_medium / (_C * _MU0)
-        Ht *= -sinP / (k0r) * self.n_medium / (_C * _MU0)
-        Hp *= -cosP / (k0r) * self.n_medium / (_C * _MU0)
-        
-        # Cartesian components
-        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
-        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
-        Hz = Hr * cos_theta - Ht * sinT
-        if total_field:
-            # Incident field (E field x-polarized)
-            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / (_C * _MU0)
-            return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
-        else:
-            return np.concatenate((Hx, Hy, Hz), axis=0)
+        Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
+                alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                    n * jn_over_k1r[n - 1, :]))
 
-    def _internal_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                          alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, cosP: np.ndarray,
-                          sinP: np.ndarray):
-
-        # Radial, theta and phi-oriented fields
-        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-
-        sinT = np.sqrt(1 - cos_theta**2)
-
-        #short hand for readability:
-        cn = self._cn
-        dn = self._dn
-        sphBessel = self._sphBessel
-        jn_over_k1r = self._jn_over_k1r
-        jn_1 = self._jn_1
-
-        for n in range(1, self._n_coeffs + 1):
-            Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
-                    jn_over_k1r[n - 1, :])
-
-            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
-                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
-                                        n * jn_over_k1r[n - 1, :]))
-
-            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
-                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-                1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
-                                                    jn_over_k1r[n - 1, :]))
+        Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+            alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+            1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                jn_over_k1r[n - 1, :]))
 
 
-        Hr *= sinP * self.n_bead / (_C * _MU0)
-        Ht *= -sinP * self.n_bead / (_C * _MU0)
-        Hp *= cosP * self.n_bead / (_C * _MU0)
-        # Cartesian components
-        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
-        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
-        Hz = Hr * cos_theta - Ht * sinT
+    Er *= -cosP
+    Et *= -cosP
+    Ep *= -sinP
+    # Cartesian components
+    Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
+    Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
+    Ez = Er * cos_theta - Et * sinT
+    return np.concatenate((Ex, Ey, Ez), axis=0)
+
+
+@njit(cache=True)
+def _scattered_H_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray, 
+                            dkrh_dkr: np.ndarray, k0r: np.ndarray, 
+                            alp: np.ndarray, alp_sin: np.ndarray,
+                            alp_deriv: np.ndarray,
+                            cos_theta: np.ndarray, cosP: np.ndarray,
+                            sinP: np.ndarray, n_medium: float,
+                            total_field=True):
+    
+    # Radial, theta and phi-oriented fields
+    Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+    sinT = np.sqrt(1 - cos_theta**2)
+
+    L = np.arange(start=1, stop=an.size + 1)
+    C1 = 1j**L * (2 * L + 1)
+    C2 = C1 / (L * (L + 1))
+    for L in prange(1, an.size + 1):
+        Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
+
+        Ht += C2[L-1] * (1j* bn[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
+                krh[L - 1,:] * alp_sin[L - 1,:])
+
+        Hp += C2[L-1] * (1j * bn[L - 1] *
+            dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
+            krh[L - 1,:] * alp_deriv[L - 1,:])
+    
+    # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
+    # but our associated Legendre polynomials do include it
+    Hr *= -sinP / (k0r)**2 * n_medium / (_C * _MU0)
+    Ht *= -sinP / (k0r) * n_medium / (_C * _MU0)
+    Hp *= -cosP / (k0r) * n_medium / (_C * _MU0)
+    
+    # Cartesian components
+    Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+    Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+    Hz = Hr * cos_theta - Ht * sinT
+    if total_field:
+        # Incident field (E field x-polarized)
+        Hi = np.exp(1j * k0r * cos_theta) * n_medium / (_C * _MU0)
+        return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
+    else:
         return np.concatenate((Hx, Hy, Hz), axis=0)
 
-    def _R_phi(self, cos_phi, sin_phi):
-        return np.asarray([[cos_phi, -sin_phi, 0],
-                           [sin_phi, cos_phi, 0],
-                           [0, 0, 1]])
 
-    def _R_th(self, cos_th, sin_th):
-        return np.asarray([[cos_th, 0, sin_th],
-                           [0,  1,  0],
-                           [-sin_th, 0, cos_th]])
+@njit(cache=True)
+def _internal_H_field_fixed_r(cn: np.ndarray, dn: np.ndarray, 
+    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray, 
+    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
+    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray, 
+    n_bead: np.complex128):
+
+    # Radial, theta and phi-oriented fields
+    Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+    sinT = np.sqrt(1 - cos_theta**2)
+
+    for n in prange(1, cn.size + 1):
+        Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
+                jn_over_k1r[n - 1, :])
+
+        Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+                alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
+                alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                    n * jn_over_k1r[n - 1, :]))
+
+        Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+            alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+            1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                jn_over_k1r[n - 1, :]))
+
+
+    Hr *= sinP * n_bead / (_C * _MU0)
+    Ht *= -sinP * n_bead / (_C * _MU0)
+    Hp *= cosP * n_bead / (_C * _MU0)
+    # Cartesian components
+    Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+    Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+    Hz = Hr * cos_theta - Ht * sinT
+    return np.concatenate((Hx, Hy, Hz), axis=0)
+
+
+def _R_phi(cos_phi, sin_phi):
+    return np.asarray([[cos_phi, -sin_phi, 0],
+                        [sin_phi, cos_phi, 0],
+                        [0, 0, 1]])
+
+
+def _R_th(cos_th, sin_th):
+    return np.asarray([[cos_th, 0, sin_th],
+                        [0,  1,  0],
+                        [-sin_th, 0, cos_th]])
