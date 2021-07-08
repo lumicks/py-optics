@@ -161,7 +161,7 @@ def test_plane_wave_dipole_forces_bfp(
 
     # Use dipole approximation and Eq. 14.40 from "principles of nano-optics, L Novotny & B. Hecht, 2nd ed."
     # Ei grad(Ei) for an x-polarized plane wave in the z direction
-    Ex_gradEx = E0**2 * 1j * k
+    Ex_gradEx = E0**2 * 1j * k  # in z direction only
     Fdipole_quasistatic = a.real / 2 * Ex_gradEx.real + a.imag / 2 * Ex_gradEx.imag
     Fdipole_mie = alpha.real / 2 * Ex_gradEx.real + alpha.imag / 2 * Ex_gradEx.imag
 
