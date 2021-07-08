@@ -343,8 +343,10 @@ class MieCalc:
 
         self._get_mie_coefficients(num_orders)
         if integration_orders is None:
-            x, y, z, w = get_integration_locations(get_nearest_order(
-                self._n_coeffs))
+            # Go to the next higher available order of integration than should 
+            # be strictly necessary
+            order = get_nearest_order(get_nearest_order(self._n_coeffs) + 1)
+            x, y, z, w = get_integration_locations(order)
         else:
             x, y, z, w = get_integration_locations(get_nearest_order(
                 np.amax((1,int(integration_orders)))

@@ -16,6 +16,7 @@
 # %%
 import numpy as np
 import matplotlib.pyplot as plt
+import pytest
 
 # %% tags=[]
 from pyoptics import fast_psf_calc as psf
@@ -86,15 +87,16 @@ def field_func_kz(X_BFP, Y_BFP, R, Rmax, Th, Phi):
     Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)*1j*Kz
     return (Ein, None)
 
-def test_force_focus():
+@pytest.mark.parametrize('z_pos', zrange)
+def test_force_focus(z_pos):
     Ex, Ey, Ez, X, Y, Z = psf.fast_psf_calc(field_func, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
-                                               yrange=dim, numpoints_y=numpoints, z=zrange, bfp_sampling_n=bfp_sampling_n, return_grid=True)
+                                               yrange=dim, numpoints_y=numpoints, z=z_pos, bfp_sampling_n=bfp_sampling_n, return_grid=True)
     Exdx, Eydx, Ezdx = psf.fast_psf_calc(field_func_kx, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
-                                               yrange=dim, numpoints_y=numpoints, z=zrange, bfp_sampling_n=bfp_sampling_n, return_grid=False)
+                                               yrange=dim, numpoints_y=numpoints, z=z_pos, bfp_sampling_n=bfp_sampling_n, return_grid=False)
     Exdy, Eydy, Ezdy = psf.fast_psf_calc(field_func_ky, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
-                                               yrange=dim, numpoints_y=numpoints, z=zrange, bfp_sampling_n=bfp_sampling_n, return_grid=False)
+                                               yrange=dim, numpoints_y=numpoints, z=z_pos, bfp_sampling_n=bfp_sampling_n, return_grid=False)
     Exdz, Eydz, Ezdz = psf.fast_psf_calc(field_func_kz, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
-                                               yrange=dim, numpoints_y=numpoints, z=zrange, bfp_sampling_n=bfp_sampling_n, return_grid=False)
+                                               yrange=dim, numpoints_y=numpoints, z=z_pos, bfp_sampling_n=bfp_sampling_n, return_grid=False)
 
     E_grad_E_x = np.conj(Ex)*Exdx + np.conj(Ey)*Eydx + np.conj(Ez)*Ezdx
     E_grad_E_y = np.conj(Ex)*Exdy + np.conj(Ey)*Eydy + np.conj(Ez)*Ezdy
@@ -107,16 +109,13 @@ def test_force_focus():
     Fy_mie = np.empty(Ex.shape)
     Fz_mie = np.empty(Ex.shape)
     mie = mc.MieCalc(bead_size, n_bead, n_medium, 1064e-9)
-    print(mie.number_of_orders())
-    for l in range(numpoints):
-        print(l)
-        for p in range(numpoints):
-            for m in range(numpoints):
-                F = mie.forces_focused_fields(field_func_mie, 1.0, 4.43e-3, 1.2, bead_center=(X[p, m, l], Y[p, m, l], Z[p, m, l]), 
-                                              bfp_sampling_n=bfp_sampling_n, num_orders=None, integration_orders=None)
-                Fx_mie[p,m,l] = F[0]
-                Fy_mie[p,m,l] = F[1]
-                Fz_mie[p,m,l] = F[2]
+    for p in range(numpoints):
+        for m in range(numpoints):
+            F = mie.forces_focused_fields(field_func_mie, 1.0, 4.43e-3, 1.2, bead_center=(X[p, m], Y[p, m], z_pos), 
+                                          bfp_sampling_n=bfp_sampling_n, num_orders=None, integration_orders=None)
+            Fx_mie[p,m] = F[0]
+            Fy_mie[p,m] = F[1]
+            Fz_mie[p,m] = F[2]
     np.testing.assert_allclose(Fx, Fx_mie, rtol=1e-2, atol=1e-23)
     np.testing.assert_allclose(Fy, Fy_mie, rtol=1e-2, atol=1e-23)
     np.testing.assert_allclose(Fz, Fz_mie, rtol=1e-2, atol=1e-23)
