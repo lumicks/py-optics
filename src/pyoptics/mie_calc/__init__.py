@@ -2,7 +2,7 @@ from .legendre import *
 from  .lebedev_laikov import *
 import numpy as np
 import scipy.special as sp
-from numba import njit, prange
+from numba import njit
 
 """References:
     1. Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
@@ -1139,7 +1139,7 @@ def _scattered_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
     L = np.arange(start=1, stop=an.size + 1)
     C1 = 1j**(L + 1) * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
-    for L in prange(1, an.size + 1):
+    for L in range(1, an.size + 1):
         Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
         Et += C2[L-1] * (an[L - 1] *
@@ -1178,7 +1178,7 @@ def _internal_field_fixed_r(cn: np.ndarray, dn: np.ndarray,
 
     sinT = np.sqrt(1 - cos_theta**2)
     
-    for n in prange(1, cn.size + 1):
+    for n in range(1, cn.size + 1):
         Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
                 jn_over_k1r[n - 1, :])
 
@@ -1222,7 +1222,7 @@ def _scattered_H_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
     L = np.arange(start=1, stop=an.size + 1)
     C1 = 1j**L * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
-    for L in prange(1, an.size + 1):
+    for L in range(1, an.size + 1):
         Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
         Ht += C2[L-1] * (1j* bn[L - 1] *
@@ -1265,7 +1265,7 @@ def _internal_H_field_fixed_r(cn: np.ndarray, dn: np.ndarray,
 
     sinT = np.sqrt(1 - cos_theta**2)
 
-    for n in prange(1, cn.size + 1):
+    for n in range(1, cn.size + 1):
         Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
                 jn_over_k1r[n - 1, :])
 
