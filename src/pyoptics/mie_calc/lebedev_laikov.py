@@ -830,6 +830,10 @@ def _ld0146():
     x, y, z, w = gen_oh(1, v=v)
     v = .007372999718620756
     _x, _y, _z, _w = gen_oh(2, v=v)
+    x.extend(_x)
+    y.extend(_y)
+    z.extend(_z)
+    w.extend(_w)
     v = .007210515360144488
     _x, _y, _z, _w = gen_oh(3, v=v)
     x.extend(_x)
