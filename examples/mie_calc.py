@@ -38,7 +38,7 @@ z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=1.2, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=1.2, x=x, y=0, z=z, 
                                          bead_center=(0,0,0), bfp_sampling_n=9, return_grid=True)
 
 # %%
@@ -77,7 +77,7 @@ z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.9, x=0, y=y, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=0, y=y, z=z, 
                                          bead_center=(0,2.9e-6,0), bfp_sampling_n=9, return_grid=True)
 
 # %%
@@ -115,7 +115,7 @@ z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
                                          bead_center=(0,0,0), bfp_sampling_n=9, return_grid=True)
 
 # %%
@@ -154,7 +154,7 @@ mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 # Change `num_orders` to `None` or remove it to restore default behavior, which is to use the recommended number of orders from literature
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
                                          bead_center=(0,0,0), num_orders=1,
                                          bfp_sampling_n=9, return_grid=True)
 
@@ -173,7 +173,7 @@ plt.show()
 # %%
 num_ord = mie.number_of_orders()
 print(f'Number of orders is {num_ord}')
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
                                          bead_center=(0,0,0), num_orders=np.max((num_ord//2,1)),
                                          bfp_sampling_n=9, return_grid=True)
 
@@ -206,7 +206,7 @@ z = np.linspace(-2*bead_size, 2*bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=4.43e-3, NA=.9, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=x, y=0, z=z, 
                                          bead_center=(0,0,0), num_orders=None, total_field=False, inside_bead=False,
                                          bfp_sampling_n=9, return_grid=True)
 

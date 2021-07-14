@@ -5,6 +5,15 @@ import numpy as np
 import scipy.special as sp
 from scipy.special import jv, yv
 
+"""References:
+    1. Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+       Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
+    2. Craig F. Bohren & Donald R. Huffman (1983). Absorption and Scattering of 
+       Light by Small Particles. WILEY‐VCH Verlag GmbH & Co. KGaA. 
+       doi:10.1002/9783527618156
+"""
+
+# Some constants useful for calculating the magnetic fields
 _C = 299792458
 _MU0 = 4 * np.pi * 1e-7
 _EPS0 = (_C**2 * _MU0)**-1
@@ -12,24 +21,75 @@ _EPS0 = (_C**2 * _MU0)**-1
 class MieCalc:
     def __init__(self, bead_diameter=1e-6, n_bead=1.5, n_medium=1.33,
               lambda_vac=1064e-9):
-              self.bead_diameter = bead_diameter
-              self.n_bead = n_bead
-              self.n_medium = n_medium
-              self.lambda_vac = lambda_vac
-              self._k = 2 * np.pi * n_medium / lambda_vac
-              self._k1 = 2 * np.pi * n_bead / lambda_vac
+        """Create a new instance of the MieCalc class. The class describes 
+        the situation of a spherical bead with a diameter of bead_diameter 
+        (in meters) and having a refractive index n_bead, where the bead is 
+        embedded in a medium with a refractive index n_medium. The wavelength 
+        for any calculation is lambda_vac, which is the wavelength in vacuum 
+        (in meters)
+        
+        Parameters
+        ----------
+        bead_diameter : Diameter of the bead in meters
+        n_bead : refractive index of the bead
+        n_medium : refractive index of the medium
+        lambda_vac : wavelength of the light in meters, in vacuum (so not the
+        medium)
+        """
+
+        self.bead_diameter = bead_diameter
+        self.n_bead = n_bead
+        self.n_medium = n_medium
+        self.lambda_vac = lambda_vac
+        self._k = 2 * np.pi * n_medium / lambda_vac
+        self._k1 = 2 * np.pi * n_bead / lambda_vac
 
     def size_param(self):
+        """Return the size parameter of the bead k*a, where k is the wave number
+        in the medium and a is the radius of the bead
+        
+        Returns
+        -------
+        size parameter [-]
+        """
         return np.pi * self.n_medium * self.bead_diameter / self.lambda_vac
 
     def nrel(self):
+        """Return the relative refractive index n_bead/n_medium"""
         return self.n_bead / self.n_medium
 
     def number_of_orders(self):
+        """Return the number of orders required to 'properly' approximate the 
+        fields scattered by the bead. The criterion is the closest integer to 
+        x + 4x^(1/3) + 2, where x is the size parameter of the bead [1] 
+        
+        1.  "Absorption and Scattering of Light by Small Particles", 
+            Craig F. Bohren & Donald R. Huffman, p. 477
+        
+        Returns
+        -------
+        n : number of orders
+        """
+
         size_param = self.size_param()
         return int(np.round(size_param + 4 * size_param**(1/3) + 2.0))
 
     def ab_coeffs(self, num_orders=None):
+        """Return the scattering coefficients for plane wave excitation of the
+        bead. 
+        
+        Parameters
+        ----------
+        num_orders : determines the number of orders returned. If num_orders is
+            None (default), the number of orders returned is determined by the
+            method number_of_orders()
+        
+        Returns
+        -------
+        an : scattering coefficients
+        bn : scattering coefficients
+        """
+
         nrel = self.nrel()
         size_param = self.size_param()
         y = nrel * size_param
@@ -65,6 +125,19 @@ class MieCalc:
         return an, bn
 
     def cd_coeffs(self, num_orders=None):
+        """Return the coefficients for the internal field of the bead.
+        
+        Parameters
+        ----------
+        num_orders : determines the number of orders returned. If num_orders is
+            None (default), the number of orders returned is determined by the
+            method number_of_orders()
+        
+        Returns
+        -------
+        cn : internal field coefficients
+        dn : internal field coefficients
+        """
         nrel = self.nrel()
         size_param = self.size_param()
         y = nrel * size_param
@@ -102,6 +175,21 @@ class MieCalc:
 
     
     def extinction_eff(self, num_orders=None):
+        """Return the extinction efficiency Qext (for plane wave excitation),
+        defined as Qext = Cext/(pi r**2), where Cext is the exctinction cross
+        section and r is the bead radius.
+
+        Parameters
+        ----------
+        num_orders : determines the number of orders returned. If num_orders is
+            None (default), the number of orders returned is determined by the
+            method number_of_orders()
+        
+        Returns
+        -------
+        Qext : extinction efficiency
+        """
+
         self._get_mie_coefficients(num_orders=num_orders)
         C = 2 * (1 + np.arange(self._n_coeffs)) + 1
         return 2 * self.size_param()**-2 * np.sum(C * (self._an + 
@@ -109,6 +197,21 @@ class MieCalc:
 
 
     def scattering_eff(self, num_orders=None):
+        """Return the scattering efficiency Qsca (for plane wave excitation),
+        defined as Qsca = Csca/(pi r**2), where Csca is the scattering cross
+        section and r is the bead radius.
+
+        Parameters
+        ----------
+        num_orders : determines the number of orders returned. If num_orders is
+            None (default), the number of orders returned is determined by the
+            method number_of_orders()
+        
+        Returns
+        -------
+        Qsca : scattering efficiency
+        """
+
         self._get_mie_coefficients(num_orders=num_orders)
         C = 2 * (1 + np.arange(self._n_coeffs)) + 1
         return 2 * self.size_param()**-2 * np.sum(C * 
@@ -116,6 +219,22 @@ class MieCalc:
 
     
     def pressure_eff(self, num_orders=None):
+        """Return the pressure efficiency Qpr (for plane wave excitation),
+        defined as Qpr = Qext - Qsca <cos(theta)>, where <cos(theta)> is the
+        mean scattering angle.
+
+        Parameters
+        ----------
+        num_orders : determines the number of orders returned. If num_orders is
+            None (default), the number of orders returned is determined by the
+            method number_of_orders()
+        
+        Returns
+        -------
+        Qpr : pressure efficiency
+
+        """
+
         self._get_mie_coefficients(num_orders=num_orders)
         n = 1 + np.arange(self._n_coeffs)
         C = 2 * n + 1
@@ -126,37 +245,184 @@ class MieCalc:
         an_1[0:-2] = self._an[1:-1]
         bn_1[0:-2] = self._bn[1:-1]
 
-        return self.extinction_eff(num_orders) - 4 * self.size_param()**-2 * np.sum(C1 *
-            (self._an * np.conj(an_1) + self._bn * np.conj(bn_1)).real + 
-            C2 * (self._an * np.conj(self._bn)).real)
+        return self.extinction_eff(num_orders) - (4 * self.size_param()**-2 * 
+            np.sum(C1 * (self._an * np.conj(an_1) + 
+            self._bn * np.conj(bn_1)).real + 
+            C2 * (self._an * np.conj(self._bn)).real))
 
 
-    def fields_gaussian_focus(self, n_BFP=1.0,
+    def fields_gaussian_focus(self, n_bfp=1.0,
                         focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
                         x=0, y=0, z=0, bead_center=(0,0,0),
                         bfp_sampling_n=31, num_orders=None,
                         return_grid=False,  total_field=True,
                         inside_bead=True, H_field=False, verbose=False, 
                         grid=True):
+        """Calculate the three-dimensional electromagnetic field of a bead the
+        focus of a of a Gaussian beam, using the angular spectrum of plane waves
+        and Mie theory. 
+
+        This function correctly incorporates the polarized nature of light in a
+        focus. In other words, the polarization state at the focus includes
+        electric fields in the x, y, and z directions. The input is taken to be
+        polarized along the x direction.
+
+        Parameters
+        ---------- 
+        n_bfp : refractive index at the back focal plane of the objective
+            focused focal_length: focal length of the objective, in meters
+        filling_factor : filling factor of the Gaussian beam over the
+            aperture, defined as w0/R. Here, w0 is the waist of the Gaussian
+            beam and R is the radius of the aperture. Range 0...Inf 
+        NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+        x : array of x locations for evaluation, in meters 
+        y : array of y locations for evaluation, in meters 
+        z : array of z locations for evaluation, in meters
+        bead_center : tuple: tuple of three floating point numbers
+            determining the x, y and z position of the bead center in 3D space,
+            in meters
+        bfp_sampling_n : (Default value = 31) Number of discrete steps with
+            which the back focal plane is sampled, from the center to the edge.
+            The total number of plane waves scales with the square of
+            bfp_sampling_n 
+        num_orders : number of order that should be included in the
+            calculation the Mie solution. If it is None (default), the code will
+            use the number_of_orders() method to calculate a sufficient number.
+        return_grid: (Default value = False) return the sampling grid in the
+            matrices X, Y and Z
+        total_field : If True, return the total field of incident and
+            scattered electromagnetic field (default). If False, then only
+            return the scattered field outside the bead. Inside the bead, the
+            full field is always returned.
+        inside_bead : If True (default), return the fields inside the bead. If
+            False, do not calculate the fields inside the bead. Zero is returned
+            for positions inside the bead instead. 
+        H_field : If True, return the magnetic fields as well. If false
+            (default), do not return the magnetic fields.
+        verbose : If True, print statements on the progress of the calculation.
+            Default is False
+        grid: If True (default), interpret the vectors or scalars x, y and z as
+            the input for the numpy.meshgrid function, and calculate the fields
+            at the locations that are the result of the numpy.meshgrid output.
+            If False, interpret the x, y and z vectors as the exact locations
+            where the field needs to be evaluated. In that case, all vectors
+            need to be of the same length.
+
+        Returns
+        -------
+        Ex : the electric field along x, as a function of (x, y, z) 
+        Ey : the electric field along y, as a function of (x, y, z) 
+        Ez : the electric
+        field along z, as a function of (x, y, z) 
+        Hx : the magnetic field along x, as a function of (x, y, z) 
+        Hy : the magnetic field along y, as a function of (x, y, z) 
+        Hz : the magnetic field along z, as a function of (x, y, z) 
+            These values are only returned when H_field is True
+        X : x coordinates of the sampling grid
+        Y : y coordinates of the sampling grid
+        Z : z coordinates of the sampling grid
+            These values are only returned if return_grid is True
+        """
+
         w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
 
         def field_func(X_BFP, Y_BFP, *args):
             Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
             return Ein, None
         
-        return self.fields_focus(field_func, n_BFP=n_BFP, 
+        return self.fields_focus(field_func, n_bfp=n_bfp, 
             focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
             bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
             num_orders=num_orders, return_grid=return_grid, 
             total_field=total_field, inside_bead=inside_bead, H_field=H_field,
             verbose=verbose, grid=grid)
     
-    def fields_focus(self, f_input_field, n_BFP=1.0,
+    def fields_focus(self, f_input_field, n_bfp=1.0,
                 focal_length=4.43e-3, NA=1.2,
                 x=0, y=0, z=0, bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None,
                 return_grid=False,  total_field=True,
                 inside_bead=True, H_field=False, verbose=False, grid=True):
+        """Calculate the three-dimensional electromagnetic field of a bead in the
+        focus of an arbitrary input beam, going through an objective with a
+        certain NA and focal length. Implemented with the angular spectrum of 
+        plane waves and Mie theory. 
+
+        This function correctly incorporates the polarized nature of light in a
+        focus. In other words, the polarization state at the focus includes
+        electric fields in the x, y, and z directions. The input can be a
+        combination of x- and y-polarized light of complex amplitudes.
+
+        parameters
+        ----------
+        f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
+            cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
+            the back focal plane, determined by the focal length and NA of the
+            objective. Y_BFP is the corresponding grid of y locations, and R is
+            the radial distance from the center of the back focal plane. Rmax is
+            the largest distance that falls inside the NA, but R will contain
+            larger numbers as the back focal plane is sampled with a square
+            grid. Theta is defined as the angle with the negative optical axis
+            (-z), and cosTheta is the cosine of this angle. Phi is defined as
+            the angle between the x and y axis, and cosPhi and sinPhi are its
+            cosine and sine, respectively. The function must return a tuple
+            (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
+            direction, respectively, at the sample locations in the back focal
+            plane. The fields may be complex, so a phase difference between x
+            and y is possible. If only one polarization is used, the other
+            return value must be None, e.g., y polarization would return (None,
+            E_BFP_y). The fields are post-processed such that any part that
+            falls outside of the NA is set to zero.
+        n_bfp : refractive index at the back focal plane of the objective
+        focused focal_length : focal length of the objective, in meters
+        NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+        x : array of x locations for evaluation, in meters 
+        y : array of y locations for evaluation, in meters 
+        z : array of z locations for evaluation, in meters
+        bead_center : tuple of three floating point numbers determining
+            the x, y and z position of the bead center in 3D space, in meters
+        bfp_sampling_n : (Default value = 31) Number of discrete steps with which
+            the back focal plane is sampled, from the center to the edge.
+            The total number of plane waves scales with the square of
+            bfp_sampling_n 
+        num_orders: number of order that should be included in the calculation
+                the Mie solution. If it is None (default), the code will use the
+                number_of_orders() method to calculate a sufficient number.
+        return_grid : (Default value = False) return the sampling grid in the
+        matrices X, Y and Z
+        total_field : If True, return the total field of incident and scattered
+        electromagnetic field (default). If False, then only return the
+        scattered field outside the bead. Inside the bead, the full field is
+        always returned.
+        inside_bead : If True (default), return the fields inside the bead. If
+        False, do not calculate the fields inside the bead. Zero is returned for
+        positions inside the bead instead. 
+        H_field: If True, return the magnetic fields as well. If false
+        (default), do not return the magnetic fields.
+        verbose: If True, print statements on the progress of the calculation.
+        Default is False
+        grid: If True (default), interpret the vectors or scalars x, y and z as
+        the input for the numpy.meshgrid function, and calculate the fields at
+        the locations that are the result of the numpy.meshgrid output. If
+        False, interpret the x, y and z vectors as the exact locations where the
+        field needs to be evaluated. In that case, all vectors need to be of the
+        same length.
+
+        Returns
+        -------
+        Ex : the electric field along x, as a function of (x, y, z) 
+        Ey : the electric field along y, as a function of (x, y, z) 
+        Ez : the electric
+        field along z, as a function of (x, y, z) 
+        Hx : the magnetic field along x, as a function of (x, y, z) 
+        Hy : the magnetic field along y, as a function of (x, y, z) 
+        Hz : the magnetic field along z, as a function of (x, y, z) 
+            These values are only returned when H_field is True
+        X : x coordinates of the sampling grid
+        Y : y coordinates of the sampling grid
+        Z : z coordinates of the sampling grid
+            These values are only returned if return_grid is True
+        """
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -168,7 +434,7 @@ class MieCalc:
 
         self._init_local_coordinates(x,y,z, bead_center, grid=grid)
         self._get_mie_coefficients(num_orders)
-        self._init_back_focal_plane(f_input_field, n_BFP, focal_length, NA, 
+        self._init_back_focal_plane(f_input_field, n_bfp, focal_length, NA, 
                                     bfp_sampling_n)
         if verbose:
             print('Hankel functions')
@@ -248,7 +514,58 @@ class MieCalc:
                          total_field=True, inside_bead=True, H_field=False,
                          verbose=False, grid=True
                          ):
-    
+        """Calculate the electromagnetic field of a bead, subject to excitation
+        by a plane wave. The plane wave can be at an angle theta and phi, and
+        have a polarization state that is the combination of the (complex)
+        amplitudes of a theta-polarization state and phi-polarized state. If
+        theta == 0 and phi == 0, the theta polarization points along +x axis and
+        the wave travels into the +z direction.
+        
+        Parameters
+        ----------
+        x : array of x locations for evaluation, in meters 
+        y : array of y locations for evaluation, in meters 
+        z : array of z locations for evaluation, in meters
+        theta : angle with the negative optical axis (-z)
+        phi : angle with the positive x axis
+        num_orders : number of order that should be included in the calculation
+                the Mie solution. If it is None (default), the code will use the
+                number_of_orders() method to calculate a sufficient number.
+        return_grid : (Default value = False) return the sampling grid in the
+            matrices X, Y and Z
+        total_field : If True, return the total field of incident and scattered
+            electromagnetic field (default). If False, then only return the
+            scattered field outside the bead. Inside the bead, the full field is
+            always returned.
+        inside_bead : If True (default), return the fields inside the bead. If
+            False, do not calculate the fields inside the bead. Zero is returned
+            for positions inside the bead instead. 
+        H_field : If True, return the magnetic fields as well. If false
+            (default), do not return the magnetic fields.
+        verbose : If True, print statements on the progress of the calculation.
+            Default is False
+        grid : If True (default), interpret the vectors or scalars x, y and z as
+            the input for the numpy.meshgrid function, and calculate the fields 
+            at the locations that are the result of the numpy.meshgrid output. 
+            If False, interpret the x, y and z vectors as the exact locations
+            where the field needs to be evaluated. In that case, all vectors
+            need to be of the same length.
+
+        Returns
+        -------
+        Ex : the electric field along x, as a function of (x, y, z) 
+        Ey : the electric field along y, as a function of (x, y, z) 
+        Ez : the electric
+        field along z, as a function of (x, y, z) 
+        Hx : the magnetic field along x, as a function of (x, y, z) 
+        Hy : the magnetic field along y, as a function of (x, y, z) 
+        Hz : the magnetic field along z, as a function of (x, y, z) 
+            These values are only returned when H_field is True
+        X : x coordinates of the sampling grid
+        Y : y coordinates of the sampling grid
+        Z : z coordinates of the sampling grid
+            These values are only returned if return_grid is True
+        """
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         z = np.atleast_1d(z)
@@ -334,12 +651,77 @@ class MieCalc:
             return Ex, Ey, Ez
     
 
-    def forces_focused_fields(self, f_input_field, n_BFP=1.0,
+    def forces_focused_fields(self, f_input_field, n_bfp=1.0,
                 focal_length=4.43e-3, NA=1.2,
                 bead_center=(0,0,0),
                 bfp_sampling_n=31, num_orders=None, integration_orders=None,
                 verbose=False
                 ):
+        """Calculate the forces on a bead in the focus of an arbitrary input
+        beam, going through an objective with a certain NA and focal length.
+        Implemented with the angular spectrum of plane waves and Mie theory. 
+
+        This function correctly incorporates the polarized nature of light in a
+        focus. In other words, the polarization state at the focus includes
+        electric fields in the x, y, and z directions. The input can be a
+        combination of x- and y-polarized light of complex amplitudes.
+
+        Parameters
+        ----------
+        f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
+            cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
+            the back focal plane, determined by the focal length and NA of the
+            objective. Y_BFP is the corresponding grid of y locations, and R is
+            the radial distance from the center of the back focal plane. Rmax is
+            the largest distance that falls inside the NA, but R will contain
+            larger numbers as the back focal plane is sampled with a square
+            grid. Theta is defined as the angle with the negative optical axis
+            (-z), and cosTheta is the cosine of this angle. Phi is defined as
+            the angle between the x and y axis, and cosPhi and sinPhi are its
+            cosine and sine, respectively. The function must return a tuple
+            (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
+            direction, respectively, at the sample locations in the back focal
+            plane. The fields may be complex, so a phase difference between x
+            and y is possible. If only one polarization is used, the other
+            return value must be None, e.g., y polarization would return (None,
+            E_BFP_y). The fields are post-processed such that any part that
+            falls outside of the NA is set to zero. 
+        n_bfp : refractive index at the back focal plane of the objective
+            focused focal_length: focal length of the objective, in meters 
+        NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+        bead_center : tuple of three floating point numbers determining the
+            x, y and z position of the bead center in 3D space, in meters 
+        bfp_sampling_n : (Default value = 31) Number of discrete steps with
+            which the back focal plane is sampled, from the center to the edge.
+            The total number of plane waves scales with the square of
+            bfp_sampling_n num_orders: number of order that should be included
+            in the calculation the Mie solution. If it is None (default), the
+            code will use the number_of_orders() method to calculate a
+            sufficient number. 
+        return_grid : (Default value = False) return the sampling grid in
+            the matrices X, Y and Z total_field: If True, return the total field
+            of incident and scattered electromagnetic field (default). If False,
+            then only return the scattered field outside the bead. Inside the
+            bead, the full field is always returned. 
+        inside_bead : If True (default), return the fields inside the bead.
+            If False, do not calculate the fields inside the bead. Zero is
+            returned for positions inside the bead instead.
+        H_field : If True, return the magnetic fields as well. If false
+            (default), do not return the magnetic fields. 
+        verbose : If True, print statements on the progress of the
+            calculation. Default is False 
+        grid : If True (default), interpret the vectors or scalars x, y
+            and z as the input for the numpy.meshgrid function, and calculate
+            the fields at the locations that are the result of the
+            numpy.meshgrid output. If False, interpret the x, y and z vectors as
+            the exact locations where the field needs to be evaluated. In that
+            case, all vectors need to be of the same length.
+
+        Returns
+        -------
+        F : an array with the force on the bead in the x direction F[0], in the
+            y direction F[1] and in the z direction F[2]. The force is in [N].
+        """
 
         self._get_mie_coefficients(num_orders)
         if integration_orders is None:
@@ -362,7 +744,7 @@ class MieCalc:
         zb = z * self.bead_diameter * 0.51 + bead_center[2]
 
         Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
-            f_input_field, n_BFP, focal_length, NA, xb, yb, zb,
+            f_input_field, n_bfp, focal_length, NA, xb, yb, zb,
             bead_center, bfp_sampling_n, num_orders, return_grid=False,
             total_field=True, inside_bead=False, H_field=True, verbose=verbose,
             grid=False
@@ -444,7 +826,7 @@ class MieCalc:
         
         self._n_coeffs = self._an.shape[0]
     
-    def _init_back_focal_plane(self, f_input_field, n_BFP, focal_length, NA, 
+    def _init_back_focal_plane(self, f_input_field, n_bfp, focal_length, NA, 
                                bfp_sampling_n):
         npupilsamples = (2*bfp_sampling_n - 1)
 
@@ -489,7 +871,7 @@ class MieCalc:
         if Einx is not None:
             Einx[self._aperture] = 0  
             Einx = np.complex128(Einx)
-            self._Einfx = (np.sqrt(n_BFP / self.n_medium) * Einx *
+            self._Einfx = (np.sqrt(n_bfp / self.n_medium) * Einx *
                         np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfx = 0
@@ -497,7 +879,7 @@ class MieCalc:
         if Einy is not None:
             Einy[self._aperture] = 0
             Einy = np.complex128(Einy)
-            self._Einfy = (np.sqrt(n_BFP / self.n_medium) * Einy *
+            self._Einfy = (np.sqrt(n_bfp / self.n_medium) * Einy *
                         np.sqrt(self._cosT) / self._Kz)
         else:
             self._Einfy = 0

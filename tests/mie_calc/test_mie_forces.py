@@ -97,7 +97,7 @@ def test_plane_wave_forces_bfp(
                 
                 return (Ex, Ey)
             
-            F = mie.forces_focused_fields(input_field_Etheta, n_BFP=n_bfp, focal_length=focal_length, NA=NA, 
+            F = mie.forces_focused_fields(input_field_Etheta, n_bfp=n_bfp, focal_length=focal_length, NA=NA, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=13)
             if skip:
                 continue
@@ -115,7 +115,7 @@ def test_plane_wave_forces_bfp(
             np.testing.assert_allclose(n, Fn, rtol=1e-2, atol=1e-4)
             
             
-            F = mie.forces_focused_fields(input_field_Ephi, n_BFP=n_bfp, focal_length=focal_length, NA=NA, 
+            F = mie.forces_focused_fields(input_field_Ephi, n_bfp=n_bfp, focal_length=focal_length, NA=NA, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=13)
             Fn = np.squeeze(F/np.linalg.norm(F))
             # check that the magnitude is the same as predicted for Mie scattering
@@ -216,7 +216,7 @@ def test_plane_wave_dipole_forces_bfp(
                 return (Ex, Ey)
             
             bead_pos = np.squeeze(rng.random((3,1)))*200e-9
-            F = mie.forces_focused_fields(input_field_Etheta, n_BFP=n_bfp, focal_length=focal_length, NA=NA, 
+            F = mie.forces_focused_fields(input_field_Etheta, n_bfp=n_bfp, focal_length=focal_length, NA=NA, 
                                          bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=5)
             if skip:
                 continue
@@ -238,7 +238,7 @@ def test_plane_wave_dipole_forces_bfp(
             np.testing.assert_allclose(np.linalg.norm(F), Fdipole_mie, rtol=1e-2)
             
             
-            F = mie.forces_focused_fields(input_field_Ephi, n_BFP=n_bfp, focal_length=focal_length, NA=NA, 
+            F = mie.forces_focused_fields(input_field_Ephi, n_bfp=n_bfp, focal_length=focal_length, NA=NA, 
                                         bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=5)
             Fn = np.squeeze(F/np.linalg.norm(F))
             # check that the magnitude is the same as predicted for Mie scattering

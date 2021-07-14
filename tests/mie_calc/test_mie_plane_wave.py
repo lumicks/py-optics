@@ -157,7 +157,7 @@ def test_plane_wave_bfp(
                 return (Ex, Ey)
             
             mie = mc.MieCalc(1e-9, n_medium, n_medium, lambda_vac)
-            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Etheta, n_BFP=n_bfp, focal_length=focal_length, 
+            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Etheta, n_bfp=n_bfp, focal_length=focal_length, 
                                                        NA=NA, x=xy_eval, y=0, z=z_eval, 
                                                       bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False)
             if skip:
@@ -181,7 +181,7 @@ def test_plane_wave_bfp(
 #                 print(costheta, cosphi, sinphi)
 #                 return Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z, Exp
             
-            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Ephi, n_BFP=n_bfp, focal_length=focal_length, 
+            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Ephi, n_bfp=n_bfp, focal_length=focal_length, 
                                                        NA=NA, x=xy_eval, y=0, z=z_eval, 
                                                       bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False)
             Expw = -sinphi * Exp

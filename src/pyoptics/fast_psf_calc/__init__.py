@@ -26,7 +26,9 @@ def focused_gauss(
     This function correctly incorporates the polarized nature of light in a
     focus. In other words, the polarization state at the focus includes electric
     fields in the x, y, and z directions. The input is taken to be polarized
-    along the x direction.
+    along the x direction. This is an example of how to use the 
+    function fast_psf_calc(), which takes an arbitrary field distribution on the
+    back focal plane as input.
 
     This function is not recommended in general, as it's slow. However, the
     points (x, y, z)  at which the point spread function is to be evaluated are
@@ -85,9 +87,7 @@ def direct_psf_calc(
 
     This function correctly incorporates the polarized nature of light in a
     focus. In other words, the polarization state at the focus includes electric
-    fields in the x, y, and z directions. This is an example of how to use the 
-    function fast_psf_calc(), which takes an arbitrary field distribution on the
-    back focal plane as input.
+    fields in the x, y, and z directions. 
 
     This function is not recommended in general, as it's slow. However, the
     points (x, y, z)  at which the point spread function is to be evaluated are

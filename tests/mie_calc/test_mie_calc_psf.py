@@ -38,7 +38,7 @@ def test_gaussian_input(
     mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
     bfp_sampling = 31
     
-    Exm, Eym, Ezm, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=focal_length, NA=NA, filling_factor=1.0,x=xy_eval, y=xy_eval, z=z_eval, 
+    Exm, Eym, Ezm, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=focal_length, NA=NA, filling_factor=1.0,x=xy_eval, y=xy_eval, z=z_eval, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling, return_grid=True, verbose=True, num_orders=None)
     Exr, Eyr, Ezr = psf.focused_gauss(lambda_vac, n_bfp=1.0, n_medium=n_medium, focal_length=focal_length, filling_factor=1.0,
         NA=NA, x=xy_eval, y=xy_eval, z=z_eval, bfp_sampling_n=bfp_sampling, return_grid=False)
@@ -67,7 +67,7 @@ def test_gaussian_input_bead_shift(bead_center):
     mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
     bfp_sampling = 31
     
-    Exm, Eym, Ezm, X, Y, Z = mie.fields_gaussian_focus(n_BFP=1.0, focal_length=focal_length, NA=NA, filling_factor=1.0,x=xy_eval, y=xy_eval, z=z_eval, 
+    Exm, Eym, Ezm, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=focal_length, NA=NA, filling_factor=1.0,x=xy_eval, y=xy_eval, z=z_eval, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling, return_grid=True, verbose=True, num_orders=None)
     Exr, Eyr, Ezr = psf.focused_gauss(lambda_vac, n_bfp=1.0, n_medium=n_medium, focal_length=focal_length, filling_factor=1.0,
         NA=NA, x=xy_eval, y=xy_eval, z=z_eval, bfp_sampling_n=bfp_sampling, return_grid=False)
