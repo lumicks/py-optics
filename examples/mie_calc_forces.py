@@ -34,9 +34,10 @@ matplotlib.rc('font', **font)
 # ## Definition of coordinate system
 # The optical axis (direction of the light to travel into) is the $+z$ axis. For an aberration-free system, the focus of the laser beam ends up at $(x, y, z) = (0, 0, 0)$ See also below:
 #
-# <div>
+# <figure>
 #     <img src="images/axes.png" width=400>
-# </div>
+#     <figcaption>Fig. 1: Definition of the coordinate system</figcaption>
+# </figure>
 #
 # ## Properties of the bead, the medium and the laser
 # The bead is described by a refractive index $n_{bead}$, a diameter $D$ and a location in space $(x_b, y_b, z_b)$, the latter two in meters. In the code, the diameter is given by `bead_diameter`. The refractive index is given by `n_bead` and the location is passed to the code as a tuple `bead_center` containing three floating point numbers. These numbers represent the $x$-, $y$- and $z$-location of the bead, respectively, in meters. The wavelength of the trapping light is given in meters as well, by the parameter `lambda_vac`. The wavelength is given as it occurs in vacuum ('air'), not in the medium. The refractive index of the medium $n_{medium}$ is given by the parameter `n_medium`.
@@ -56,9 +57,10 @@ print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
 # %% [markdown] tags=[]
 # ## Properties of the objective
 # See the image below. The definition of the coordinate system remains as before, and the objective is described by the $\mathit{NA}=n_\mathit{medium} \sin(\theta)$, the focal length $f$ in meters, and the medium at the back focal plane (BFP), $n_\mathit{bfp}$. The parameter `NA` sets the $\mathit{NA}$ (unitless), `focal_length` sets the focal length $f$ (in meters) and the refractive index of the medium at the BFP, $n_\mathit{bfp}$, is set by `n_bfp` (unitless).
-# <div>
+# <figure>
 #     <img src="images/objective.png" width=400>
-# </div>
+#     <figcaption>Fig. 2: Coordinate system and the relation to the properties of the objective (NA, focal length, immersion medium)</figcaption>
+# </figure>
 #                                                                           
 
 # %% tags=[]
@@ -71,10 +73,11 @@ n_bfp = 1.0  #  Other side of the water immersion objective is air
 # ## Properties of the input beam
 #
 # The continuous field distribution at the back focal plane (the input beam, left figure) is discretized with $N$ samples, counting from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples you have, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $N^2$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large. *Do* check for convergence, however (see below).
-# <div>
+# <figure>
 #     <img src="images/aperture_inf.png" width=400>
 #     <img src="images/aperture_discretized.png" width=400>
-# </div>
+#     <figcaption>Fig. 3: Left - continuous field distribution of the laser beam. Right - discretized approximation<figcaption>
+# </figure>
 #
 # The parameter `bfp_sampling_n` determines the number of samples $N$ in the back focal plane.
 
