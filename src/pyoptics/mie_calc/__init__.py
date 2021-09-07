@@ -987,14 +987,21 @@ class MieCalc:
         self._alp_deriv = np.zeros((self._n_coeffs, cosT_unique.size))
         alp_prev = None # unique situation that for n == 1,
                         # the previous Assoc. Legendre Poly. isn't required
-
+        sign_cosT_unique = np.sign(cosT_unique)
+        abs_cosT_unique, sign_inv = np.unique(np.abs(cosT_unique), 
+            return_inverse=True)
+        parity = 1
         for L in range(1, self._n_coeffs + 1):
-            self._alp[L - 1,:] = associated_legendre(L, cosT_unique)
+            self._alp[L - 1,:] = associated_legendre(L, abs_cosT_unique)[sign_inv]
+            if parity == -1:
+                self._alp[L - 1,:] *= sign_cosT_unique
+            
             self._alp_sin[L - 1, :] = associated_legendre_over_sin_theta(L,
                                     cosT_unique, self._alp[L - 1,:])
             self._alp_deriv[L - 1, :] = associated_legendre_dtheta(L, cosT_unique,
                                     (self._alp[L - 1,:], alp_prev))
             alp_prev = self._alp[L - 1,:]
+            parity *= -1
 
     def _calculate_field_speed_mem(self, Ex, Ey, Ez, Hx, Hy, Hz, 
                                    internal: bool,

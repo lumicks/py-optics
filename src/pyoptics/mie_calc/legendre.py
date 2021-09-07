@@ -5,7 +5,7 @@ import numpy.polynomial as npp
 from numba import njit
 
 
-@njit(cache=True)
+@njit(cache=True, parallel=True)
 def associated_legendre(n: int, x: np.ndarray):
     """associated_legendre(n, x): Return the 1st order (m == 1) of the 
     associated Legendre polynomial of degree n, evaluated at x [-1..1]
