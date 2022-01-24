@@ -953,7 +953,7 @@ class MieCalc:
         # Loop over all cos(theta), in order to find the unique values of
         # cos(theta)
         # TODO: Consider using parity to shorten calculations by a factor ~2
-        cosTs = np.empty(cos_th_shape)
+        cosTs = np.zeros(cos_th_shape)
 
         for m in range(s[1]):
             for p in range(s[0]):
