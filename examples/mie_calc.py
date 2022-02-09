@@ -13,40 +13,81 @@
 #     name: python3
 # ---
 
+# %% [markdown] tags=[]
+# # Calculating field around a bead
+
 # %% tags=[]
 # %matplotlib inline
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rc
 from pyoptics import mie_calc as mc
+font = {'weight' : 'normal',
+        'size'   : 16}
+rc('font', **font)
 
 # %% [markdown]
-# # Examples of spherical particle in a focus
-# **Note:** These examples are optimized to give a quick result, not an accurate result. Generally speaking, the parameter `bfp_sampling_n` should be increased considerably for an accurate representation of the focus. 
-
-# %% [markdown]
-# ## 1 micron polystyrene particle in water
+# ## Definition of coordinate system
+# The optical axis (direction of the light to travel into) is the $+z$ axis. For an aberration-free system, the focus of the laser beam ends up at $(x, y, z) = (0, 0, 0)$ See also below:
+#
+# <div>
+#     <img src="images/axes.png" width=400>
+# </div>
+#
+# ## Properties of the bead, the medium and the laser
+# The bead is described by a refractive index $n_{bead}$, a diameter $D$ and a location in space $(x_b, y_b, z_b)$, the latter two in meters. In the code, the diameter is given by `bead_diameter`. The refractive index is given by `n_bead` and the location is passed to the code as a tuple `bead_center` containing three floating point numbers. These numbers represent the $x$-, $y$- and $z$-location of the bead, respectively, in meters. The wavelength of the trapping light is given in meters as well, by the parameter `lambda_vac`. The wavelength is given as it occurs in vacuum ('air'), not in the medium. The refractive index of the medium $n_{medium}$ is given by the parameter `n_medium`.
+#
+# ### 1 micron polystyrene particle in water
 # Laser at 1064 nm
 
 # %%
-bead_size = 1.0e-6
-lambda_vac = 1.064e-6
-n_bead =  1.5
-n_medium = 1.33
-num_pts = 41
-x = np.linspace(-1*bead_size, 1*bead_size, num_pts)
-z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
-mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
+bead_diameter = 1.0e-6  # [m]
+lambda_vac = 1.064e-6   # [m]
+n_bead =  1.57          # [-]
+n_medium = 1.33         # [-]
+
+# %% [markdown]
+# ## Properties of the objective
+# See the image below. The definition of the coordinate system remains as before, and the objective is described by the $\mathit{NA}=n_\mathit{medium} \sin(\theta)$, the focal length $f$ in meters, and the medium at the back focal plane (BFP), $n_\mathit{bfp}$. The parameter `NA` sets the $\mathit{NA}$ (unitless), `focal_length` sets the focal length $f$ (in meters) and the refractive index of the medium at the BFP, $n_\mathit{bfp}$, is set by `n_bfp` (unitless).
+# <div>
+#     <img src="images/objective.png" width=400>
+# </div>
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=1.2, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), bfp_sampling_n=9, return_grid=True)
+focal_length = 4.43e-3  # [m]
+NA = 1.2                # [-]
+n_bfp = 1.0             # [-]
+
+# %% [markdown]
+# ## Properties of the input beam
+#
+# The continuous field distribution at the back focal plane (the input beam, left figure) is discretized with $N$ samples, counting from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples you have, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $N^2$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large. 
+# <div>
+#     <img src="images/aperture_inf.png" width=400>
+#     <img src="images/aperture_discretized.png" width=400>
+# </div>
+#
+# The parameter `bfp_sampling_n` determines the number of samples $N$ in the back focal plane.
 
 # %%
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
-plt.title('|E|')
+bfp_sampling_n = 9
+
+# %%
+num_pts = 201
+half_extent = bead_diameter
+x = np.linspace(-half_extent, half_extent, num_pts)
+z = np.linspace(-half_extent, half_extent, num_pts)
+mie = mc.MieCalc(bead_diameter, n_bead, n_medium, lambda_vac)
+bead_center = (0,0,0)  # [m]
+Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=n_bfp, focal_length=focal_length, NA=NA, x=x, y=0, z=z, 
+                                         bead_center=bead_center, bfp_sampling_n=9, return_grid=True, verbose=True)
+
+# %%
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
+plt.title('|E| [V/m]')
 plt.colorbar()
 plt.show()
 
@@ -54,12 +95,12 @@ plt.show()
 # Imaginary part of the z-component of the E field:
 
 # %% tags=[]
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.imag(Ez), cmap='jet', shading='auto')
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6, X * 1e6, Ez.imag, cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('imag(Ez)')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
+plt.title('imag(Ez) [V/m]')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
 plt.show()
 
 # %% [markdown]
@@ -71,82 +112,107 @@ bead_size = 4.05e-6
 lambda_vac = 1.064e-6
 n_bead =  1.5
 n_medium = 1.0
-num_pts = 81
-y = np.linspace(-0.5*bead_size, 1.5*bead_size, num_pts)
-z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
+num_pts = 101
+y = np.linspace(-0.5 * bead_size, 1.5 * bead_size, num_pts)
+z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
 Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=0, y=y, z=z, 
-                                         bead_center=(0,2.9e-6,0), bfp_sampling_n=9, return_grid=True)
+                                         bead_center=(0, 2.9e-6, 0), bfp_sampling_n=9, return_grid=True)
 
 # %%
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,Y, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6,Y * 1e6, np.abs(Ex), cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('|E|')
-plt.xlabel('Z [m]')
-plt.ylabel('Y [m]')
+plt.title('|E| [V/m]')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('Y [$\mu$m]')
 plt.show()
 
 # %% [markdown]
 # Imaginary part of Ex. Modify the code to check that Ez and Ey are practically zero too:
 
 # %% tags=[]
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,Y, np.imag(Ex), cmap='jet', shading='auto')
-plt.xlabel('Z [m]')
-plt.ylabel('Y [m]')
-plt.title('imag(Ex)')
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6,Y * 1e6, Ex.imag, cmap='plasma', shading='auto')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('Y [$\mu$m]')
+plt.title('imag(Ex) [V/m]')
 plt.colorbar()
 plt.show()
 
 # %% [markdown]
-# ## Silver nanoparticle, excited by 345 nm UV laser
+# ## Silver nanoparticle, excited by 345 nm UV laser and 1064 nm IR laser
 
 # %%
-bead_size = .2e-6
-lambda_vac = 0.345e-6
-n_bead =  0.06 + 1.76j # Silver at 345 nm
+bead_diameter = .15e-6     # [m]
+lambda_vac_UV = 0.345e-6   # [m]
+n_bead_UV =  0.06 + 1.76j  # [-] Silver at 345 nm
+lambda_vac_IR = 1064e-9    # [m]
+n_bead_IR =  0.04 + 7.60j  # [-] Silver at 1064 nm
 n_medium = 1.0
-num_pts = 61
-x = np.linspace(-1*bead_size, 1*bead_size, num_pts)
-z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
-mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
+num_pts = 201
+x = np.linspace(-1*bead_diameter, 1*bead_diameter, num_pts)
+z = np.linspace(-1*bead_diameter, 1*bead_diameter, num_pts)
+mie_UV = mc.MieCalc(bead_diameter, n_bead_UV, n_medium, lambda_vac_UV)
+mie_IR = mc.MieCalc(bead_diameter, n_bead_IR, n_medium, lambda_vac_IR)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), bfp_sampling_n=9, return_grid=True)
+Ex_UV, Ey_UV, Ez_UV, X, Y, Z = mie_UV.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=x, y=0, z=z, 
+                                         bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
+Ex_IR, Ey_IR, Ez_IR, X, Y, Z = mie_IR.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=x, y=0, z=z, 
+                                         bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
+
+# %%
+plt.figure(figsize=(21, 7.5))
+plt.subplot(1, 2, 1)
+plt.pcolor(Z, X, np.sqrt(np.abs(Ez_IR)**2 + np.abs(Ex_IR)**2), cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('|E|')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
+plt.title('|$E_{IR}$|')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
+
+plt.subplot(1, 2, 2)
+plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez_UV)**2 + np.abs(Ex_UV)**2), cmap='plasma', shading='auto')
+plt.colorbar()
+plt.title('|$E_{UV}$|')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
+
 plt.show()
 
 # %% tags=[]
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.imag(Ez), cmap='jet', shading='auto')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
-plt.title('imag(Ez)')
+plt.figure(figsize=(21, 7.5))
+plt.subplot(1, 2, 1)
+plt.pcolor(Z * 1e9, X * 1e9, Ex_IR.imag, cmap='plasma', shading='auto')
 plt.colorbar()
+plt.title('imag($E_{z,IR}$) [V/m]')
+plt.xlabel('Z [nm]')
+plt.ylabel('X [nm]')
+
+plt.subplot(1,2,2)
+plt.pcolor(Z * 1e9, X * 1e9, Ex_UV.imag, cmap='plasma', shading='auto')
+plt.colorbar()
+plt.title('imag($E_{z,UV}$) [V/m]')
+plt.xlabel('Z [nm]')
+plt.ylabel('X [nm]')
+
 plt.show()
 
 # %% [markdown]
 # ### Showcase a few other options
 
 # %%
-bead_size = 1e-6
-lambda_vac = 1.064e-6
-n_bead =  1.5
-n_medium = 1.33
-num_pts = 41
-x = np.linspace(-1*bead_size, 1*bead_size, num_pts)
-z = np.linspace(-1*bead_size, 1*bead_size, num_pts)
+bead_size = 1e-6       # [m]
+lambda_vac = 1.064e-6  # [m]
+n_bead =  1.57         # [-]
+n_medium = 1.33        # [-]
+num_pts = 101
+x = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
+z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %% [markdown]
@@ -155,16 +221,16 @@ mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
 Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), num_orders=1,
+                                         bead_center=(0, 0, 0), num_orders=1,
                                          bfp_sampling_n=9, return_grid=True)
 
 # %%
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('|E|')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
+plt.title('|E| [V/m]')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
 plt.show()
 
 # %% [markdown]
@@ -174,16 +240,17 @@ plt.show()
 num_ord = mie.number_of_orders()
 print(f'Number of orders is {num_ord}')
 Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.01, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), num_orders=np.max((num_ord//2,1)),
+                                         bead_center=(0, 0, 0), num_orders=np.max((num_ord // 2, 1)),
                                          bfp_sampling_n=9, return_grid=True)
 
 # %%
 plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('|E|')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
+plt.title('|E| [V/m]')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
+plt.show()
 plt.show()
 
 # %% [markdown]
@@ -196,25 +263,27 @@ mie.ab_coeffs()
 # Only calculate the external field, and only the scattered field (so not the focused laser). Change the bead from small to larger to see the transitions from Rayleigh scattering to forward scattering
 
 # %%
-bead_size = 0.1e-6
-lambda_vac = 1.064e-6
-n_bead =  1.5
-n_medium = 1.33
-num_pts = 41
-x = np.linspace(-2*bead_size, 2*bead_size, num_pts)
-z = np.linspace(-2*bead_size, 2*bead_size, num_pts)
+bead_size = 0.1e-6     # [m]
+lambda_vac = 1.064e-6  # [m]
+n_bead =  1.57         # [-]
+n_medium = 1.33        # [-]
+num_pts = 101
+x = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
+z = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
 mie = mc.MieCalc(bead_size, n_bead, n_medium, lambda_vac)
 
 # %%
 Ex, Ey, Ez, X, Y, Z = mie.fields_gaussian_focus(n_bfp=1.0, focal_length=4.43e-3, NA=.9, x=x, y=0, z=z, 
-                                         bead_center=(0,0,0), num_orders=None, total_field=False, inside_bead=False,
+                                         bead_center=(0, 0, 0), num_orders=None, total_field=False, inside_bead=False,
                                          bfp_sampling_n=9, return_grid=True)
 
 # %%
-plt.figure(figsize=(10,8))
-plt.pcolor(Z,X, np.sqrt(np.abs(Ez)**2+np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.figure(figsize=(10, 8))
+plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| (scattered)')
-plt.xlabel('Z [m]')
-plt.ylabel('X [m]')
+plt.xlabel('Z [$\mu$m]')
+plt.ylabel('X [$\mu$m]')
 plt.show()
+
+# %%
