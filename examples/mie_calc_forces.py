@@ -21,14 +21,14 @@
 import time, sys  # For progress bar
 from IPython.display import clear_output  # For progress bar
 import numpy as np
-import matplotlib
+from matplotlib import rc
 import matplotlib.pyplot as plt
 from pyoptics import mie_calc as mc
 from scipy.interpolate import interp1d
 
 font = {'weight' : 'normal',
         'size'   : 16}
-matplotlib.rc('font', **font)
+rc('font', **font)
 
 # %% [markdown] tags=[]
 # ## Definition of coordinate system
@@ -43,10 +43,10 @@ matplotlib.rc('font', **font)
 # The bead is described by a refractive index $n_{bead}$, a diameter $D$ and a location in space $(x_b, y_b, z_b)$, the latter two in meters. In the code, the diameter is given by `bead_diameter`. The refractive index is given by `n_bead` and the location is passed to the code as a tuple `bead_center` containing three floating point numbers. These numbers represent the $x$-, $y$- and $z$-location of the bead, respectively, in meters. The wavelength of the trapping light is given in meters as well, by the parameter `lambda_vac`. The wavelength is given as it occurs in vacuum ('air'), not in the medium. The refractive index of the medium $n_{medium}$ is given by the parameter `n_medium`.
 
 # %% tags=[]
-bead_diameter = 4.4e-6  # bead diameter in meters
-lambda_vac = 1064e-9
-n_bead =  1.5
-n_medium = 1.33
+bead_diameter = 4.4e-6  # [m]
+lambda_vac = 1064e-9    # [m]
+n_bead =  1.57          # [-]
+n_medium = 1.33         # [-]
 
 # %% tags=[]
 # instantiate the MieCalc object
@@ -65,9 +65,9 @@ print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
 
 # %% tags=[]
 # objective properties, for water immersion
-NA = 1.2
-focal_length = 4.43e-3
-n_bfp = 1.0  #  Other side of the water immersion objective is air
+NA = 1.2                # [-]
+focal_length = 4.43e-3  # [m]
+n_bfp = 1.0             # [-] Other side of the water immersion objective is air
 
 # %% [markdown]
 # ## Properties of the input beam
@@ -86,19 +86,18 @@ n_bfp = 1.0  #  Other side of the water immersion objective is air
 # best to check the correct range by plotting fields!
 bfp_sampling_n=9
 
-# 100% is roughly 3.3W into a single trap at trap split=50%, a typical number for a C Trap
-power_percentage = 5
-
+# 100% is 1.75W into a single trapping beam before the objective, at trap split = 50%
+power_percentage = 25
 
 # %%
-def gaussian_beam(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi):
-    w0 = 0.9 * focal_length * NA / n_medium 
-    
-    # Corresponds to approximately 3.3W through the back aperture at 100% power
-    # for an NA of 1.2 and focal length of 4.43 mm
-    Ex = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)*10000*np.sqrt(power_percentage/100)
-    
-    # This beam is x-polarized
+filling_factor = 0.9                                # [-]
+w0 = filling_factor * focal_length * NA / n_medium  # [m]
+P = 1.75 * power_percentage / 100.                  # [W]
+I0 = 2 * P / (np.pi * w0**2)                        # [W/m^2]
+E0 = (I0 * 2/(mc._EPS0 * mc._C * n_bfp))**0.5       # [V/m]
+
+def gaussian_beam(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi): 
+    Ex = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2) * E0
     return (Ex, None)
 
 
@@ -126,7 +125,7 @@ def update_progress(progress):
 # Start with a range of $0\ldots 1 \mu m$
 
 # %%
-z = np.linspace(0,1000e-9,20)  
+z = np.linspace(0, 1e-6, 20)  
 Fz = np.empty(z.shape)
 
 # %%
@@ -138,11 +137,11 @@ for idx, zz in enumerate(z):
 update_progress(1.)
 
 # %%
-plt.figure(figsize=(8,6))
-plt.plot(z*1e9, Fz*1e12)
+plt.figure(figsize=(8, 6))
+plt.plot(z * 1e9, Fz * 1e12)
 plt.xlabel('$z$ [nm]')
 plt.ylabel('$F$ [pN]')
-plt.title(f'{bead_diameter*1e6} $\mu$m bead, $F_z$ at $x_b = y_b = 0$')
+plt.title(f'{bead_diameter * 1e6} $\mu$m bead, $F_z$ at $x_b = y_b = 0$')
 plt.show()
 
 # %%
@@ -155,7 +154,7 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 # Calculate the forces in the $x$ and $y$ direction at the location where the force in the $z$ direction is (nearly) zero
 
 # %%
-x = np.linspace(-500e-9,1e-9,21)
+x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
 for idx, xx in enumerate(x):
     F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
@@ -165,7 +164,7 @@ for idx, xx in enumerate(x):
 update_progress(1.)
 
 # %%
-y = np.linspace(-500e-9,1e-9,21)
+y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
 for idx, yy in enumerate(y):
     F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
@@ -175,13 +174,13 @@ for idx, yy in enumerate(y):
 update_progress(1.)
 
 # %%
-plt.figure(figsize=(8,6))
-plt.plot(x*1e9,Fx*1e12, label='x')
-plt.plot(y*1e9,Fy*1e12, label='y')
+plt.figure(figsize=(8, 6))
+plt.plot(x * 1e9,Fx * 1e12, label='x')
+plt.plot(y * 1e9,Fy * 1e12, label='y')
 plt.xlabel('displacement [nm]')
 plt.ylabel('F [pN]')
 plt.legend()
-plt.title(f'{bead_diameter*1e6} $\mu$m bead, $F_x$ at $(x, 0, {z_eval*1e9:.1f})$ nm, $F_y$ at $(0, y, {z_eval*1e9:.1f})$ nm')
+plt.title(f'{bead_diameter * 1e6} $\mu$m bead, $F_x$ at $(x, 0, {z_eval * 1e9:.1f})$ nm, $F_y$ at $(0, y, {z_eval * 1e9:.1f})$ nm')
 plt.show()
 
 # %% [markdown]
@@ -195,25 +194,25 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0,0, k), 
+    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0,0, k), 
+    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
     update_progress(idx / z.size)
 update_progress(1.)
 
 # %%
-plt.figure(figsize=(16,6))
-plt.subplot(1,2,1)
-plt.plot(z*1e9, Fz1*1e12)
-plt.plot(z*1e9, Fz2*1e12)
+plt.figure(figsize=(16, 6))
+plt.subplot(1, 2, 1)
+plt.plot(z * 1e9, Fz1 * 1e12)
+plt.plot(z * 1e9, Fz2 * 1e12)
 plt.xlabel('z [nm]')
 plt.ylabel('F [pN]')
-plt.title(f'{bead_size*1e6} um bead, Fz at X = Y = 0')
-plt.subplot(1,2,2)
-plt.plot(z*1e9, (Fz1-Fz2)*1e12)
+plt.title(f'{bead_diameter * 1e6} um bead, Fz at X = Y = 0')
+plt.subplot(1, 2, 2)
+plt.plot(z * 1e9, (Fz1 - Fz2) * 1e12)
 plt.xlabel('z [nm]')
 plt.ylabel('difference [pN]')
 plt.title('difference between calculations')
@@ -223,10 +222,11 @@ plt.show()
 # ### Gaining some speed
 # 1. *Decrease* the number of spherical harmonics `num_orders` and check the difference between the old and newly calculated forces.
 #     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff:
+# 1. *Decrease* the number of plane waves in the back focal plane, and check the difference between the old and newly calculated forces.
 
 # %%
 an, bn = mie.ab_coeffs()
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(8, 6))
 plt.semilogy(range(1, an.size + 1), np.abs(an), label='$a_n$')
 plt.semilogy(range(1, bn.size + 1), np.abs(bn), label='$b_n$')
 plt.xlabel('Order')
@@ -234,5 +234,3 @@ plt.ylabel('|$a_n$|, $|b_n|$ [-]')
 plt.legend()
 plt.grid()
 plt.show()
-
-# %%
