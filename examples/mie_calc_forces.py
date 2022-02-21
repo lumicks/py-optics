@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.1
+#       jupytext_version: 1.13.7
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -194,10 +194,12 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, 
+                                  focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n * 2, 
+                                  focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
     update_progress(idx / z.size)
@@ -206,10 +208,11 @@ update_progress(1.)
 # %%
 plt.figure(figsize=(16, 6))
 plt.subplot(1, 2, 1)
-plt.plot(z * 1e9, Fz1 * 1e12)
-plt.plot(z * 1e9, Fz2 * 1e12)
+plt.plot(z * 1e9, Fz1 * 1e12, label=f'bfp_sampling = {bfp_sampling_n}')
+plt.plot(z * 1e9, Fz2 * 1e12, label=f'bfp_sampling = {bfp_sampling_n * 2}')
 plt.xlabel('z [nm]')
 plt.ylabel('F [pN]')
+plt.legend()
 plt.title(f'{bead_diameter * 1e6} um bead, Fz at X = Y = 0')
 plt.subplot(1, 2, 2)
 plt.plot(z * 1e9, (Fz1 - Fz2) * 1e12)
