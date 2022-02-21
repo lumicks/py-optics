@@ -62,10 +62,11 @@ n_bfp = 1.0             # [-]
 # ## Properties of the input beam
 #
 # The continuous field distribution at the back focal plane (the input beam, left figure) is discretized with $N$ samples, counting from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples you have, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $N^2$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large. 
-# <div>
-#     <img src="images/aperture_inf.png" width=400>
+# <figure>
+#     <img src="images/aperture_inf.png" width=400 align="left">
 #     <img src="images/aperture_discretized.png" width=400>
-# </div>
+#     <figcaption>Fig. 3: Left - continuous field distribution of the laser beam. Right - discretized approximation</figcaption>
+# </figure>
 #
 # The parameter `bfp_sampling_n` determines the number of samples $N$ in the back focal plane.
 
