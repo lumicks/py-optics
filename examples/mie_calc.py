@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.1
+#       jupytext_version: 1.13.7
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -189,14 +189,14 @@ plt.figure(figsize=(21, 7.5))
 plt.subplot(1, 2, 1)
 plt.pcolor(Z * 1e9, X * 1e9, Ex_IR.imag, cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('imag($E_{z,IR}$) [V/m]')
+plt.title('imag($E_{x,IR}$) [V/m]')
 plt.xlabel('Z [nm]')
 plt.ylabel('X [nm]')
 
 plt.subplot(1,2,2)
 plt.pcolor(Z * 1e9, X * 1e9, Ex_UV.imag, cmap='plasma', shading='auto')
 plt.colorbar()
-plt.title('imag($E_{z,UV}$) [V/m]')
+plt.title('imag($E_{x,UV}$) [V/m]')
 plt.xlabel('Z [nm]')
 plt.ylabel('X [nm]')
 
@@ -285,5 +285,3 @@ plt.title('|E| (scattered)')
 plt.xlabel('Z [$\mu$m]')
 plt.ylabel('X [$\mu$m]')
 plt.show()
-
-# %%
