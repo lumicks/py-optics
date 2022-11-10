@@ -286,3 +286,5 @@ plt.title('|E| (scattered)')
 plt.xlabel('Z [$\mu$m]')
 plt.ylabel('X [$\mu$m]')
 plt.show()
+
+# %%

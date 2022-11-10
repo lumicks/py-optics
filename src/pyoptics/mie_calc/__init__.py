@@ -1,9 +1,8 @@
-#from numpy.core.fromnumeric import size
 from .legendre import *
 from  .lebedev_laikov import *
 import numpy as np
 import scipy.special as sp
-from scipy.special import jv, yv
+from numba import njit
 
 """References:
     1. Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
@@ -374,7 +373,7 @@ class MieCalc:
             E_BFP_y). The fields are post-processed such that any part that
             falls outside of the NA is set to zero.
         n_bfp : refractive index at the back focal plane of the objective
-        focused focal_length : focal length of the objective, in meters
+        focal_length : focal length of the objective, in meters
         NA : Numerical Aperture n_medium * sin(theta_max) of the objective
         x : array of x locations for evaluation, in meters 
         y : array of y locations for evaluation, in meters 
@@ -688,6 +687,7 @@ class MieCalc:
             falls outside of the NA is set to zero. 
         n_bfp : refractive index at the back focal plane of the objective
             focused focal_length: focal length of the objective, in meters 
+        focal_length : focal length of the objective, in meters
         NA : Numerical Aperture n_medium * sin(theta_max) of the objective
         bead_center : tuple of three floating point numbers determining the
             x, y and z position of the bead center in 3D space, in meters 
@@ -698,25 +698,7 @@ class MieCalc:
             in the calculation the Mie solution. If it is None (default), the
             code will use the number_of_orders() method to calculate a
             sufficient number. 
-        return_grid : (Default value = False) return the sampling grid in
-            the matrices X, Y and Z total_field: If True, return the total field
-            of incident and scattered electromagnetic field (default). If False,
-            then only return the scattered field outside the bead. Inside the
-            bead, the full field is always returned. 
-        inside_bead : If True (default), return the fields inside the bead.
-            If False, do not calculate the fields inside the bead. Zero is
-            returned for positions inside the bead instead.
-        H_field : If True, return the magnetic fields as well. If false
-            (default), do not return the magnetic fields. 
-        verbose : If True, print statements on the progress of the
-            calculation. Default is False 
-        grid : If True (default), interpret the vectors or scalars x, y
-            and z as the input for the numpy.meshgrid function, and calculate
-            the fields at the locations that are the result of the
-            numpy.meshgrid output. If False, interpret the x, y and z vectors as
-            the exact locations where the field needs to be evaluated. In that
-            case, all vectors need to be of the same length.
-
+        
         Returns
         -------
         F : an array with the force on the bead in the x direction F[0], in the
@@ -784,9 +766,189 @@ class MieCalc:
             n[1] = y[k]
             n[2] = z[k]
             F += T @ n * w[k]
-
+        # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
         return F * (self.bead_diameter * 0.51)**2 * 2 * np.pi
 
+
+
+    def absorbed_power_focus(self, f_input_field, n_bfp=1.0,
+                    focal_length=4.43e-3, NA=1.2,
+                    bead_center=(0,0,0),
+                    bfp_sampling_n=31, num_orders=None, integration_orders=None,
+                    verbose=False
+                    ):
+            """Calculate the dissipated power in a bead in the focus of an arbitrary input
+            beam, going through an objective with a certain NA and focal length.
+            Implemented with the angular spectrum of plane waves and Mie theory. 
+
+            This function correctly incorporates the polarized nature of light in a
+            focus. In other words, the polarization state at the focus includes
+            electric fields in the x, y, and z directions. The input can be a
+            combination of x- and y-polarized light of complex amplitudes.
+
+            Parameters
+            ----------
+            f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
+                cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
+                the back focal plane, determined by the focal length and NA of the
+                objective. Y_BFP is the corresponding grid of y locations, and R is
+                the radial distance from the center of the back focal plane. Rmax is
+                the largest distance that falls inside the NA, but R will contain
+                larger numbers as the back focal plane is sampled with a square
+                grid. Theta is defined as the angle with the negative optical axis
+                (-z), and cosTheta is the cosine of this angle. Phi is defined as
+                the angle between the x and y axis, and cosPhi and sinPhi are its
+                cosine and sine, respectively. The function must return a tuple
+                (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
+                direction, respectively, at the sample locations in the back focal
+                plane. The fields may be complex, so a phase difference between x
+                and y is possible. If only one polarization is used, the other
+                return value must be None, e.g., y polarization would return (None,
+                E_BFP_y). The fields are post-processed such that any part that
+                falls outside of the NA is set to zero. 
+            n_bfp : refractive index at the back focal plane of the objective
+                focused focal_length: focal length of the objective, in meters 
+            focal_length : focal length of the objective, in meters
+            NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+            bead_center : tuple of three floating point numbers determining the
+                x, y and z position of the bead center in 3D space, in meters 
+            bfp_sampling_n : (Default value = 31) Number of discrete steps with
+                which the back focal plane is sampled, from the center to the edge.
+                The total number of plane waves scales with the square of
+                bfp_sampling_n num_orders: number of order that should be included
+                in the calculation the Mie solution. If it is None (default), the
+                code will use the number_of_orders() method to calculate a
+                sufficient number. 
+            
+            Returns
+            -------
+            Pabs : the absorbed power in Watts.
+            """
+
+            self._get_mie_coefficients(num_orders)
+            if integration_orders is None:
+                # Go to the next higher available order of integration than should 
+                # be strictly necessary
+                order = get_nearest_order(get_nearest_order(self._n_coeffs) + 1)
+                x, y, z, w = get_integration_locations(order)
+            else:
+                x, y, z, w = get_integration_locations(get_nearest_order(
+                    np.amax((1,int(integration_orders)))
+                    ))
+
+            x = np.asarray(x)
+            y = np.asarray(y)
+            z = np.asarray(z)
+            w = np.asarray(w)
+        
+            xb = x * self.bead_diameter * 0.51 + bead_center[0]
+            yb = y * self.bead_diameter * 0.51 + bead_center[1]
+            zb = z * self.bead_diameter * 0.51 + bead_center[2]
+
+            Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
+                f_input_field, n_bfp, focal_length, NA, xb, yb, zb,
+                bead_center, bfp_sampling_n, num_orders, return_grid=False,
+                total_field=True, inside_bead=False, H_field=True, verbose=verbose,
+                grid=False
+            )
+        
+            # Note: factor 1/2 incorporated later as 2 pi instead of 4 pi
+            Px = (np.conj(Hz)*Ey - np.conj(Hy)*Ez).real
+            Py = (np.conj(Hx)*Ez - np.conj(Hz)*Ex).real
+            Pz = (np.conj(Hy)*Ex - np.conj(Hx)*Ey).real
+            Pabs = np.sum((Px * x + Py * y + Pz * z) * w)
+
+            return Pabs * (self.bead_diameter * 0.51)**2 * 2 * np.pi
+    
+
+    def scattered_power_focus(self, f_input_field, n_bfp=1.0,
+                    focal_length=4.43e-3, NA=1.2,
+                    bead_center=(0,0,0),
+                    bfp_sampling_n=31, num_orders=None, integration_orders=None,
+                    verbose=False
+                    ):
+            """Calculate the scattered power by a bead in the focus of an arbitrary input
+            beam, going through an objective with a certain NA and focal length.
+            Implemented with the angular spectrum of plane waves and Mie theory. 
+
+            This function correctly incorporates the polarized nature of light in a
+            focus. In other words, the polarization state at the focus includes
+            electric fields in the x, y, and z directions. The input can be a
+            combination of x- and y-polarized light of complex amplitudes.
+
+            Parameters
+            ----------
+            f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
+                cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
+                the back focal plane, determined by the focal length and NA of the
+                objective. Y_BFP is the corresponding grid of y locations, and R is
+                the radial distance from the center of the back focal plane. Rmax is
+                the largest distance that falls inside the NA, but R will contain
+                larger numbers as the back focal plane is sampled with a square
+                grid. Theta is defined as the angle with the negative optical axis
+                (-z), and cosTheta is the cosine of this angle. Phi is defined as
+                the angle between the x and y axis, and cosPhi and sinPhi are its
+                cosine and sine, respectively. The function must return a tuple
+                (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
+                direction, respectively, at the sample locations in the back focal
+                plane. The fields may be complex, so a phase difference between x
+                and y is possible. If only one polarization is used, the other
+                return value must be None, e.g., y polarization would return (None,
+                E_BFP_y). The fields are post-processed such that any part that
+                falls outside of the NA is set to zero. 
+            n_bfp : refractive index at the back focal plane of the objective
+                focused focal_length: focal length of the objective, in meters 
+            focal_length : focal length of the objective, in meters
+            NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+            bead_center : tuple of three floating point numbers determining the
+                x, y and z position of the bead center in 3D space, in meters 
+            bfp_sampling_n : (Default value = 31) Number of discrete steps with
+                which the back focal plane is sampled, from the center to the edge.
+                The total number of plane waves scales with the square of
+                bfp_sampling_n num_orders: number of order that should be included
+                in the calculation the Mie solution. If it is None (default), the
+                code will use the number_of_orders() method to calculate a
+                sufficient number. 
+            
+            Returns
+            -------
+            Psca : the scattered power in Watts.
+            """
+
+            self._get_mie_coefficients(num_orders)
+            if integration_orders is None:
+                # Go to the next higher available order of integration than should 
+                # be strictly necessary
+                order = get_nearest_order(get_nearest_order(self._n_coeffs) + 1)
+                x, y, z, w = get_integration_locations(order)
+            else:
+                x, y, z, w = get_integration_locations(get_nearest_order(
+                    np.amax((1,int(integration_orders)))
+                    ))
+
+            x = np.asarray(x)
+            y = np.asarray(y)
+            z = np.asarray(z)
+            w = np.asarray(w)
+        
+            xb = x * self.bead_diameter * 0.51 + bead_center[0]
+            yb = y * self.bead_diameter * 0.51 + bead_center[1]
+            zb = z * self.bead_diameter * 0.51 + bead_center[2]
+
+            Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
+                f_input_field, n_bfp, focal_length, NA, xb, yb, zb,
+                bead_center, bfp_sampling_n, num_orders, return_grid=False,
+                total_field=False, inside_bead=False, H_field=True, verbose=verbose,
+                grid=False
+            )
+        
+            # Note: factor 1/2 incorporated later as 2 pi instead of 4 pi
+            Px = (np.conj(Hz)*Ey - np.conj(Hy)*Ez).real
+            Py = (np.conj(Hx)*Ez - np.conj(Hz)*Ex).real
+            Pz = (np.conj(Hy)*Ex - np.conj(Hx)*Ey).real
+            Psca = np.sum((Px * x + Py * y + Pz * z) * w)
+
+            return Psca * (self.bead_diameter * 0.51)**2 * 2 * np.pi
 
     def _init_local_coordinates(self, x, y, z, bead_center=(0,0,0), 
         grid=True
@@ -954,7 +1116,7 @@ class MieCalc:
         # Loop over all cos(theta), in order to find the unique values of
         # cos(theta)
         # TODO: Consider using parity to shorten calculations by a factor ~2
-        cosTs = np.empty(cos_th_shape)
+        cosTs = np.zeros(cos_th_shape)
 
         for m in range(s[1]):
             for p in range(s[0]):
@@ -963,8 +1125,8 @@ class MieCalc:
                 # Rotate the coordinate system such that the x-polarization on the
                 # bead coincides with theta polarization in global space
                 # however, cos(theta) is the same for phi polarization!
-                A = (self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]))
+                A = (_R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m]))
                 coords = A @ local_coords
                 Zvl_s = coords[2,:]
 
@@ -974,7 +1136,6 @@ class MieCalc:
                 else:
                     cosTs[p, m, r > 0] = Zvl_s[r > 0] / r[r > 0]
                     cosTs[p, m, r == 0] = 1
-
 
         cosTs = np.reshape(cosTs, cosTs.size)
         # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
@@ -988,14 +1149,21 @@ class MieCalc:
         self._alp_deriv = np.zeros((self._n_coeffs, cosT_unique.size))
         alp_prev = None # unique situation that for n == 1,
                         # the previous Assoc. Legendre Poly. isn't required
-
+        sign_cosT_unique = np.sign(cosT_unique)
+        abs_cosT_unique, sign_inv = np.unique(np.abs(cosT_unique), 
+            return_inverse=True)
+        parity = 1
         for L in range(1, self._n_coeffs + 1):
-            self._alp[L - 1,:] = associated_legendre(L, cosT_unique)
+            self._alp[L - 1,:] = associated_legendre(L, abs_cosT_unique)[sign_inv]
+            if parity == -1:
+                self._alp[L - 1,:] *= sign_cosT_unique
+            
             self._alp_sin[L - 1, :] = associated_legendre_over_sin_theta(L,
                                     cosT_unique, self._alp[L - 1,:])
             self._alp_deriv[L - 1, :] = associated_legendre_dtheta(L, cosT_unique,
                                     (self._alp[L - 1,:], alp_prev))
             alp_prev = self._alp[L - 1,:]
+            parity *= -1
 
     def _calculate_field_speed_mem(self, Ex, Ey, Ez, Hx, Hy, Hz, 
                                    internal: bool,
@@ -1031,11 +1199,11 @@ class MieCalc:
             for p in range(s[0]):
                 if self._aperture[p, m]:  # Skip points outside aperture
                     continue
-                matrices = [self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m]),
-                    self._R_phi(0, -1) @ 
-                    self._R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                    self._R_phi(self._cosP[p,m], -self._sinP[p,m])]
+                matrices = [_R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m]),
+                    _R_phi(0, -1) @ 
+                    _R_th(self._cosT[p,m], self._sinT[p,m]) @ 
+                    _R_phi(self._cosP[p,m], -self._sinP[p,m])]
                 E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
             
                 for polarization in range(2):
@@ -1071,15 +1239,18 @@ class MieCalc:
                     
                     E[:] = 0
                     if internal:
-                        E[:, region] = self._internal_field_fixed_r(
-                                        alp_expanded,
-                                        alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, cosP, sinP)
+                        E[:, region] = _internal_field_fixed_r(self._cn,
+                            self._dn, self._sphBessel, self._jn_over_k1r, 
+                            self._jn_1, 
+                            alp_expanded,
+                            alp_sin_expanded, alp_deriv_expanded,
+                            cosT, cosP, sinP)
                     else:
-                        E[:, region] = self._scattered_field_fixed_r(
-                                    alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, cosP, sinP,
-                                    total_field)
+                        E[:, region] = _scattered_field_fixed_r(self._an,
+                            self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                            alp_expanded, alp_sin_expanded,
+                            alp_deriv_expanded, cosT, cosP, sinP,
+                            total_field)
 
                     E = np.matmul(A.T, E)
                     E[:, region] *= E0[polarization] * np.exp(1j *
@@ -1094,15 +1265,18 @@ class MieCalc:
                     if H_field:
                         H[:] = 0
                         if internal:
-                            H[:, region] = self._internal_H_field_fixed_r(
-                                        alp_expanded,
-                                        alp_sin_expanded, alp_deriv_expanded,
-                                        cosT, cosP, sinP)
+                            H[:, region] = _internal_H_field_fixed_r(self._cn,
+                                self._dn, self._sphBessel, self._jn_over_k1r,
+                                self._jn_1,
+                                alp_expanded,
+                                alp_sin_expanded, alp_deriv_expanded,
+                                cosT, cosP, sinP, self.n_bead)
                         else:
-                            H[:, region] = self._scattered_H_field_fixed_r(
-                                    alp_expanded, alp_sin_expanded,
-                                    alp_deriv_expanded, cosT, cosP, sinP,
-                                    total_field)
+                            H[:, region] = _scattered_H_field_fixed_r(self._an,
+                                self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                                alp_expanded, alp_sin_expanded,
+                                alp_deriv_expanded, cosT, cosP, sinP, 
+                                self.n_medium, total_field)
 
                         H = np.matmul(A.T, H)
                         H[:, region] *= E0[polarization] * np.exp(1j *
@@ -1115,193 +1289,183 @@ class MieCalc:
                         Hz[:,:,:] += np.reshape(H[2,:], self._XYZshape)
 
 
-    def _scattered_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                                alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, cosP: np.ndarray,
-                                sinP: np.ndarray,
-                                total_field=True):
+@njit(cache=True)
+def _scattered_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray, 
+                            dkrh_dkr: np.ndarray, k0r: np.ndarray, 
+                            alp: np.ndarray, alp_sin: np.ndarray,
+                            alp_deriv: np.ndarray,
+                            cos_theta: np.ndarray, cosP: np.ndarray,
+                            sinP: np.ndarray,
+                            total_field=True):
 
-        # Radial, theta and phi-oriented fields
-        Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    # Radial, theta and phi-oriented fields
+    Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
+    sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
-        an = self._an
-        bn = self._bn
-        krh = self._krh
-        dkrh_dkr = self._dkrh_dkr
-        k0r = self._k0r
-        L = np.arange(start=1, stop=self._n_coeffs + 1)
-        C1 = 1j**(L + 1) * (2 * L + 1)
-        C2 = C1 / (L * (L + 1))
-        for L in range(1, self._n_coeffs + 1):
-            Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
+    L = np.arange(start=1, stop=an.size + 1)
+    C1 = 1j**(L + 1) * (2 * L + 1)
+    C2 = C1 / (L * (L + 1))
+    for L in range(1, an.size + 1):
+        Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
-            Et += C2[L-1] * (an[L - 1] *
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
-                    krh[L - 1,:] * alp_sin[L - 1,:])
+        Et += C2[L-1] * (an[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] + 1j*bn[L - 1] *
+                krh[L - 1,:] * alp_sin[L - 1,:])
 
-            Ep += C2[L-1] * (an[L - 1] *
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
-                krh[L - 1,:] * alp_deriv[L - 1,:])
+        Ep += C2[L-1] * (an[L - 1] *
+            dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] + 1j * bn[L - 1] *
+            krh[L - 1,:] * alp_deriv[L - 1,:])
 
-        Er *= -cosP / (k0r)**2
-        Et *= -cosP / (k0r)
-        Ep *= sinP / (k0r)
-        # Cartesian components
-        Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
-        Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
-        Ez = Er * cos_theta - Et * sinT
-        if total_field:
-            # Incident field (x-polarized)
-            Ei = np.exp(1j * k0r * cos_theta)
-            return np.concatenate((Ex + Ei, Ey, Ez), axis=0)
-        else:
-            return np.concatenate((Ex, Ey, Ez), axis=0)
-
-    def _internal_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                          alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, cosP: np.ndarray,
-                          sinP: np.ndarray):
-
-        # Radial, theta and phi-oriented fields
-        Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-
-        sinT = np.sqrt(1 - cos_theta**2)
-        
-        #short hand for readability:
-        cn = self._cn
-        dn = self._dn
-        sphBessel = self._sphBessel
-        jn_over_k1r = self._jn_over_k1r
-        jn_1 = self._jn_1
-
-        for n in range(1, self._n_coeffs + 1):
-            Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
-                    jn_over_k1r[n - 1, :])
-
-            Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
-                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
-                                        n * jn_over_k1r[n - 1, :]))
-
-            Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
-                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-                1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
-                                                    jn_over_k1r[n - 1, :]))
-
-
-        Er *= -cosP
-        Et *= -cosP
-        Ep *= -sinP
-        # Cartesian components
-        Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
-        Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
-        Ez = Er * cos_theta - Et * sinT
+    Er *= -cosP / (k0r)**2
+    Et *= -cosP / (k0r)
+    Ep *= sinP / (k0r)
+    # Cartesian components
+    Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
+    Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
+    Ez = Er * cos_theta - Et * sinT
+    if total_field:
+        # Incident field (x-polarized)
+        Ei = np.exp(1j * k0r * cos_theta)
+        return np.concatenate((Ex + Ei, Ey, Ez), axis=0)
+    else:
         return np.concatenate((Ex, Ey, Ez), axis=0)
 
-    def _scattered_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                                alp_deriv: np.ndarray,
-                                cos_theta: np.ndarray, cosP: np.ndarray,
-                                sinP: np.ndarray,
-                                total_field=True):
-        
-        # Radial, theta and phi-oriented fields
-        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-        sinT = np.sqrt(1 - cos_theta**2)
+@njit(cache=True)
+def _internal_field_fixed_r(cn: np.ndarray, dn: np.ndarray, 
+    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray, 
+    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
+    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray):
 
-        an = self._an
-        bn = self._bn
-        krh = self._krh
-        dkrh_dkr = self._dkrh_dkr
-        k0r = self._k0r
-        L = np.arange(start=1, stop=self._n_coeffs + 1)
-        C1 = 1j**L * (2 * L + 1)
-        C2 = C1 / (L * (L + 1))
-        for L in range(1, self._n_coeffs + 1):
-            Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
+    # Radial, theta and phi-oriented fields
+    Er = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Et = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ep = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
 
-            Ht += C2[L-1] * (1j* bn[L - 1] *
-                    dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
-                    krh[L - 1,:] * alp_sin[L - 1,:])
+    sinT = np.sqrt(1 - cos_theta**2)
+    
+    for n in range(1, cn.size + 1):
+        Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
+                jn_over_k1r[n - 1, :])
 
-            Hp += C2[L-1] * (1j * bn[L - 1] *
-                dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
-                krh[L - 1,:] * alp_deriv[L - 1,:])
-        
-        # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
-        # but our associated Legendre polynomials do include it
-        Hr *= -sinP / (k0r)**2 * self.n_medium / (_C * _MU0)
-        Ht *= -sinP / (k0r) * self.n_medium / (_C * _MU0)
-        Hp *= -cosP / (k0r) * self.n_medium / (_C * _MU0)
-        
-        # Cartesian components
-        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
-        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
-        Hz = Hr * cos_theta - Ht * sinT
-        if total_field:
-            # Incident field (E field x-polarized)
-            Hi = np.exp(1j * k0r * cos_theta) * self.n_medium / (_C * _MU0)
-            return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
-        else:
-            return np.concatenate((Hx, Hy, Hz), axis=0)
+        Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+                alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
+                alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                    n * jn_over_k1r[n - 1, :]))
 
-    def _internal_H_field_fixed_r(self, alp: np.ndarray, alp_sin: np.ndarray,
-                          alp_deriv: np.ndarray,
-                          cos_theta: np.ndarray, cosP: np.ndarray,
-                          sinP: np.ndarray):
-
-        # Radial, theta and phi-oriented fields
-        Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-        Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
-
-        sinT = np.sqrt(1 - cos_theta**2)
-
-        #short hand for readability:
-        cn = self._cn
-        dn = self._dn
-        sphBessel = self._sphBessel
-        jn_over_k1r = self._jn_over_k1r
-        jn_1 = self._jn_1
-
-        for n in range(1, self._n_coeffs + 1):
-            Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
-                    jn_over_k1r[n - 1, :])
-
-            Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
-                    alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
-                    alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
-                                        n * jn_over_k1r[n - 1, :]))
-
-            Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
-                alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-                1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
-                                                    jn_over_k1r[n - 1, :]))
+        Ep += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (cn[n - 1] *
+            alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+            1j*dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                jn_over_k1r[n - 1, :]))
 
 
-        Hr *= sinP * self.n_bead / (_C * _MU0)
-        Ht *= -sinP * self.n_bead / (_C * _MU0)
-        Hp *= cosP * self.n_bead / (_C * _MU0)
-        # Cartesian components
-        Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
-        Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
-        Hz = Hr * cos_theta - Ht * sinT
+    Er *= -cosP
+    Et *= -cosP
+    Ep *= -sinP
+    # Cartesian components
+    Ex = Er * sinT * cosP + Et * cos_theta * cosP - Ep * sinP
+    Ey = Er * sinT * sinP + Et * cos_theta * sinP + Ep * cosP
+    Ez = Er * cos_theta - Et * sinT
+    return np.concatenate((Ex, Ey, Ez), axis=0)
+
+
+@njit(cache=True)
+def _scattered_H_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray, 
+                            dkrh_dkr: np.ndarray, k0r: np.ndarray, 
+                            alp: np.ndarray, alp_sin: np.ndarray,
+                            alp_deriv: np.ndarray,
+                            cos_theta: np.ndarray, cosP: np.ndarray,
+                            sinP: np.ndarray, n_medium: float,
+                            total_field=True):
+    
+    # Radial, theta and phi-oriented fields
+    Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+    sinT = np.sqrt(1 - cos_theta**2)
+
+    L = np.arange(start=1, stop=an.size + 1)
+    C1 = 1j**L * (2 * L + 1)
+    C2 = C1 / (L * (L + 1))
+    for L in range(1, an.size + 1):
+        Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
+
+        Ht += C2[L-1] * (1j* bn[L - 1] *
+                dkrh_dkr[L - 1,:] * alp_deriv[L - 1,:] - an[L - 1] *
+                krh[L - 1,:] * alp_sin[L - 1,:])
+
+        Hp += C2[L-1] * (1j * bn[L - 1] *
+            dkrh_dkr[L - 1,:] * alp_sin[L - 1,:] - an[L - 1] *
+            krh[L - 1,:] * alp_deriv[L - 1,:])
+    
+    # Extra factor of -1 as B&H does not include the Condon–Shortley phase, 
+    # but our associated Legendre polynomials do include it
+    Hr *= -sinP / (k0r)**2 * n_medium / (_C * _MU0)
+    Ht *= -sinP / (k0r) * n_medium / (_C * _MU0)
+    Hp *= -cosP / (k0r) * n_medium / (_C * _MU0)
+    
+    # Cartesian components
+    Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+    Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+    Hz = Hr * cos_theta - Ht * sinT
+    if total_field:
+        # Incident field (E field x-polarized)
+        Hi = np.exp(1j * k0r * cos_theta) * n_medium / (_C * _MU0)
+        return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
+    else:
         return np.concatenate((Hx, Hy, Hz), axis=0)
 
-    def _R_phi(self, cos_phi, sin_phi):
-        return np.asarray([[cos_phi, -sin_phi, 0],
-                           [sin_phi, cos_phi, 0],
-                           [0, 0, 1]])
 
-    def _R_th(self, cos_th, sin_th):
-        return np.asarray([[cos_th, 0, sin_th],
-                           [0,  1,  0],
-                           [-sin_th, 0, cos_th]])
+@njit(cache=True)
+def _internal_H_field_fixed_r(cn: np.ndarray, dn: np.ndarray, 
+    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray, 
+    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
+    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray, 
+    n_bead: np.complex128):
+
+    # Radial, theta and phi-oriented fields
+    Hr = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Ht = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+    Hp = np.zeros((1,cos_theta.shape[0]), dtype='complex128')
+
+    sinT = np.sqrt(1 - cos_theta**2)
+
+    for n in range(1, cn.size + 1):
+        Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
+                jn_over_k1r[n - 1, :])
+
+        Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+                alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * cn[n - 1] *
+                alp_deriv[n - 1, :] * (jn_1[n - 1, :] -
+                                    n * jn_over_k1r[n - 1, :]))
+
+        Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (dn[n - 1] *
+            alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
+            1j*cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n *
+                                                jn_over_k1r[n - 1, :]))
+
+
+    Hr *= sinP * n_bead / (_C * _MU0)
+    Ht *= -sinP * n_bead / (_C * _MU0)
+    Hp *= cosP * n_bead / (_C * _MU0)
+    # Cartesian components
+    Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
+    Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
+    Hz = Hr * cos_theta - Ht * sinT
+    return np.concatenate((Hx, Hy, Hz), axis=0)
+
+
+def _R_phi(cos_phi, sin_phi):
+    return np.asarray([[cos_phi, -sin_phi, 0],
+                        [sin_phi, cos_phi, 0],
+                        [0, 0, 1]])
+
+
+def _R_th(cos_th, sin_th):
+    return np.asarray([[cos_th, 0, sin_th],
+                        [0,  1,  0],
+                        [-sin_th, 0, cos_th]])
