@@ -3,8 +3,12 @@
 import numpy as np
 import numpy.polynomial as npp
 from numba import njit
+from joblib import Memory
 
+cachedir = 'miecalc_cache'
+memory = Memory(cachedir, verbose=0)
 
+# @memory.cache
 @njit(cache=True, parallel=True)
 def associated_legendre(n: int, x: np.ndarray):
     """associated_legendre(n, x): Return the 1st order (m == 1) of the 
@@ -28,7 +32,7 @@ def associated_legendre(n: int, x: np.ndarray):
         return _fi1(x)
     if n == 2:
         return _fi2(x)
-
+    print('calculating')
     bk2 = np.zeros(x.shape)
     bk1 = np.ones(x.shape)
     for k in range(n - 1, 1, -1):

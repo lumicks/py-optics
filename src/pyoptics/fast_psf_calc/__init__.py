@@ -13,12 +13,9 @@ from . import czt
 import numpy as np
 import scipy.special as sp
 from scipy.integrate import quad
-
-
-# Some constants useful for calculating the magnetic fields
-_C = 299792458
-_MU0 = 4 * np.pi * 1e-7
-_EPS0 = (_C**2 * _MU0)**-1
+from scipy.constants import speed_of_light as _C
+from scipy.constants import mu_0 as _MU0
+from scipy.constants import epsilon_0 as _EPS0
 
 
 def focused_gauss(
