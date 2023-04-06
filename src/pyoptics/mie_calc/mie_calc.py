@@ -15,7 +15,7 @@ from scipy.constants import (
     mu_0 as _MU0
 )
 
-def calculate_fields(
+def _calculate_fields(
     Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
     Hx: np.ndarray, Hy: np.ndarray, Hz: np.ndarray,
     bead: Bead = None,
@@ -54,100 +54,122 @@ def calculate_fields(
     alp_sin_expanded = np.empty(alp_expanded.shape)
     alp_deriv_expanded = np.empty(alp_expanded.shape)
 
+    an, bn = bead.ab_coeffs(n_orders)
+    cn, dn = bead.cd_coeffs(n_orders)
+
     n_pupil_samples = farfield_data.Einf_phi.shape[0]
     cosT = np.empty(r.shape)
     for m in range(n_pupil_samples):
         for p in range(n_pupil_samples):
-            if self._aperture[p, m]:  # Skip points outside aperture
+            if not farfield_data.aperture[p, m]:  # Skip points outside aperture
                 continue
-            matrices = [_R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                _R_phi(self._cosP[p,m], -self._sinP[p,m]),
+            matrices = [
+                _R_th(farfield_data.cos_theta[p,m], farfield_data.sin_theta[p,m]) @ 
+                _R_phi(farfield_data.cos_phi[p,m], -farfield_data.sin_phi[p,m]),
                 _R_phi(0, -1) @ 
-                _R_th(self._cosT[p,m], self._sinT[p,m]) @ 
-                _R_phi(self._cosP[p,m], -self._sinP[p,m])]
-            E0 = [self._Einf_theta[p, m], self._Einf_phi[p, m]]
+                _R_th(farfield_data.cos_theta[p,m], farfield_data.sin_theta[p,m]) @ 
+                _R_phi(farfield_data.cos_phi[p,m], -farfield_data.sin_phi[p,m])
+            ]
+            
+            E0 = [farfield_data.Einf_theta[p, m], farfield_data.Einf_phi[p, m]]
         
             for polarization in range(2):
                 A = matrices[polarization]
                 coords = A @ local_coords
-                Xvl_s = coords[0,:]
-                Yvl_s = coords[1,:]
-                Zvl_s = coords[2,:]
+                x = coords[0,:]
+                y = coords[1,:]
+                z = coords[2,:]
 
                 if polarization == 0:
                     if internal:
-                        cosT[r > 0] = Zvl_s[r > 0] / r[r > 0]
+                        cosT[r > 0] = z[r > 0] / r[r > 0]
                         cosT[r == 0] = 1
                     else:
-                        cosT[:] = Zvl_s / r
+                        cosT[:] = z / r
                     cosT[cosT > 1] = 1
                     cosT[cosT < -1] = -1
                 
                     # Expand the legendre derivatives from the unique version of
                     # cos(theta)
-                    alp_expanded[:] = self._alp[:, self._inverse[p,m]]
-                    alp_sin_expanded[:] = self._alp_sin[:, self._inverse[p,m]]
-                    alp_deriv_expanded[:] = self._alp_deriv[:, self._inverse[p,m]]
+                    alp_expanded[:] = legendre_data.associated_legendre(p, m)
+                    alp_sin_expanded[:] = legendre_data.associated_legendre_over_sin_theta(p, m)
+                    alp_deriv_expanded[:] = legendre_data.associated_legendre_dtheta(p, m)
                 
-                rho_l = np.hypot(Xvl_s, Yvl_s)
+                rho_l = np.hypot(x, y)
                 cosP = np.empty(rho_l.shape)
                 sinP = np.empty(rho_l.shape)
                 where = rho_l > 0
-                cosP[where] = Xvl_s[where]/rho_l[where]
-                sinP[where] = Yvl_s[where]/rho_l[where]
+                cosP[where] = x[where]/rho_l[where]
+                sinP[where] = y[where]/rho_l[where]
                 cosP[rho_l == 0] = 1
                 sinP[rho_l == 0] = 0
                 
                 E[:] = 0
                 if internal:
-                    E[:, region] = _internal_field_fixed_r(self._cn,
-                        self._dn, self._sphBessel, self._jn_over_k1r, 
-                        self._jn_1, 
+                    E[:, region] = _internal_field_fixed_r(
+                        cn, dn, 
+                        internal_radial_data.sphBessel,
+                        internal_radial_data.jn_over_k1r, 
+                        internal_radial_data.jn_1, 
                         alp_expanded,
                         alp_sin_expanded, alp_deriv_expanded,
-                        cosT, cosP, sinP)
+                        cosT, cosP, sinP
+                    )
                 else:
-                    E[:, region] = _scattered_field_fixed_r(self._an,
-                        self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                    E[:, region] = _scattered_field_fixed_r(
+                        an, bn,
+                        external_radial_data.krH,
+                        external_radial_data.dkrH_dkr,
+                        external_radial_data.k0r,
                         alp_expanded, alp_sin_expanded,
                         alp_deriv_expanded, cosT, cosP, sinP,
-                        total_field)
+                        total_field
+                    )
 
                 E = np.matmul(A.T, E)
-                E[:, region] *= E0[polarization] * np.exp(1j *
-                    (self._Kx[p,m] * bead_center[0] +
-                    self._Ky[p,m] * bead_center[1] +
-                    self._Kz[p,m] * bead_center[2]))
+                E[:, region] *= E0[polarization] * np.exp(1j * (
+                    farfield_data.Kx[p,m] * bead_center[0] +
+                    farfield_data.Ky[p,m] * bead_center[1] +
+                    farfield_data.Kz[p,m] * bead_center[2])
+                )
 
-                Ex[:,:,:] += np.reshape(E[0,:], self._local_coordinates.coordinate_shape)
-                Ey[:,:,:] += np.reshape(E[1,:], self._local_coordinates.coordinate_shape)
-                Ez[:,:,:] += np.reshape(E[2,:], self._local_coordinates.coordinate_shape)
+                Ex[:,:,:] += np.reshape(E[0,:], local_coordinates.coordinate_shape)
+                Ey[:,:,:] += np.reshape(E[1,:], local_coordinates.coordinate_shape)
+                Ez[:,:,:] += np.reshape(E[2,:], local_coordinates.coordinate_shape)
 
-                if H_field:
+                if magnetic_field:
                     H[:] = 0
                     if internal:
-                        H[:, region] = _internal_H_field_fixed_r(self._cn,
-                            self._dn, self._sphBessel, self._jn_over_k1r,
-                            self._jn_1,
+                        H[:, region] = _internal_H_field_fixed_r(
+                            cn, dn,
+                            internal_radial_data.sphBessel,
+                            internal_radial_data.jn_over_k1r,
+                            internal_radial_data.jn_1,
                             alp_expanded,
                             alp_sin_expanded, alp_deriv_expanded,
-                            cosT, cosP, sinP, self.n_bead)
+                            cosT, cosP, sinP, bead.n_bead
+                        )
                     else:
-                        H[:, region] = _scattered_H_field_fixed_r(self._an,
-                            self._bn, self._krh, self._dkrh_dkr, self._k0r,
+                        H[:, region] = _scattered_H_field_fixed_r(
+                            an, bn,
+                            external_radial_data.krH,
+                            external_radial_data.dkrH_dkr,
+                            external_radial_data.k0r,
                             alp_expanded, alp_sin_expanded,
                             alp_deriv_expanded, cosT, cosP, sinP, 
-                            self.n_medium, total_field)
+                            bead.n_medium, total_field
+                        )
 
                     H = np.matmul(A.T, H)
-                    H[:, region] *= E0[polarization] * np.exp(1j *
-                        (self._Kx[p,m] * bead_center[0] +
-                        self._Ky[p,m] * bead_center[1] +
-                        self._Kz[p,m] * bead_center[2]))
+                    H[:, region] *= E0[polarization] * np.exp(1j * (
+                        farfield_data.Kx[p,m] * bead_center[0] +
+                        farfield_data.Ky[p,m] * bead_center[1] +
+                        farfield_data.Kz[p,m] * bead_center[2])
+                    )
 
-                    Hx[:,:,:] += np.reshape(H[0,:], self._local_coordinates.coordinate_shape)
-                    Hy[:,:,:] += np.reshape(H[1,:], self._local_coordinates.coordinate_shape)
-                    Hz[:,:,:] += np.reshape(H[2,:], self._local_coordinates.coordinate_shape)
+                    Hx[:,:,:] += np.reshape(H[0,:], local_coordinates.coordinate_shape)
+                    Hy[:,:,:] += np.reshape(H[1,:], local_coordinates.coordinate_shape)
+                    Hz[:,:,:] += np.reshape(H[2,:], local_coordinates.coordinate_shape)
 
 
 @njit(cache=True)
@@ -169,7 +191,7 @@ def _scattered_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
     L = np.arange(start=1, stop=an.size + 1)
     C1 = 1j**(L + 1) * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
-    for L in range(1, an.size + 1):
+    for L in range(an.size, 0, -1):
         Er += C1[L-1] * an[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
         Et += C2[L-1] * (an[L - 1] *
@@ -208,7 +230,7 @@ def _internal_field_fixed_r(cn: np.ndarray, dn: np.ndarray,
 
     sinT = np.sqrt(1 - cos_theta**2)
     
-    for n in range(1, cn.size + 1):
+    for n in range(cn.size, 0, -1):
         Er += - (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * dn[n - 1] *
                 jn_over_k1r[n - 1, :])
 
@@ -252,7 +274,7 @@ def _scattered_H_field_fixed_r(an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
     L = np.arange(start=1, stop=an.size + 1)
     C1 = 1j**L * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
-    for L in range(1, an.size + 1):
+    for L in range(an.size, 0, -1):
         Hr += C1[L-1] * 1j * bn[L - 1] * krh[L - 1,:] * alp[L-1,:]
 
         Ht += C2[L-1] * (1j* bn[L - 1] *
@@ -295,7 +317,7 @@ def _internal_H_field_fixed_r(cn: np.ndarray, dn: np.ndarray,
 
     sinT = np.sqrt(1 - cos_theta**2)
 
-    for n in range(1, cn.size + 1):
+    for n in range(cn.size, 0, -1):
         Hr += (1j**(n + 1) * (2*n + 1)  * alp[n - 1, :] * cn[n - 1] *
                 jn_over_k1r[n - 1, :])
 
@@ -406,12 +428,13 @@ def fields_gaussian_focus(self, n_bfp=1.0,
         total_field=total_field, inside_bead=inside_bead, H_field=H_field,
         verbose=verbose, grid=grid)
 
-def fields_focus(self, f_input_field, n_bfp=1.0,
+def fields_focus(f_input_field, n_bfp=1.0,
             focal_length=4.43e-3, NA=1.2,
             x=0, y=0, z=0, bead_center=(0,0,0),
+            bead: Bead = None,
             bfp_sampling_n=31, num_orders=None,
             return_grid=False,  total_field=True,
-            inside_bead=True, H_field=False, verbose=False, grid=True):
+            inside_bead=True, magnetic_field=False, verbose=False, grid=True):
     """Calculate the three-dimensional electromagnetic field of a bead in the
     focus of an arbitrary input beam, going through an objective with a
     certain NA and focal length. Implemented with the angular spectrum of 
@@ -501,26 +524,46 @@ def fields_focus(self, f_input_field, n_bfp=1.0,
     #if M > bfp_sampling_n:
     #    print('bfp_sampling_n lower than recommendation for convergence')
 
-    self._local_coordinates = LocalBeadCoordinates(
-        x, y, z, self.bead_diameter, bead_center, grid=grid
+    objective = Objective(
+        NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=bead.n_medium
     )
-    self._get_mie_coefficients(num_orders)
-    self._init_back_focal_plane(f_input_field, n_bfp, focal_length, NA, 
-                                bfp_sampling_n)
+    local_coordinates = LocalBeadCoordinates(
+        x, y, z, bead.bead_diameter, bead_center, grid=grid
+    )
+
+    an, bn = bead.ab_coeffs(num_orders)
+    cn, dn = bead.cd_coeffs(num_orders)
+
+    bfp_coords, bfp_fields = sample_bfp(
+        f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n, objective=objective
+    )
+
+    farfield_data = bfp_to_farfield(bfp_coords, bfp_fields, objective, bead.lambda_vac)
+    
     if verbose:
         print('Hankel functions')
-    self._init_hankel()
+    external_radial_data = calculate_external(bead.k, local_coordinates.r_outside, an.size)
+
     if verbose:
         print('Legendre functions')
-    self._init_legendre(outside=True)
+    legendre_data_ext = calculate_legendre(
+        local_coordinates.xyz_stacked(inside=False),
+        local_coordinates.r_outside,
+        bfp_coords.aperture,
+        farfield_data.cos_theta,
+        farfield_data.sin_theta,
+        farfield_data.cos_phi,
+        farfield_data.sin_phi,
+        an.size
+    )
 
-    Ex = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
-    Ey = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
-    Ez = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
-    if H_field:
-        Hx = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
-        Hy = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
-        Hz = np.zeros(self._local_coordinates.coordinate_shape, dtype='complex128')
+    Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    Ey = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    Ez = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    if magnetic_field:
+        Hx = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+        Hy = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+        Hz = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
     else:
         Hx = 0
         Hy = 0
@@ -528,26 +571,51 @@ def fields_focus(self, f_input_field, n_bfp=1.0,
         
     if verbose:
         print('External field')
-    self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, internal=False,
-        total_field=total_field, H_field=H_field, bead_center=bead_center)
+
+    _calculate_fields(
+        Ex, Ey, Ez, Hx, Hy, Hz,
+        bead=bead, bead_center=bead_center, local_coordinates=local_coordinates,
+        farfield_data=farfield_data, legendre_data=legendre_data_ext,
+        external_radial_data=external_radial_data,
+        internal=False,
+        total_field=total_field, magnetic_field=magnetic_field,
+    )
 
     if inside_bead:
         if verbose:
             print('Bessel functions')
-        self._init_bessel()
+        internal_radial_data = calculate_internal(
+            bead.k1, local_coordinates.r_inside, an.size
+        )
+
         if verbose:
             print('Legendre functions')
-        self._init_legendre(outside=False)
+        legendre_data_int = calculate_legendre(
+            local_coordinates.xyz_stacked(inside=True),
+            local_coordinates.r_inside,
+            bfp_coords.aperture,
+            farfield_data.cos_theta,
+            farfield_data.sin_theta,
+            farfield_data.cos_phi,
+            farfield_data.sin_phi,
+            an.size
+        )
         if verbose:
             print('Internal field')
-        self._calculate_field_speed_mem(Ex, Ey, Ez, Hx, Hy, Hz, 
-            internal=True, total_field=total_field, H_field=H_field, 
-            bead_center=bead_center)
+        _calculate_fields(
+            Ex, Ey, Ez, Hx, Hy, Hz,
+            bead=bead, bead_center=bead_center, local_coordinates=local_coordinates,
+            farfield_data=farfield_data, legendre_data=legendre_data_int,
+            internal_radial_data=internal_radial_data,
+            internal=True,
+            total_field=total_field, magnetic_field=magnetic_field,
+        )
 
-    ks = self._k * NA / self.n_medium
+    ks = bead.k * objective.NA / bead.n_medium
     dk = ks / (bfp_sampling_n - 1)
-    phase = -1j * focal_length * (np.exp(-1j * self._k * focal_length) *
-            dk**2 / (2 * np.pi))
+    phase = -1j * objective.focal_length * (
+        np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi)
+    )
     Ex *= phase
     Ey *= phase
     Ez *= phase
@@ -562,7 +630,7 @@ def fields_focus(self, f_input_field, n_bfp=1.0,
         Y = np.squeeze(Y)
         Z = np.squeeze(Z)
 
-    if H_field:
+    if magnetic_field:
         Hx *= phase
         Hy *= phase
         Hz *= phase

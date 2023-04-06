@@ -22,20 +22,20 @@ class InternalRadialData:
     jn_1: np.ndarray
 
 
-@njit(cache=True, parallel=True)
+# @njit(cache=True, parallel=True)
 def calculate_external(k: float, radii: np.ndarray, n_orders: int):
     """Precompute the spherical Hankel functions and derivatives that only depend
     on the r coordinate. These functions will not change for any rotation of
     the coordinate system."""
 
     # Only calculate the spherical bessel function for unique values of k0r
-    k0r  = k * radii
+    k0r = k * radii
     k0r_unique, inverse = np.unique(k0r, return_inverse=True)
     sqrt_x = np.sqrt(0.5 * np.pi / k0r_unique)
     krh_1 = np.sin(k0r) - 1j * np.cos(k0r)
-    sphHankel = np.empty((n_orders, k0r.shape[0]), dtype='complex128')
-    krH = np.empty(sphHankel.shape, dtype='complex128')
-    dkrH_dkr = np.empty(sphHankel.shape, dtype='complex128')
+    sphHankel = np.empty((n_orders, k0r.shape[0]), dtype=np.complex128)
+    krH = np.empty(sphHankel.shape, dtype=np.complex128)
+    dkrH_dkr = np.empty(sphHankel.shape, dtype=np.complex128)
 
     for L in range(1, n_orders + 1):
         sphHankel[L - 1, :] = (
@@ -46,10 +46,9 @@ def calculate_external(k: float, radii: np.ndarray, n_orders: int):
         dkrH_dkr[L - 1, :] = krh_1 - L * sphHankel[L - 1, :]
         krh_1 = krH[L - 1, :]
     
-    return k0r, krH, dkrH_dkr
+    return ExternalRadialData(k0r, krH, dkrH_dkr)
 
 
-@njit(cache=True, parallel=True)
 def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
     """Precompute the spherical Bessel functions and related that only depend on
     the r coordinate, for the fields inside of the sphere."""
@@ -77,4 +76,4 @@ def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
     # For n > 1 taken care of by np.zeros(...)
     jn_over_k1r[0, k1r == 0] = 1/3
 
-    return k1r, sphBessel, jn_over_k1r, jn_1
+    return InternalRadialData(k1r, sphBessel, jn_over_k1r, jn_1)

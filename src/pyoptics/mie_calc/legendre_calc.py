@@ -1,6 +1,10 @@
 from .legendre import *
 import numpy as np
 from numba import njit, prange
+from joblib import Memory
+
+cachedir = 'miecalc_cache'
+memory = Memory(cachedir, verbose=0)
 
 class AssociatedLegendreData:
     __slots__ = (
@@ -31,8 +35,7 @@ class AssociatedLegendreData:
     def associated_legendre_dtheta(self, p: int, m: int):
         return self._associated_legendre_dtheta[:, self._inverse[p, m]]
 
-
-njit(cache=True, parallel=True)
+@memory.cache
 def calculate_legendre(
     local_coords: np.ndarray, radii: np.ndarray, aperture: np.ndarray, 
     cos_theta: np.ndarray, sin_theta: np.ndarray,
@@ -47,23 +50,31 @@ def calculate_legendre(
     if (n_pupil_samples := aperture.shape[0]) != aperture.shape[1]:
         raise ValueError("Aperture matrix must be square")
     
-    for m in prange(n_pupil_samples):
-        for p in range(n_pupil_samples):
-            if not aperture[p, m]:
-                continue
-            # Rotate the coordinate system such that the x-polarization on the
-            # bead coincides with theta polarization in global space
-            # however, cos(theta) is the same for phi polarization!
-            A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @ 
-                _R_phi(cos_phi[p,m], -sin_phi[p,m]))
-            coords = A @ local_coords
-            z = coords[2,:]
-
-            # Retrieve an array of all values of cos(theta)
-            region = radii > 0
-            cosTs[p, m, region] = z[region] / radii[region] # cos(theta)
-            cosTs[p, m, radii == 0] = 1
-
+    @njit(cache=True, parallel=True)
+    def iterate(cosTs):
+        for m in prange(n_pupil_samples):
+            for p in range(n_pupil_samples):
+                if not aperture[p, m]:
+                    continue
+                ct = cosTs[p, m, :]
+                # Rotate the coordinate system such that the x-polarization on the
+                # bead coincides with theta polarization in global space
+                # however, cos(theta) is the same for phi polarization!
+                # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @ 
+                #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
+                # coords = A @ local_coords
+                z = (
+                    local_coords[2, :] * cos_theta[p, m] - 
+                    local_coords[0, :] * cos_phi[p, m] * sin_theta[p, m] +
+                    local_coords[1, :] * sin_phi[p, m] * sin_theta[p, m]
+                )
+                # z = coords[2, :]
+                # Retrieve an array of all values of cos(theta)
+                index = np.flatnonzero(radii)
+                ct[index] = z[index] / radii[index] # cos(theta)    
+                ct[radii == 0] = 1
+    
+    iterate(cosTs=cosTs)
     cosTs = np.reshape(cosTs, cosTs.size)
     # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
     cosTs[cosTs > 1] = 1
@@ -94,7 +105,7 @@ def calculate_legendre(
         alp_prev = alp[L - 1, :]
         parity *= -1
 
-    return alp, alp_sin, alp_deriv, inverse
+    return AssociatedLegendreData(alp, alp_sin, alp_deriv, inverse)
 
 
 def _R_phi(cos_phi, sin_phi):

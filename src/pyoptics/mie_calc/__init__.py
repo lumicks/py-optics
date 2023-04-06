@@ -6,3 +6,4 @@
        doi:10.1002/9783527618156
 """
 from .bead import Bead
+from .mie_calc import fields_focus
