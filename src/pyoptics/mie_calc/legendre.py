@@ -1,101 +1,116 @@
-"""Legendre polynomials"""
-
+from .associated_legendre import *
 import numpy as np
-import numpy.polynomial as npp
-from numba import njit
+from numba import njit, prange
 from joblib import Memory
 
 cachedir = 'miecalc_cache'
 memory = Memory(cachedir, verbose=0)
 
+@njit(cache=True)
+def _exec_lookup(source, lookup, p, m):
+    """Compile the retrieval of the lookup table with Numba, as it's slightly faster"""
+    return source[:, lookup[p, m]]
+
+
+class AssociatedLegendreData:
+    __slots__ = (
+        '_associated_legendre',
+        '_associated_legendre_over_sin_theta',
+        '_associated_legendre_dtheta',
+        '_inverse'
+    )
+    def __init__(
+        self,
+        associated_legendre: np.ndarray,
+        associated_legendre_over_sin_theta: np.ndarray,
+        associated_legendre_dtheta: np.ndarray,
+        inverse: np.ndarray
+    ) -> None:
+            
+        self._associated_legendre = associated_legendre
+        self._associated_legendre_over_sin_theta = associated_legendre_over_sin_theta
+        self._associated_legendre_dtheta = associated_legendre_dtheta
+        self._inverse = inverse
+    
+    def associated_legendre(self, p: int, m: int):
+        return _exec_lookup(self._associated_legendre, self._inverse, p, m)
+    
+    def associated_legendre_over_sin_theta(self, p: int, m: int):
+        return _exec_lookup(self._associated_legendre_over_sin_theta, self._inverse, p, m)
+
+    def associated_legendre_dtheta(self, p: int, m: int):
+        return _exec_lookup(self._associated_legendre_dtheta, self._inverse, p, m)
+
+
 @memory.cache
-@njit(cache=True, parallel=True)
-def associated_legendre(n: int, x: np.ndarray):
-    """associated_legendre(n, x): Return the 1st order (m == 1) of the 
-    associated Legendre polynomial of degree n, evaluated at x [-1..1]
+def calculate_legendre(
+    local_coords: np.ndarray, radii: np.ndarray, aperture: np.ndarray, 
+    cos_theta: np.ndarray, sin_theta: np.ndarray,
+    cos_phi: np.ndarray, sin_phi: np.ndarray,
+    n_orders: int
+):
+    """Calculating the Legendre polynomials is computationally intense, so
+    Loop over all cos(theta), in order to find the unique values of
+    cos(theta)"""
 
-    Uses a Clenshaw recursive algorithm for the evaluation, specific for the 
-    1st order associated Legendre polynomials.
+    cosTs = np.zeros((*aperture.shape, radii.size))
+    if (n_pupil_samples := aperture.shape[0]) != aperture.shape[1]:
+        raise ValueError("Aperture matrix must be square")
+    
+    @njit(cache=True, parallel=True)
+    def iterate(cosTs):
+        for m in prange(n_pupil_samples):
+            for p in range(n_pupil_samples):
+                if not aperture[p, m]:
+                    continue
+                ct = cosTs[p, m, :]
+                # Rotate the coordinate system such that the x-polarization on the
+                # bead coincides with theta polarization in global space
+                # however, cos(theta) is the same for phi polarization!
+                # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @ 
+                #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
+                # coords = A @ local_coords
+                z = (
+                    local_coords[2, :] * cos_theta[p, m] - 
+                    local_coords[0, :] * cos_phi[p, m] * sin_theta[p, m] +
+                    local_coords[1, :] * sin_phi[p, m] * sin_theta[p, m]
+                )
+                # z = coords[2, :]
+                # Retrieve an array of all values of cos(theta)
+                index = np.flatnonzero(radii)
+                ct[index] = z[index] / radii[index] # cos(theta)    
+                ct[radii == 0] = 1
+    
+    iterate(cosTs=cosTs)
+    cosTs = np.reshape(cosTs, cosTs.size)
+    # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
+    cosTs[cosTs > 1] = 1
+    cosTs[cosTs < -1] = -1
 
-    See Clenshaw, C. W. (July 1955). "A note on the summation of Chebyshev 
-    series". Mathematical Tables and Other Aids to Computation. 9 (51): 118
-    """
-    def _fi1(x):
-        """First order associated Legendre polynomial evaluated at x"""
-        return -(1-x**2)**0.5 
+    # Get the unique values of cos(theta) in the array
+    cosT_unique, inverse = np.unique(cosTs, return_inverse=True)
+    inverse = np.reshape(inverse, (n_pupil_samples, n_pupil_samples, radii.size))
+    alp = np.zeros((n_orders, cosT_unique.size))
+    alp_sin = np.zeros(alp.shape)
+    alp_deriv = np.zeros(alp.shape)
+    alp_prev = None # unique situation that for n == 1,
+                    # the previous Assoc. Legendre Poly. isn't required
+    sign_cosT_unique = np.sign(cosT_unique)
+    abs_cosT_unique, sign_inv = np.unique(np.abs(cosT_unique), 
+        return_inverse=True)
+    parity = 1
+    
+    for L in range(1, n_orders + 1):
+        alp[L - 1,:] = associated_legendre(L, abs_cosT_unique)[sign_inv]
+        if parity == -1:
+            alp[L - 1, :] *= sign_cosT_unique
+        alp_sin[L - 1, :] = associated_legendre_over_sin_theta(
+            L, cosT_unique, alp[L - 1, :]
+        )
+        alp_deriv[L - 1, :] = associated_legendre_dtheta(
+            L, cosT_unique, (alp[L - 1, :], alp_prev)
+        )
+        alp_prev = alp[L - 1, :]
+        parity *= -1
 
-    def _fi2(x):
-        """Second order associated Legendre polynomial evaluated at x"""
-        return -3*x*(1-x**2)**0.5
-
-    if n == 1:
-        return _fi1(x)
-    if n == 2:
-        return _fi2(x)
-    bk2 = np.zeros(x.shape)
-    bk1 = np.ones(x.shape)
-    for k in range(n - 1, 1, -1):
-        bk = ((2 * k + 1) / k) * x * bk1 - (k + 2) / (k + 1) * bk2
-        bk2 = bk1
-        bk1 = bk
-    return _fi2(x) * bk1 - 1.5 * _fi1(x) * bk2
-
-def associated_legendre_npp(n, x):
-    """associated_legendre(n, x): Return the 1st order (m == 1) of the 
-    associated Legendre polynomial of degree n, evaluated at x [-1..1]
-
-    This is a reference implementation in numpy, which is more generic and 
-    therefore slower. Furthermore, it's not compatible with Numba.
-    """
-    orders = np.zeros(n + 1)
-    orders[n] = 1
-    c = npp.Legendre(npp.legendre.legder(orders))
-    return -c(x) * np.sqrt(1 - x**2)
-
-
-def associated_legendre_dtheta(n, cos_theta, alp_pre=(None, None)):
-    """
-    Evaluate the derivative of the associated legendre polynomial 
-    P_n^1(cos(theta)), of order 1 and degree n, to the variable theta, 
-    where cos_theta == cos(theta).
-    """
-    if alp_pre[0] is None:
-        alp = associated_legendre(n, cos_theta)
-        if n > 1:
-            alp_1 = associated_legendre(n - 1, cos_theta)
-    else:
-        alp = alp_pre[0]
-        alp_1 = alp_pre[1]
-
-    with np.errstate(divide='ignore', invalid='ignore'):
-        if n == 1:
-            result = (n * cos_theta * alp) / np.sqrt(1 - cos_theta**2)
-        else:
-            # let it 'crash' on cos_theta == +/- 1, fix later
-            # with np.errstate(divide='ignore', invalid='ignore'):
-            result = (n * cos_theta * alp - (n + 1) * alp_1) / np.sqrt(1 -
-                    cos_theta**2)
-
-    result[cos_theta == 1] = -n * (n + 1) / 2
-    result[cos_theta == -1] = -(-1)**n * n * (n + 1) / 2
-
-    return result
-
-
-def associated_legendre_over_sin_theta(n, cos_theta, alp_pre=None):
-    """Evaluate the associated legendre polynomial of order 1 and degree n, 
-    divided by sin(theta): P_n^1(cos(theta))/sin(theta)"""
-
-    if alp_pre is None:
-        alp = associated_legendre(n, cos_theta)
-    else:
-        alp = alp_pre
-
-    # ignore division by zero, fix later
-    with np.errstate(divide='ignore', invalid='ignore'):
-        result = alp / np.sqrt(1 - cos_theta**2)
-
-    result[cos_theta == 1] =  -n * (n + 1) / 2
-    result[cos_theta == -1] = (-1)**n * n * (n + 1) / 2
-
-    return result
+    return AssociatedLegendreData(alp, alp_sin, alp_deriv, inverse)

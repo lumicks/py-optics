@@ -7,3 +7,4 @@
 """
 from .bead import Bead
 from .mie_calc import fields_focus
+from .objective import Objective

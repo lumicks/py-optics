@@ -1,14 +1,12 @@
 from .bead import Bead
-from .legendre import *
 from .lebedev_laikov import *
 from .local_coordinates import LocalBeadCoordinates
-from .legendre_calc import *
+from .legendre import *
 from .hankel import *
 from .objective import *
 
 import numpy as np
 from numba import njit
-from typing import Union
 from scipy.constants import (
     speed_of_light as _C,
     epsilon_0 as _EPS0,
@@ -428,13 +426,14 @@ def fields_gaussian_focus(self, n_bfp=1.0,
         total_field=total_field, inside_bead=inside_bead, H_field=H_field,
         verbose=verbose, grid=grid)
 
-def fields_focus(f_input_field, n_bfp=1.0,
-            focal_length=4.43e-3, NA=1.2,
-            x=0, y=0, z=0, bead_center=(0,0,0),
-            bead: Bead = None,
+def fields_focus(f_input_field, objective: Objective,
+            bead: Bead = None, bead_center=(0,0,0), 
+            x=0, y=0, z=0, 
             bfp_sampling_n=31, num_orders=None,
             return_grid=False,  total_field=True,
-            inside_bead=True, magnetic_field=False, verbose=False, grid=True):
+            inside_bead=True, magnetic_field=False, 
+            verbose=False, grid=True
+            ):
     """Calculate the three-dimensional electromagnetic field of a bead in the
     focus of an arbitrary input beam, going through an objective with a
     certain NA and focal length. Implemented with the angular spectrum of 
@@ -524,15 +523,12 @@ def fields_focus(f_input_field, n_bfp=1.0,
     #if M > bfp_sampling_n:
     #    print('bfp_sampling_n lower than recommendation for convergence')
 
-    objective = Objective(
-        NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=bead.n_medium
-    )
     local_coordinates = LocalBeadCoordinates(
         x, y, z, bead.bead_diameter, bead_center, grid=grid
     )
 
-    an, bn = bead.ab_coeffs(num_orders)
-    cn, dn = bead.cd_coeffs(num_orders)
+    an, _ = bead.ab_coeffs(num_orders)
+    n_orders = an.size
 
     bfp_coords, bfp_fields = sample_bfp(
         f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n, objective=objective
@@ -542,7 +538,7 @@ def fields_focus(f_input_field, n_bfp=1.0,
     
     if verbose:
         print('Hankel functions')
-    external_radial_data = calculate_external(bead.k, local_coordinates.r_outside, an.size)
+    external_radial_data = calculate_external(bead.k, local_coordinates.r_outside, n_orders)
 
     if verbose:
         print('Legendre functions')
@@ -554,7 +550,7 @@ def fields_focus(f_input_field, n_bfp=1.0,
         farfield_data.sin_theta,
         farfield_data.cos_phi,
         farfield_data.sin_phi,
-        an.size
+        n_orders
     )
 
     Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
@@ -585,7 +581,7 @@ def fields_focus(f_input_field, n_bfp=1.0,
         if verbose:
             print('Bessel functions')
         internal_radial_data = calculate_internal(
-            bead.k1, local_coordinates.r_inside, an.size
+            bead.k1, local_coordinates.r_inside, n_orders
         )
 
         if verbose:
@@ -598,7 +594,7 @@ def fields_focus(f_input_field, n_bfp=1.0,
             farfield_data.sin_theta,
             farfield_data.cos_phi,
             farfield_data.sin_phi,
-            an.size
+            n_orders
         )
         if verbose:
             print('Internal field')

@@ -22,7 +22,6 @@ class InternalRadialData:
     jn_1: np.ndarray
 
 
-# @njit(cache=True, parallel=True)
 def calculate_external(k: float, radii: np.ndarray, n_orders: int):
     """Precompute the spherical Hankel functions and derivatives that only depend
     on the r coordinate. These functions will not change for any rotation of
