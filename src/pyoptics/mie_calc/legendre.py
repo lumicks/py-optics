@@ -100,7 +100,8 @@ def _do_legendre_calc(
             L, cosT_unique, alp[L - 1, :]
         )
     
-    for L in prange(1, n_orders + 1):
+    # For some reason, prange leads to numerical errors here
+    for L in range(1, n_orders + 1):
         alp_prev = alp[L - 2, :] if L > 1 else None
         alp_deriv[L - 1, :] = associated_legendre_dtheta(
             L, cosT_unique, (alp[L - 1, :], alp_prev)
