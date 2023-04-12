@@ -17,7 +17,7 @@ class BackFocalPlaneCoordinates:
     Y_bfp: np.ndarray
     R_bfp: np.ndarray
     R_max: float
-    n_pupil_samples: int
+    bfp_sampling_n: int
 
 
 @dataclass
@@ -49,21 +49,22 @@ def sample_bfp(
     """Sample f_input_field with bfp_sampling_n samples and return the
     coordinates and the fields as a tuple"""
 
-    npupilsamples = 2 * bfp_sampling_n - 1
+    sin_theta_max = objective.NA / objective.n_medium
+    sin_theta = np.zeros(bfp_sampling_n * 2 - 1)
+    _sin_theta = np.linspace(0, sin_theta_max, num=bfp_sampling_n)
+    sin_theta[0:bfp_sampling_n] = -_sin_theta[::-1]
+    sin_theta[bfp_sampling_n:] = _sin_theta[1:]
 
-    sin_th_max = objective.NA / objective.n_medium
-    R_max = sin_th_max * objective.focal_length
-
-    _xy_bfp = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
-    _x_bfp, _y_bfp = np.meshgrid(_xy_bfp, _xy_bfp)
+    _x_bfp, _y_bfp = np.meshgrid(sin_theta, sin_theta)
     
     X_bfp = _x_bfp * objective.focal_length
     Y_bfp = _y_bfp * objective.focal_length
     R_bfp = np.hypot(_x_bfp, _y_bfp) * objective.focal_length
+    R_max = sin_theta_max * objective.focal_length
     aperture = R_bfp <= R_max
     bfp_coords = BackFocalPlaneCoordinates(
         aperture=aperture, X_bfp=X_bfp, Y_bfp=Y_bfp, 
-        R_bfp=R_bfp, R_max=R_max, n_pupil_samples=npupilsamples)
+        R_bfp=R_bfp, R_max=R_max, bfp_sampling_n=bfp_sampling_n)
     Ex_bfp, Ey_bfp = f_input_field(**asdict(bfp_coords))
 
     return bfp_coords, BackFocalPlaneFields(Ex_bfp=Ex_bfp, Ey_bfp=Ey_bfp)
@@ -75,14 +76,18 @@ def bfp_to_farfield(
     objective: Objective,
     lambda_vac: float
 ):
+    bfp_sampling_n = bfp_coords.bfp_sampling_n
     sin_theta_max = objective.NA / objective.n_medium
-    _sin_theta = np.linspace(-sin_theta_max, sin_theta_max, num=bfp_coords.n_pupil_samples)
-    sin_theta_x, sin_theta_y = np.meshgrid(_sin_theta, _sin_theta)
+    sin_theta = np.zeros(bfp_sampling_n * 2 - 1)
+    _sin_theta = np.linspace(0, sin_theta_max, num=bfp_sampling_n)
+    sin_theta[0:bfp_sampling_n] = -_sin_theta[::-1]
+    sin_theta[bfp_sampling_n:] = _sin_theta[1:]
+    sin_theta_x, sin_theta_y = np.meshgrid(sin_theta, sin_theta)
     sin_theta = np.hypot(sin_theta_x, sin_theta_y)
 
     # Calculate properties of the plane waves in the far field
     k = 2 * np.pi * objective.n_medium / lambda_vac
-    bfp_sampling_n = (bfp_coords.n_pupil_samples + 1) // 2
+    
         
     cos_theta = np.ones(sin_theta.shape)
     cos_theta[bfp_coords.aperture] = (

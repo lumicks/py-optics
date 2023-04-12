@@ -12,6 +12,8 @@ from scipy.constants import (
     epsilon_0 as _EPS0,
     mu_0 as _MU0
 )
+import logging
+
 
 def _calculate_fields(
     Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
@@ -340,13 +342,16 @@ def _internal_H_field_fixed_r(cn: np.ndarray, dn: np.ndarray,
     return np.concatenate((Hx, Hy, Hz), axis=0)
 
 
-def fields_gaussian_focus(self, n_bfp=1.0,
-                    focal_length=4.43e-3, NA=1.2, filling_factor=0.9,
-                    x=0, y=0, z=0, bead_center=(0,0,0),
-                    bfp_sampling_n=31, num_orders=None,
-                    return_grid=False,  total_field=True,
-                    inside_bead=True, H_field=False, verbose=False, 
-                    grid=True):
+def fields_gaussian_focus(
+    beam_power: float, 
+    objective: Objective, filling_factor=0.9,
+    bead: Bead = None, bead_center=(0,0,0),
+    x=0, y=0, z=0,
+    bfp_sampling_n=31, num_orders=None,
+    return_grid=False,  total_field=True,
+    inside_bead=True, H_field=False, verbose=False, 
+    grid=True
+):
     """Calculate the three-dimensional electromagnetic field of a bead the
     focus of a of a Gaussian beam, using the angular spectrum of plane waves
     and Mie theory. 
@@ -358,12 +363,11 @@ def fields_gaussian_focus(self, n_bfp=1.0,
 
     Parameters
     ---------- 
-    n_bfp : refractive index at the back focal plane of the objective
-        focused focal_length: focal length of the objective, in meters
+    beam_power : power of the laser beam before entering the objective, in Watt.
     filling_factor : filling factor of the Gaussian beam over the
         aperture, defined as w0/R. Here, w0 is the waist of the Gaussian
         beam and R is the radius of the aperture. Range 0...Inf 
-    NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+    objective : instance of the Objective class.
     x : array of x locations for evaluation, in meters 
     y : array of y locations for evaluation, in meters 
     z : array of z locations for evaluation, in meters
@@ -413,21 +417,25 @@ def fields_gaussian_focus(self, n_bfp=1.0,
         These values are only returned if return_grid is True
     """
 
-    w0 = filling_factor * focal_length * NA / self.n_medium  # See [1]
+    w0 = filling_factor * objective.focal_length * objective.NA / bead.n_medium  # [m]
+    I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
+    E0 = (I0 * 2/(_EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
 
-    def field_func(X_BFP, Y_BFP, *args):
-        Ein = np.exp(-(X_BFP**2 + Y_BFP**2)/w0**2)
-        return Ein, None
+    def gaussian_beam(X_bfp, Y_bfp, **kwargs): 
+        Ex = np.exp(-(X_bfp**2 + Y_bfp**2) / w0**2) * E0
+        return (Ex, None)
     
-    return self.fields_focus(field_func, n_bfp=n_bfp, 
-        focal_length=focal_length, NA=NA, x=x, y=y, z=z, 
+    return fields_focus(
+        gaussian_beam, objective, bead,
+        x=x, y=y, z=z, 
         bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
         num_orders=num_orders, return_grid=return_grid, 
         total_field=total_field, inside_bead=inside_bead, H_field=H_field,
-        verbose=verbose, grid=grid)
+        verbose=verbose, grid=grid
+    )
 
 def fields_focus(f_input_field, objective: Objective,
-            bead: Bead = None, bead_center=(0,0,0), 
+            bead: Bead, bead_center=(0,0,0), 
             x=0, y=0, z=0, 
             bfp_sampling_n=31, num_orders=None,
             return_grid=False,  total_field=True,
@@ -435,76 +443,64 @@ def fields_focus(f_input_field, objective: Objective,
             verbose=False, grid=True
             ):
     """Calculate the three-dimensional electromagnetic field of a bead in the
-    focus of an arbitrary input beam, going through an objective with a
-    certain NA and focal length. Implemented with the angular spectrum of 
-    plane waves and Mie theory. 
+    focus of an arbitrary input beam, going through an objective with a certain NA and focal
+    length. Implemented with the angular spectrum of plane waves and Mie theory. 
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes
-    electric fields in the x, y, and z directions. The input can be a
-    combination of x- and y-polarized light of complex amplitudes.
+    This function correctly incorporates the polarized nature of light in a focus. In other
+    words, the polarization state at the focus includes electric fields in the x, y, and z
+    directions. The input can be a combination of x- and y-polarized light of complex
+    amplitudes.
 
-    parameters
+    Parameters
     ----------
-    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
-        cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
-        the back focal plane, determined by the focal length and NA of the
-        objective. Y_BFP is the corresponding grid of y locations, and R is
-        the radial distance from the center of the back focal plane. Rmax is
-        the largest distance that falls inside the NA, but R will contain
-        larger numbers as the back focal plane is sampled with a square
-        grid. Theta is defined as the angle with the negative optical axis
-        (-z), and cosTheta is the cosine of this angle. Phi is defined as
-        the angle between the x and y axis, and cosPhi and sinPhi are its
-        cosine and sine, respectively. The function must return a tuple
-        (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
-        direction, respectively, at the sample locations in the back focal
-        plane. The fields may be complex, so a phase difference between x
-        and y is possible. If only one polarization is used, the other
-        return value must be None, e.g., y polarization would return (None,
-        E_BFP_y). The fields are post-processed such that any part that
+    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax), where
+        X_BFP is a grid of x locations in the back focal plane, determined by the focal length
+        and NA of the objective. Y_BFP is the corresponding grid of y locations, and R is the
+        radial distance from the center of the back focal plane. Rmax is the largest distance
+        that falls inside the NA, but R will contain larger numbers as the back focal plane is
+        sampled with a square grid. 
+        The function must return a tuple (Ex, Ey), which are the electric fields in
+        the x- and y- direction, respectively, at the sample locations in the back focal plane.
+        The fields may be complex, so a phase difference between x and y is possible. If only
+        one polarization is used, the other return value must be None, e.g., y polarization
+        would return (None, Ey). The fields are post-processed such that any part that
         falls outside of the NA is set to zero.
-    n_bfp : refractive index at the back focal plane of the objective
-    focal_length : focal length of the objective, in meters
-    NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+    objective : instance of the Objective class
+    bead : instance of the Bead class
     x : array of x locations for evaluation, in meters 
     y : array of y locations for evaluation, in meters 
     z : array of z locations for evaluation, in meters
     bead_center : tuple of three floating point numbers determining
         the x, y and z position of the bead center in 3D space, in meters
     bfp_sampling_n : (Default value = 31) Number of discrete steps with which
-        the back focal plane is sampled, from the center to the edge.
-        The total number of plane waves scales with the square of
-        bfp_sampling_n 
+        the back focal plane is sampled, from the center to the edge. The total number of plane
+        waves scales with the square of bfp_sampling_n 
     num_orders: number of order that should be included in the calculation
-            the Mie solution. If it is None (default), the code will use the
-            number_of_orders() method to calculate a sufficient number.
+        the Mie solution. If it is None (default), the code will use the number_of_orders()
+        method to calculate a sufficient number.
     return_grid : (Default value = False) return the sampling grid in the
-    matrices X, Y and Z
+        matrices X, Y and Z
     total_field : If True, return the total field of incident and scattered
-    electromagnetic field (default). If False, then only return the
-    scattered field outside the bead. Inside the bead, the full field is
-    always returned.
+        electromagnetic field (default). If False, then only return the scattered field outside
+        the bead. Inside the bead, the full field is always returned.
     inside_bead : If True (default), return the fields inside the bead. If
-    False, do not calculate the fields inside the bead. Zero is returned for
-    positions inside the bead instead. 
+        False, do not calculate the fields inside the bead. Zero is returned for positions
+        inside the bead instead. 
     H_field: If True, return the magnetic fields as well. If false
-    (default), do not return the magnetic fields.
+        (default), do not return the magnetic fields.
     verbose: If True, print statements on the progress of the calculation.
-    Default is False
+        Default is False
     grid: If True (default), interpret the vectors or scalars x, y and z as
-    the input for the numpy.meshgrid function, and calculate the fields at
-    the locations that are the result of the numpy.meshgrid output. If
-    False, interpret the x, y and z vectors as the exact locations where the
-    field needs to be evaluated. In that case, all vectors need to be of the
-    same length.
+        the input for the numpy.meshgrid function, and calculate the fields at the locations
+        that are the result of the numpy.meshgrid output. If False, interpret the x, y and z
+        vectors as the exact locations where the field needs to be evaluated. In that case, all
+        vectors need to be of the same length.
 
     Returns
     -------
     Ex : the electric field along x, as a function of (x, y, z) 
     Ey : the electric field along y, as a function of (x, y, z) 
-    Ez : the electric
-    field along z, as a function of (x, y, z) 
+    Ez : the electric field along z, as a function of (x, y, z) 
     Hx : the magnetic field along x, as a function of (x, y, z) 
     Hy : the magnetic field along y, as a function of (x, y, z) 
     Hz : the magnetic field along z, as a function of (x, y, z) 
@@ -514,6 +510,10 @@ def fields_focus(f_input_field, objective: Objective,
     Z : z coordinates of the sampling grid
         These values are only returned if return_grid is True
     """
+    loglevel = logging.getLogger().getEffectiveLevel()
+    if verbose:
+        logging.getLogger().setLevel(logging.INFO)
+
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
     z = np.atleast_1d(z)
@@ -536,12 +536,10 @@ def fields_focus(f_input_field, objective: Objective,
 
     farfield_data = bfp_to_farfield(bfp_coords, bfp_fields, objective, bead.lambda_vac)
     
-    if verbose:
-        print('Hankel functions')
+    logging.info('Calculating Hankel functions and derivatives')
     external_radial_data = calculate_external(bead.k, local_coordinates.r_outside, n_orders)
 
-    if verbose:
-        print('Legendre functions')
+    logging.info('Calculating Associated Legendre polynomials for external fields')
     legendre_data_ext = calculate_legendre(
         local_coordinates.xyz_stacked(inside=False),
         local_coordinates.r_outside,
@@ -565,8 +563,7 @@ def fields_focus(f_input_field, objective: Objective,
         Hy = 0
         Hz = 0
         
-    if verbose:
-        print('External field')
+    logging.info('Calculating external fields')
 
     _calculate_fields(
         Ex, Ey, Ez, Hx, Hy, Hz,
@@ -578,14 +575,13 @@ def fields_focus(f_input_field, objective: Objective,
     )
 
     if inside_bead:
-        if verbose:
-            print('Bessel functions')
+        
+        logging.info('Calculating Bessel functions and derivatives')
         internal_radial_data = calculate_internal(
             bead.k1, local_coordinates.r_inside, n_orders
         )
 
-        if verbose:
-            print('Legendre functions')
+        logging.info('Calculating Associated Legendre polynomials for internal fields')
         legendre_data_int = calculate_legendre(
             local_coordinates.xyz_stacked(inside=True),
             local_coordinates.r_inside,
@@ -596,8 +592,8 @@ def fields_focus(f_input_field, objective: Objective,
             farfield_data.sin_phi,
             n_orders
         )
-        if verbose:
-            print('Internal field')
+
+        logging.info('Calculating internal fields')
         _calculate_fields(
             Ex, Ey, Ez, Hx, Hy, Hz,
             bead=bead, bead_center=bead_center, local_coordinates=local_coordinates,
@@ -607,6 +603,7 @@ def fields_focus(f_input_field, objective: Objective,
             total_field=total_field, magnetic_field=magnetic_field,
         )
 
+    logging.getLogger().setLevel(loglevel)
     ks = bead.k * objective.NA / bead.n_medium
     dk = ks / (bfp_sampling_n - 1)
     phase = -1j * objective.focal_length * (

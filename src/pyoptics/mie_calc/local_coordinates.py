@@ -1,7 +1,6 @@
 import numpy as np
 
 class LocalBeadCoordinates:
-
     __slots__ = (
         '_bead_diameter',
         '_outside_bead',

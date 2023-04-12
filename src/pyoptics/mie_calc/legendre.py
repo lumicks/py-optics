@@ -1,10 +1,7 @@
 from .associated_legendre import *
 import numpy as np
-from numba import njit, prange
-from joblib import Memory
+from numba import njit, jit, prange
 
-cachedir = 'miecalc_cache'
-memory = Memory(cachedir, verbose=0)
 
 @njit(cache=True)
 def _exec_lookup(source, lookup, p, m):
@@ -24,7 +21,7 @@ class AssociatedLegendreData:
         associated_legendre: np.ndarray,
         associated_legendre_over_sin_theta: np.ndarray,
         associated_legendre_dtheta: np.ndarray,
-        inverse: np.ndarray
+        inverse: np.ndarray,
     ) -> None:
             
         self._associated_legendre = associated_legendre
@@ -41,47 +38,92 @@ class AssociatedLegendreData:
     def associated_legendre_dtheta(self, p: int, m: int):
         return _exec_lookup(self._associated_legendre_dtheta, self._inverse, p, m)
 
+    
+@njit(cache=True, parallel=True)
+def _loop_over_rotations(
+    local_coords: np.ndarray, radii: np.ndarray, aperture: np.ndarray, 
+    cos_theta: np.ndarray, sin_theta: np.ndarray,
+    cos_phi: np.ndarray, sin_phi: np.ndarray
+):
+    """Calculating the Legendre polynomials is computationally intense, so
+    Loop over all possible rotations, in order to find the unique values of
+    cos(theta)"""
 
-@memory.cache
+    cosTs = np.zeros((*aperture.shape, radii.size))
+    n_pupil_samples = aperture.shape[0]
+    
+    index = radii == 0
+    for m in prange(n_pupil_samples):
+        for p in range(n_pupil_samples):
+            if not aperture[p, m]:
+                continue
+            ct = cosTs[p, m, :]
+            # Rotate the coordinate system such that the x-polarization on the
+            # bead coincides with theta polarization in global space
+            # however, cos(theta) is the same for phi polarization!
+            # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @ 
+            #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
+            # coords = A @ local_coords
+            # z = coords[2, :]
+            z = (
+                local_coords[2, :] * cos_theta[p, m] - ( 
+                local_coords[0, :] * cos_phi[p, m]  +
+                local_coords[1, :] * sin_phi[p, m]
+                ) * sin_theta[p, m]
+            )
+            
+            # Retrieve an array of all values of cos(theta)
+            ct[:] = z / radii # cos(theta)    
+            ct[index] = 1
+            cosTs[p, m, :] = ct
+    
+    return cosTs
+
+@njit(cache=True, parallel=True)
+def _do_legendre_calc(
+    cosT_unique: np.ndarray, abs_cosT_unique: np.ndarray,
+    sign_inv: np.ndarray, sign_cosT_unique, n_orders: int
+):
+    
+    # Allocate memory for the Associated Legendre Polynomials and derivatives
+    alp = np.zeros((n_orders, sign_inv.size))
+    alp_deriv = np.zeros_like(alp)
+    alp_sin = np.zeros_like(alp)
+    
+    # Parity for order L: parity[0] == 1, for L == 1
+    parity = (-1)**np.arange(n_orders)
+    for L in prange(1, n_orders + 1):
+        alp[L - 1,:] = associated_legendre(L, abs_cosT_unique)[sign_inv]
+        if parity[L - 1] == -1:
+            alp[L - 1, :] *= sign_cosT_unique
+        alp_sin[L - 1, :] = associated_legendre_over_sin_theta(
+            L, cosT_unique, alp[L - 1, :]
+        )
+    
+    for L in prange(1, n_orders + 1):
+        alp_prev = alp[L - 2, :] if L > 1 else None
+        alp_deriv[L - 1, :] = associated_legendre_dtheta(
+            L, cosT_unique, (alp[L - 1, :], alp_prev)
+        )
+    
+    return alp, alp_sin, alp_deriv
+
+
 def calculate_legendre(
     local_coords: np.ndarray, radii: np.ndarray, aperture: np.ndarray, 
     cos_theta: np.ndarray, sin_theta: np.ndarray,
     cos_phi: np.ndarray, sin_phi: np.ndarray,
     n_orders: int
-):
-    """Calculating the Legendre polynomials is computationally intense, so
-    Loop over all cos(theta), in order to find the unique values of
-    cos(theta)"""
-
-    cosTs = np.zeros((*aperture.shape, radii.size))
-    if (n_pupil_samples := aperture.shape[0]) != aperture.shape[1]:
+):  
+    if aperture.shape[0] != aperture.shape[1]:
         raise ValueError("Aperture matrix must be square")
-    
-    @njit(cache=True, parallel=True)
-    def iterate(cosTs):
-        for m in prange(n_pupil_samples):
-            for p in range(n_pupil_samples):
-                if not aperture[p, m]:
-                    continue
-                ct = cosTs[p, m, :]
-                # Rotate the coordinate system such that the x-polarization on the
-                # bead coincides with theta polarization in global space
-                # however, cos(theta) is the same for phi polarization!
-                # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @ 
-                #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
-                # coords = A @ local_coords
-                z = (
-                    local_coords[2, :] * cos_theta[p, m] - 
-                    local_coords[0, :] * cos_phi[p, m] * sin_theta[p, m] +
-                    local_coords[1, :] * sin_phi[p, m] * sin_theta[p, m]
-                )
-                # z = coords[2, :]
-                # Retrieve an array of all values of cos(theta)
-                index = np.flatnonzero(radii)
-                ct[index] = z[index] / radii[index] # cos(theta)    
-                ct[radii == 0] = 1
-    
-    iterate(cosTs=cosTs)
+
+    cosTs = _loop_over_rotations(
+        local_coords, radii, aperture, cos_theta, sin_theta,
+        cos_phi, sin_phi
+    )
+
+    shape = cosTs.shape
     cosTs = np.reshape(cosTs, cosTs.size)
     # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
     cosTs[cosTs > 1] = 1
@@ -89,28 +131,15 @@ def calculate_legendre(
 
     # Get the unique values of cos(theta) in the array
     cosT_unique, inverse = np.unique(cosTs, return_inverse=True)
-    inverse = np.reshape(inverse, (n_pupil_samples, n_pupil_samples, radii.size))
-    alp = np.zeros((n_orders, cosT_unique.size))
-    alp_sin = np.zeros(alp.shape)
-    alp_deriv = np.zeros(alp.shape)
-    alp_prev = None # unique situation that for n == 1,
-                    # the previous Assoc. Legendre Poly. isn't required
-    sign_cosT_unique = np.sign(cosT_unique)
-    abs_cosT_unique, sign_inv = np.unique(np.abs(cosT_unique), 
-        return_inverse=True)
-    parity = 1
-    
-    for L in range(1, n_orders + 1):
-        alp[L - 1,:] = associated_legendre(L, abs_cosT_unique)[sign_inv]
-        if parity == -1:
-            alp[L - 1, :] *= sign_cosT_unique
-        alp_sin[L - 1, :] = associated_legendre_over_sin_theta(
-            L, cosT_unique, alp[L - 1, :]
-        )
-        alp_deriv[L - 1, :] = associated_legendre_dtheta(
-            L, cosT_unique, (alp[L - 1, :], alp_prev)
-        )
-        alp_prev = alp[L - 1, :]
-        parity *= -1
+    inverse = np.reshape(inverse, shape)
 
+    # Get the signs of the cosines, and use parity to reduce the computational load
+    sign_cosT_unique = np.sign(cosT_unique)
+    abs_cosT_unique, sign_inv = np.unique(
+        np.abs(cosT_unique), return_inverse=True
+    )
+
+    alp, alp_sin, alp_deriv = _do_legendre_calc(
+        cosT_unique, abs_cosT_unique, sign_inv, sign_cosT_unique, n_orders
+    )
     return AssociatedLegendreData(alp, alp_sin, alp_deriv, inverse)
