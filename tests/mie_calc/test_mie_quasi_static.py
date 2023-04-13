@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.1
+#       jupytext_version: 1.14.1
 #   kernelspec:
 #     display_name: Python 3.8 (XPython)
 #     language: python
@@ -30,12 +30,13 @@ def test_quasi_static_field(
 ):
     # Electric field in a small dielectric particle (<< lambda) can be approximated with quasistatic solution:
     E = 3/(2 + n_bead**2/n_medium**2)
-    
-    mie = mc.MieCalc(1e-3, n_bead, n_medium, 1)
-    Ex, Ey, Ez = mie.fields_plane_wave(x=0, y=0, z=0, theta=0, phi=0, polarization=(1,0))
-    print(Ex)
+
+    bead = mc.Bead(1e-3, n_bead, n_medium, 1)
+    Ex, Ey, Ez = mc.fields_plane_wave(bead, x=0, y=0, z=0, theta=0, phi=0, polarization=(1,0))
+
     np.testing.assert_allclose([Ex, Ey, Ez], [E, 0, 0], rtol=1e-4, atol=1e-14)
-    Ex, Ey, Ez = mie.fields_plane_wave(x=0, y=0, z=0, theta=0, phi=0, polarization=(0,1))
-    np.testing.assert_allclose([Ex, Ey, Ez], [0, E, 0], rtol=1e-4, atol=1e-14)
+    Ex, Ey, Ez = mc.fields_plane_wave(bead, x=0, y=0, z=0, theta=0, phi=0, polarization=(0,1))
     
+    np.testing.assert_allclose([Ex, Ey, Ez], [0, E, 0], rtol=1e-4, atol=1e-14)
+
 

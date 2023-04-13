@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.1
+#       jupytext_version: 1.14.1
 #   kernelspec:
 #     display_name: Python 3.8 (XPython)
 #     language: python
@@ -50,8 +50,8 @@ def test_plane_wave_direct(
         for m in range(n_angles):
             if not aperture[p,m]:
                 continue
-            mie = mc.MieCalc(1e-9, n_medium, n_medium, lambda_vac)
-            Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
+            bead = mc.Bead(1e-9, n_medium, n_medium, lambda_vac)
+            Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
                                                         polarization=(1,0), return_grid=True, verbose=False)
             kz = k * np.cos(theta[p,m])
             kx = - k * np.sin(theta[p,m]) * np.cos(phi[p,m])
@@ -69,7 +69,7 @@ def test_plane_wave_direct(
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
             
-            Ex, Ey, Ez, X, Y, Z = mie.fields_plane_wave(x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
+            Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=xy_eval, y=xy_eval, z=z_eval, theta=theta[p,m], phi=phi[p,m],
                                                         polarization=(0, 1), return_grid=True, verbose=False)
             Expw = -np.sin(phi[p,m]) * Exp
             Eypw = np.cos(phi[p,m]) * Exp
@@ -156,9 +156,10 @@ def test_plane_wave_bfp(
                 
                 return (Ex, Ey)
             
-            mie = mc.MieCalc(1e-9, n_medium, n_medium, lambda_vac)
-            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Etheta, n_bfp=n_bfp, focal_length=focal_length, 
-                                                       NA=NA, x=xy_eval, y=0, z=z_eval, 
+            bead = mc.Bead(1e-9, n_medium, n_medium, lambda_vac)
+            objective = mc.Objective(n_bfp=n_bfp, focal_length=focal_length, NA=NA, n_medium=bead.n_medium)
+            Ex, Ey, Ez, X, Y, Z = mc.fields_focus(input_field_Etheta, bead=bead, objective=objective, 
+                                                      x=xy_eval, y=0, z=z_eval, 
                                                       bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False)
             if skip:
                 continue
@@ -181,8 +182,8 @@ def test_plane_wave_bfp(
 #                 print(costheta, cosphi, sinphi)
 #                 return Expw, Eypw, Ezpw, Ex,Ey,Ez, X, Y, Z, Exp
             
-            Ex, Ey, Ez, X, Y, Z = mie.fields_focus(input_field_Ephi, n_bfp=n_bfp, focal_length=focal_length, 
-                                                       NA=NA, x=xy_eval, y=0, z=z_eval, 
+            Ex, Ey, Ez, X, Y, Z = mc.fields_focus(input_field_Ephi, bead=bead, objective=objective, 
+                                                      x=xy_eval, y=0, z=z_eval, 
                                                       bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False)
             Expw = -sinphi * Exp
             Eypw = cosphi * Exp
@@ -193,3 +194,5 @@ def test_plane_wave_bfp(
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2, np.ones(Ex.shape))
 
+
+# %%

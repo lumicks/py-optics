@@ -1,11 +1,13 @@
 from .associated_legendre import *
 import numpy as np
-from numba import njit, jit, prange
+from numba import njit, prange
 
 
 @njit(cache=True)
 def _exec_lookup(source, lookup, p, m):
-    """Compile the retrieval of the lookup table with Numba, as it's slightly faster"""
+    """
+    Compile the retrieval of the lookup table with Numba, as it's slightly faster
+    """
     return source[:, lookup[p, m]]
 
 
@@ -45,9 +47,10 @@ def _loop_over_rotations(
     cos_theta: np.ndarray, sin_theta: np.ndarray,
     cos_phi: np.ndarray, sin_phi: np.ndarray
 ):
-    """Calculating the Legendre polynomials is computationally intense, so
-    Loop over all possible rotations, in order to find the unique values of
-    cos(theta)"""
+    """
+    Loop over all possible rotations, in order to find the unique values of cos(theta) to
+    reduce the computational load calculating Legendre polynomials.
+    """
 
     cosTs = np.zeros((*aperture.shape, radii.size))
     n_pupil_samples = aperture.shape[0]
@@ -84,6 +87,10 @@ def _do_legendre_calc(
     cosT_unique: np.ndarray, abs_cosT_unique: np.ndarray,
     sign_inv: np.ndarray, sign_cosT_unique, n_orders: int
 ):
+    """
+    Numba compatible function that computes Associated Legendre Polynomials for n_order orders,
+    plus derived quantities
+    """
     
     # Allocate memory for the Associated Legendre Polynomials and derivatives
     alp = np.zeros((n_orders, sign_inv.size))
@@ -116,6 +123,10 @@ def calculate_legendre(
     cos_phi: np.ndarray, sin_phi: np.ndarray,
     n_orders: int
 ):  
+    """
+    Find the value of cos(theta) for all coordinates (x, y, z) after rotating the coordinates
+    along all possible directions, defined by the angles in the back focal plane.
+    """
     if aperture.shape[0] != aperture.shape[1]:
         raise ValueError("Aperture matrix must be square")
 

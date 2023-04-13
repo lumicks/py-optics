@@ -6,5 +6,9 @@
        doi:10.1002/9783527618156
 """
 from .bead import Bead
-from .mie_calc import fields_focus
+from .mie_calc import (
+   fields_focus, 
+   fields_gaussian_focus,
+   fields_plane_wave
+)
 from .objective import Objective

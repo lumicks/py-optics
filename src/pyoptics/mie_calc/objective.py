@@ -3,6 +3,9 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class Objective:
+    """
+    Class to describe the essential properties of an objective
+    """
     NA: float
     focal_length: float
     n_bfp: float
@@ -87,15 +90,14 @@ def bfp_to_farfield(
 
     # Calculate properties of the plane waves in the far field
     k = 2 * np.pi * objective.n_medium / lambda_vac
-    
         
     cos_theta = np.ones(sin_theta.shape)
     cos_theta[bfp_coords.aperture] = (
         1 - sin_theta[bfp_coords.aperture]**2
     )**0.5
     
-    cos_phi = np.ones(sin_theta.shape)
-    sin_phi = np.zeros(sin_theta.shape)
+    cos_phi = np.ones_like(sin_theta)
+    sin_phi = np.zeros_like(sin_theta)
     region = sin_theta > 0
     cos_phi[region] = (
         bfp_coords.X_bfp[region] / (sin_theta[region] * bfp_coords.R_max)
