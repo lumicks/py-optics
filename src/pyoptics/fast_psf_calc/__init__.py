@@ -163,8 +163,11 @@ def direct_psf_calc(
 
     dk = ks / (bfp_sampling_n - 1)
     sin_th_max = NA / n_medium
-    x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
-    X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP)
+    sin_theta = np.zeros(npupilsamples)
+    _sin_theta = np.linspace(0, sin_th_max, num=bfp_sampling_n)
+    sin_theta[0:bfp_sampling_n] = -_sin_theta[::-1]
+    sin_theta[bfp_sampling_n:] = _sin_theta[1:]
+    X_BFP, Y_BFP = np.meshgrid(sin_theta, sin_theta)
     sin_th_BFP = np.hypot(X_BFP, Y_BFP)
 
     # The back focal plane is circular, but our sampling grid is square ->
@@ -539,8 +542,12 @@ def fast_psf_calc(
 
     dk = ks / (bfp_sampling_n - 1)
     sin_th_max = NA / n_medium
-    x_BFP = np.linspace(-sin_th_max, sin_th_max, num=npupilsamples)
-    X_BFP, Y_BFP = np.meshgrid(x_BFP, x_BFP, indexing='ij')
+    sin_theta = np.zeros(bfp_sampling_n * 2 - 1)
+    _sin_theta = np.linspace(0, sin_th_max, num=bfp_sampling_n)
+    sin_theta[0:bfp_sampling_n] = -_sin_theta[::-1]
+    sin_theta[bfp_sampling_n:] = _sin_theta[1:]
+
+    X_BFP, Y_BFP = np.meshgrid(sin_theta, sin_theta, indexing='ij')
 
     sin_th_BFP = np.hypot(X_BFP, Y_BFP)
     Rmax = focal_length * sin_th_max

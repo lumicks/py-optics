@@ -62,9 +62,10 @@ def sample_bfp(
     
     X_bfp = _x_bfp * objective.focal_length
     Y_bfp = _y_bfp * objective.focal_length
-    R_bfp = np.hypot(_x_bfp, _y_bfp) * objective.focal_length
+    sin_theta = np.hypot(_x_bfp, _y_bfp)
+    R_bfp =  sin_theta * objective.focal_length
     R_max = sin_theta_max * objective.focal_length
-    aperture = R_bfp <= R_max
+    aperture = sin_theta <= sin_theta_max
     bfp_coords = BackFocalPlaneCoordinates(
         aperture=aperture, X_bfp=X_bfp, Y_bfp=Y_bfp, 
         R_bfp=R_bfp, R_max=R_max, bfp_sampling_n=bfp_sampling_n)
@@ -99,13 +100,14 @@ def bfp_to_farfield(
     cos_phi = np.ones_like(sin_theta)
     sin_phi = np.zeros_like(sin_theta)
     region = sin_theta > 0
+    print(np.count_nonzero(bfp_coords.aperture))
     cos_phi[region] = (
-        bfp_coords.X_bfp[region] / (sin_theta[region] * bfp_coords.R_max)
+        sin_theta_x[region] / sin_theta[region]
     )
 
     cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
     sin_phi[region] = (
-        bfp_coords.Y_bfp[region] / (sin_theta[region] * bfp_coords.R_max)
+        sin_theta_y[region] / sin_theta[region]
     )
     sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
     sin_phi[np.logical_not(bfp_coords.aperture)] = 0
