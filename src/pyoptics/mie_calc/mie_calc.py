@@ -425,7 +425,7 @@ def fields_gaussian_focus(
 
     w0 = filling_factor * objective.focal_length * objective.NA / bead.n_medium  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
-    E0 = 1  #(I0 * 2/(_EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
+    E0 = (I0 * 2/(_EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
 
     def gaussian_beam(X_bfp, Y_bfp, **kwargs): 
         Ex = np.exp(-(X_bfp**2 + Y_bfp**2) / w0**2) * E0
