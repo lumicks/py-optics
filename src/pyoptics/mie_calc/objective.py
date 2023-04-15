@@ -100,7 +100,7 @@ def bfp_to_farfield(
     cos_phi = np.ones_like(sin_theta)
     sin_phi = np.zeros_like(sin_theta)
     region = sin_theta > 0
-    print(np.count_nonzero(bfp_coords.aperture))
+
     cos_phi[region] = (
         sin_theta_x[region] / sin_theta[region]
     )

@@ -6,9 +6,10 @@
        doi:10.1002/9783527618156
 """
 from .bead import Bead
-from .mie_calc import (
+from .interface import (
    fields_focus, 
    fields_gaussian_focus,
-   fields_plane_wave
+   fields_plane_wave,
+   forces_focused_fields
 )
-from .objective import Objective
+from .objective import *
