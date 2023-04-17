@@ -1,32 +1,19 @@
-# ---
-# jupyter:
-#   jupytext:
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.11.1
-#   kernelspec:
-#     display_name: Python 3.8 (XPython)
-#     language: python
-#     name: xpython
-# ---
-
 import numpy as np
 import pytest
 import os
+from scipy.constants import (
+    speed_of_light as C,
+    mu_0 as MU0,
+)
 
 import pyoptics.mie_calc as mc
 
 
-# + [markdown] tags=[]
-# Reference data sets are calculated by miepy 0.5.0, by the script `generate_benchmark_fields.py`
-# -
+# Reference data sets are calculated by miepy 0.5.0, by the script
+# `generate_benchmark_fields.py`
 
 @pytest.mark.parametrize('dataset',[1, 2, 3, 4, 5])
 def test_mie_nearfield(dataset):
-    C = 299792458
-    MU0 = 4 * np.pi * 1e-7
     path = os.path.abspath(os.path.dirname(__file__))
 
     data = np.load(os.path.join(path, f'ref{dataset}.npz'))
@@ -51,7 +38,7 @@ def test_mie_nearfield(dataset):
 
     bead = mc.Bead(bead_diam, n_bead, n_medium, lambda_vac)
     Ex, Ey, Ez, Hx, Hy, Hz = mc.fields_plane_wave(
-        bead, x, y, z, num_orders=num_orders, return_grid=False, inside_bead=True,
+        bead, x, y, z, num_orders=num_orders, return_grid=False,
         magnetic_field=True, total_field=False
     )
     
@@ -69,11 +56,11 @@ def test_mie_nearfield_polarizations(bead_diameter, n_bead):
     x = np.linspace(-bead_diameter, bead_diameter, 99)
     bead = mc.Bead(bead_diameter, n_bead, n_medium=1.33, lambda_vac=1064e-9)
     Ext, Eyt, Ezt = mc.fields_plane_wave(
-        bead, x=x, y=x, z=x, return_grid=False, inside_bead=True, total_field=True
+        bead, x=x, y=x, z=x, return_grid=False, total_field=True
     )
     Exp, Eyp, Ezp = mc.fields_plane_wave(
         bead, x=x, y=x, z=x, polarization=(0,1), return_grid=False,
-        inside_bead=True, total_field=True
+        total_field=True
     )
     
     np.testing.assert_allclose(Ext, np.rot90(Eyp), rtol=1e-8, atol=1e-14)

@@ -26,11 +26,11 @@ class Bead:
         self.lambda_vac = lambda_vac
     
     @property
-    def k(self):
+    def k(self) -> float:
         return 2 * np.pi * self.n_medium / self.lambda_vac
     
     @property
-    def k1(self):
+    def k1(self) -> float:
         return 2 * np.pi * self.n_bead / self.lambda_vac
 
     @property

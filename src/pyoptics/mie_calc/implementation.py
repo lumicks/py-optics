@@ -1,5 +1,10 @@
 import numpy as np
 from numba import njit
+from scipy.constants import (
+    mu_0 as _MU0,
+    speed_of_light as _C
+)
+
 from .local_coordinates import LocalBeadCoordinates
 from .radial_data import (
     ExternalRadialData,
@@ -8,10 +13,7 @@ from .radial_data import (
 from .legendre_data import AssociatedLegendreData
 from .objective import FarfieldData
 from .bead import Bead
-from scipy.constants import (
-    mu_0 as _MU0,
-    speed_of_light as _C
-)
+
 
 def calculate_fields(
     Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
@@ -126,10 +128,10 @@ def calculate_fields(
 
                 E = np.matmul(A.T, E)
                 E[:, region] *= E0[polarization] * np.exp(1j * (
-                    farfield_data.Kx[p,m] * bead_center[0] +
-                    farfield_data.Ky[p,m] * bead_center[1] +
-                    farfield_data.Kz[p,m] * bead_center[2])
-                )
+                    farfield_data.Kx[p, m] * bead_center[0] +
+                    farfield_data.Ky[p, m] * bead_center[1] +
+                    farfield_data.Kz[p, m] * bead_center[2])
+                ) / farfield_data.Kz[p, m]
 
                 Ex[:,:,:] += np.reshape(E[0,:], local_coordinates.coordinate_shape)
                 Ey[:,:,:] += np.reshape(E[1,:], local_coordinates.coordinate_shape)
@@ -160,10 +162,10 @@ def calculate_fields(
 
                     H = np.matmul(A.T, H)
                     H[:, region] *= E0[polarization] * np.exp(1j * (
-                        farfield_data.Kx[p,m] * bead_center[0] +
-                        farfield_data.Ky[p,m] * bead_center[1] +
-                        farfield_data.Kz[p,m] * bead_center[2])
-                    )
+                        farfield_data.Kx[p, m] * bead_center[0] +
+                        farfield_data.Ky[p, m] * bead_center[1] +
+                        farfield_data.Kz[p, m] * bead_center[2])
+                    ) / farfield_data.Kz[p, m]
 
                     Hx[:,:,:] += np.reshape(H[0,:], local_coordinates.coordinate_shape)
                     Hy[:,:,:] += np.reshape(H[1,:], local_coordinates.coordinate_shape)

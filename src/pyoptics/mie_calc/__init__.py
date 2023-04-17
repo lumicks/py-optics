@@ -12,4 +12,4 @@ from .interface import (
    fields_plane_wave,
    forces_focused_fields
 )
-from .objective import *
+from .objective import Objective

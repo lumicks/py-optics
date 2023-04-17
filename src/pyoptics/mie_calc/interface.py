@@ -21,8 +21,9 @@ def fields_gaussian_focus(
     bead: Bead, bead_center=(0,0,0),
     x=0, y=0, z=0,
     bfp_sampling_n=31, num_orders=None,
-    return_grid=False,  total_field=True,
-    inside_bead=True, magnetic_field=False, verbose=False, 
+    return_grid=False,
+    total_field=True, magnetic_field=False,
+    verbose=False, 
     grid=True
 ):
     """Calculate the three-dimensional electromagnetic field of a bead the
@@ -61,10 +62,7 @@ def fields_gaussian_focus(
         scattered electromagnetic field (default). If False, then only
         return the scattered field outside the bead. Inside the bead, the
         full field is always returned.
-    inside_bead : If True (default), return the fields inside the bead. If
-        False, do not calculate the fields inside the bead. Zero is returned
-        for positions inside the bead instead. 
-    H_field : If True, return the magnetic fields as well. If false
+    magnetic_field : If True, return the magnetic fields as well. If false
         (default), do not return the magnetic fields.
     verbose : If True, print statements on the progress of the calculation.
         Default is False
@@ -84,7 +82,7 @@ def fields_gaussian_focus(
     Hx : the magnetic field along x, as a function of (x, y, z) 
     Hy : the magnetic field along y, as a function of (x, y, z) 
     Hz : the magnetic field along z, as a function of (x, y, z) 
-        These values are only returned when H_field is True
+        These values are only returned when magnetic_field is True
     X : x coordinates of the sampling grid
     Y : y coordinates of the sampling grid
     Z : z coordinates of the sampling grid
@@ -103,17 +101,19 @@ def fields_gaussian_focus(
         x=x, y=y, z=z, 
         bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
         num_orders=num_orders, return_grid=return_grid, 
-        total_field=total_field, inside_bead=inside_bead, magnetic_field=magnetic_field,
+        total_field=total_field, magnetic_field=magnetic_field,
         verbose=verbose, grid=grid
     )
+
 
 def fields_focus(f_input_field, objective: Objective,
             bead: Bead, bead_center=(0,0,0), 
             x=0, y=0, z=0, 
             bfp_sampling_n=31, num_orders=None,
-            return_grid=False,  total_field=True,
-            inside_bead=True, magnetic_field=False, 
-            verbose=False, grid=True
+            return_grid=False,
+            total_field=True, magnetic_field=False, 
+            verbose=False,
+            grid=True
             ):
     """Calculate the three-dimensional electromagnetic field of a bead in the
     focus of an arbitrary input beam, going through an objective with a certain NA and focal
@@ -155,11 +155,8 @@ def fields_focus(f_input_field, objective: Objective,
         matrices X, Y and Z
     total_field : If True, return the total field of incident and scattered
         electromagnetic field (default). If False, then only return the scattered field outside
-        the bead. Inside the bead, the full field is always returned.
-    inside_bead : If True (default), return the fields inside the bead. If
-        False, do not calculate the fields inside the bead. Zero is returned for positions
-        inside the bead instead. 
-    H_field: If True, return the magnetic fields as well. If false
+        the bead. Inside the bead, the full field is always returned. 
+    magnetic_field: If True, return the magnetic fields as well. If false
         (default), do not return the magnetic fields.
     verbose: If True, print statements on the progress of the calculation.
         Default is False
@@ -177,7 +174,7 @@ def fields_focus(f_input_field, objective: Objective,
     Hx : the magnetic field along x, as a function of (x, y, z) 
     Hy : the magnetic field along y, as a function of (x, y, z) 
     Hz : the magnetic field along z, as a function of (x, y, z) 
-        These values are only returned when H_field is True
+        These values are only returned when magnetic_field is True
     X : x coordinates of the sampling grid
     Y : y coordinates of the sampling grid
     Z : z coordinates of the sampling grid
@@ -208,11 +205,13 @@ def fields_focus(f_input_field, objective: Objective,
     an, _ = bead.ab_coeffs(num_orders)
     n_orders = an.size
 
-    bfp_coords, bfp_fields = sample_bfp(
-        f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n, objective=objective
+    bfp_coords, bfp_fields = objective.sample_back_focal_plane(
+        f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n
     )
 
-    farfield_data = bfp_to_farfield(bfp_coords, bfp_fields, objective, bead.lambda_vac)
+    farfield_data = objective.back_focal_plane_to_farfield(
+        bfp_coords, bfp_fields, bead.lambda_vac
+    )
     
     logging.info('Calculating Hankel functions and derivatives')
     external_radial_data = calculate_external(bead.k, local_coordinates.r_outside, n_orders)
@@ -252,34 +251,32 @@ def fields_focus(f_input_field, objective: Objective,
         total_field=total_field, magnetic_field=magnetic_field,
     )
 
-    if inside_bead:
-        
-        logging.info('Calculating Bessel functions and derivatives')
-        internal_radial_data = calculate_internal(
-            bead.k1, local_coordinates.r_inside, n_orders
-        )
+    logging.info('Calculating Bessel functions and derivatives')
+    internal_radial_data = calculate_internal(
+        bead.k1, local_coordinates.r_inside, n_orders
+    )
 
-        logging.info('Calculating Associated Legendre polynomials for internal fields')
-        legendre_data_int = calculate_legendre(
-            local_coordinates.xyz_stacked(inside=True),
-            local_coordinates.r_inside,
-            bfp_coords.aperture,
-            farfield_data.cos_theta,
-            farfield_data.sin_theta,
-            farfield_data.cos_phi,
-            farfield_data.sin_phi,
-            n_orders
-        )
+    logging.info('Calculating Associated Legendre polynomials for internal fields')
+    legendre_data_int = calculate_legendre(
+        local_coordinates.xyz_stacked(inside=True),
+        local_coordinates.r_inside,
+        bfp_coords.aperture,
+        farfield_data.cos_theta,
+        farfield_data.sin_theta,
+        farfield_data.cos_phi,
+        farfield_data.sin_phi,
+        n_orders
+    )
 
-        logging.info('Calculating internal fields')
-        calculate_fields(
-            Ex, Ey, Ez, Hx, Hy, Hz,
-            bead=bead, bead_center=bead_center, local_coordinates=local_coordinates,
-            farfield_data=farfield_data, legendre_data=legendre_data_int,
-            internal_radial_data=internal_radial_data,
-            internal=True,
-            total_field=total_field, magnetic_field=magnetic_field,
-        )
+    logging.info('Calculating internal fields')
+    calculate_fields(
+        Ex, Ey, Ez, Hx, Hy, Hz,
+        bead=bead, bead_center=bead_center, local_coordinates=local_coordinates,
+        farfield_data=farfield_data, legendre_data=legendre_data_int,
+        internal_radial_data=internal_radial_data,
+        internal=True,
+        total_field=total_field, magnetic_field=magnetic_field,
+    )
 
     logging.getLogger().setLevel(loglevel)
     ks = bead.k * objective.NA / bead.n_medium
@@ -318,7 +315,7 @@ def fields_focus(f_input_field, objective: Objective,
 
 def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0), 
                         num_orders=None, return_grid=False, 
-                        total_field=True, inside_bead=True, magnetic_field=False,
+                        total_field=True, magnetic_field=False,
                         verbose=False, grid=True
                         ):
     """Calculate the electromagnetic field of a bead, subject to excitation
@@ -345,9 +342,6 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0),
         electromagnetic field (default). If False, then only return the
         scattered field outside the bead. Inside the bead, the full field is
         always returned.
-    inside_bead : If True (default), return the fields inside the bead. If
-        False, do not calculate the fields inside the bead. Zero is returned
-        for positions inside the bead instead. 
     magnetic_field : If True, return the magnetic fields as well. If false
         (default), do not return the magnetic fields.
     verbose : If True, print statements on the progress of the calculation.
@@ -368,7 +362,7 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0),
     Hx : the magnetic field along x, as a function of (x, y, z) 
     Hy : the magnetic field along y, as a function of (x, y, z) 
     Hz : the magnetic field along z, as a function of (x, y, z) 
-        These values are only returned when H_field is True
+        These values are only returned when magnetic_field is True
     X : x coordinates of the sampling grid
     Y : y coordinates of the sampling grid
     Z : z coordinates of the sampling grid
@@ -390,18 +384,30 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0),
     # Create a FarFieldData object that contains a single pixel == single plane wave
     # angles theta and phi and with amplitude and polarization 
     # (E_theta, E_phi) given by `polarization`
+    Einf_theta = np.atleast_2d(polarization[0])
+    Einf_phi = np.atleast_2d(polarization[1])
+    aperture = np.atleast_2d(True)
+    cos_theta = np.atleast_2d(np.cos(theta))
+    sin_theta = np.atleast_2d(np.sin(theta))
+    cos_phi = np.atleast_2d(np.cos(phi))
+    sin_phi = np.atleast_2d(np.sin(phi))
+    Kz = bead.k * cos_theta
+    Kp = bead.k * sin_theta
+    Ky = -Kp * sin_phi
+    Kx = -Kp * cos_phi
+    
     farfield_data = FarfieldData(
-        Einf_theta=np.atleast_2d(polarization[0]),
-        Einf_phi=np.atleast_2d(polarization[1]),
-        aperture=np.atleast_2d(True),
-        cos_theta=np.atleast_2d(np.cos(theta)),
-        sin_theta=np.atleast_2d(np.sin(theta)),
-        cos_phi=np.atleast_2d(np.cos(phi)),
-        sin_phi=np.atleast_2d(np.sin(phi)),
-        Kz=np.atleast_2d([0]),
-        Ky=np.atleast_2d([0]),
-        Kx=np.atleast_2d([0]),
-        Kp=np.atleast_2d([0]),
+        Einf_theta=Einf_theta * Kz,
+        Einf_phi=Einf_phi * Kz,
+        aperture=aperture,
+        cos_theta=cos_theta,
+        sin_theta=sin_theta,
+        cos_phi=cos_phi,
+        sin_phi=sin_phi,
+        Kz=Kz,
+        Ky=Ky,
+        Kx=Kx,
+        Kp=Kp,
     )
     
     logging.info('Calculating Hankel functions and derivatives')
@@ -443,33 +449,32 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0),
         total_field=total_field, magnetic_field=magnetic_field,
     )
 
-    if inside_bead:
-        logging.info('Calculating Bessel functions and derivatives')
-        internal_radial_data = calculate_internal(
-            bead.k1, local_coordinates.r_inside, n_orders
-        )
+    logging.info('Calculating Bessel functions and derivatives')
+    internal_radial_data = calculate_internal(
+        bead.k1, local_coordinates.r_inside, n_orders
+    )
 
-        logging.info('Calculating Associated Legendre polynomials for internal fields')
-        legendre_data_int = calculate_legendre(
-            local_coordinates.xyz_stacked(inside=True),
-            local_coordinates.r_inside,
-            farfield_data.aperture,
-            farfield_data.cos_theta,
-            farfield_data.sin_theta,
-            farfield_data.cos_phi,
-            farfield_data.sin_phi,
-            n_orders
-        )
+    logging.info('Calculating Associated Legendre polynomials for internal fields')
+    legendre_data_int = calculate_legendre(
+        local_coordinates.xyz_stacked(inside=True),
+        local_coordinates.r_inside,
+        farfield_data.aperture,
+        farfield_data.cos_theta,
+        farfield_data.sin_theta,
+        farfield_data.cos_phi,
+        farfield_data.sin_phi,
+        n_orders
+    )
 
-        logging.info('Calculating internal fields')
-        calculate_fields(
-            Ex, Ey, Ez, Hx, Hy, Hz,
-            bead=bead, bead_center=(0, 0, 0), local_coordinates=local_coordinates,
-            farfield_data=farfield_data, legendre_data=legendre_data_int,
-            internal_radial_data=internal_radial_data,
-            internal=True,
-            total_field=total_field, magnetic_field=magnetic_field,
-        )
+    logging.info('Calculating internal fields')
+    calculate_fields(
+        Ex, Ey, Ez, Hx, Hy, Hz,
+        bead=bead, bead_center=(0, 0, 0), local_coordinates=local_coordinates,
+        farfield_data=farfield_data, legendre_data=legendre_data_int,
+        internal_radial_data=internal_radial_data,
+        internal=True,
+        total_field=total_field, magnetic_field=magnetic_field,
+    )
     logging.getLogger().setLevel(loglevel)
 
     Ex = np.squeeze(Ex)
@@ -574,7 +579,7 @@ def forces_focused_fields(
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
         f_input_field, objective, bead, bead_center, xb, yb, zb,
         bfp_sampling_n, num_orders, return_grid=False,
-        total_field=True, inside_bead=False, magnetic_field=True, verbose=verbose,
+        total_field=True, magnetic_field=True, verbose=verbose,
         grid=False
     )
     _eps = _EPS0 * bead.n_medium**2
@@ -693,7 +698,7 @@ def absorbed_power_focus(self, f_input_field, n_bfp=1.0,
         Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
             f_input_field, n_bfp, focal_length, NA, xb, yb, zb,
             bead_center, bfp_sampling_n, num_orders, return_grid=False,
-            total_field=True, inside_bead=False, H_field=True, verbose=verbose,
+            total_field=True, magnetic_field=True, verbose=verbose,
             grid=False
         )
     
@@ -783,7 +788,7 @@ def scattered_power_focus(self, f_input_field, n_bfp=1.0,
         Ex, Ey, Ez, Hx, Hy, Hz = self.fields_focus(
             f_input_field, n_bfp, focal_length, NA, xb, yb, zb,
             bead_center, bfp_sampling_n, num_orders, return_grid=False,
-            total_field=False, inside_bead=False, H_field=True, verbose=verbose,
+            total_field=False, magnetic_field=True, verbose=verbose,
             grid=False
         )
     
