@@ -1,9 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 from scipy.constants import (
-    speed_of_light as _C,
-    mu_0 as _MU0,
     epsilon_0 as _EPS0
 )
 
@@ -35,9 +32,9 @@ a_s = 4 * np.pi * _EPS0 * n_medium**2 * (bead_size/2)**3 * (n_bead**2 - n_medium
 a = a_s + 1j * k**3 / (6*np.pi*_EPS0*n_medium**2) * a_s**2
 
 
-def field_func_mie(X_bfp, Y_bfp, *rest, **kwargs):
+def field_func_mie(x_bfp, y_bfp, **kwargs):
     
-    Ein = np.exp(-((X_bfp)**2 + Y_bfp**2)/w0**2)
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
     return (Ein, None)
 
 def field_func(X_BFP, Y_BFP, R, Rmax, Th, Phi):

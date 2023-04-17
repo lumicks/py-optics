@@ -92,8 +92,8 @@ def fields_gaussian_focus(
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
     E0 = (I0 * 2/(_EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
 
-    def gaussian_beam(X_bfp, Y_bfp, **kwargs): 
-        Ex = np.exp(-(X_bfp**2 + Y_bfp**2) / w0**2) * E0
+    def gaussian_beam(x_bfp, y_bfp, **kwargs): 
+        Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
         return (Ex, None)
     
     return fields_focus(
@@ -384,30 +384,22 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1,0),
     # Create a FarFieldData object that contains a single pixel == single plane wave
     # angles theta and phi and with amplitude and polarization 
     # (E_theta, E_phi) given by `polarization`
-    Einf_theta = np.atleast_2d(polarization[0])
-    Einf_phi = np.atleast_2d(polarization[1])
-    aperture = np.atleast_2d(True)
     cos_theta = np.atleast_2d(np.cos(theta))
     sin_theta = np.atleast_2d(np.sin(theta))
     cos_phi = np.atleast_2d(np.cos(phi))
     sin_phi = np.atleast_2d(np.sin(phi))
-    Kz = bead.k * cos_theta
-    Kp = bead.k * sin_theta
-    Ky = -Kp * sin_phi
-    Kx = -Kp * cos_phi
+    kz = bead.k * cos_theta
+    kp = bead.k * sin_theta
+    ky = -kp * sin_phi
+    kx = -kp * cos_phi
     
     farfield_data = FarfieldData(
-        Einf_theta=Einf_theta * Kz,
-        Einf_phi=Einf_phi * Kz,
-        aperture=aperture,
-        cos_theta=cos_theta,
-        sin_theta=sin_theta,
-        cos_phi=cos_phi,
-        sin_phi=sin_phi,
-        Kz=Kz,
-        Ky=Ky,
-        Kx=Kx,
-        Kp=Kp,
+        Einf_theta=np.atleast_2d(polarization[0]) * kz,
+        Einf_phi=np.atleast_2d(polarization[1]) * kz,
+        aperture=np.atleast_2d(True),
+        cos_theta=cos_theta, sin_theta=sin_theta,
+        cos_phi=cos_phi, sin_phi=sin_phi,
+        kz=kz, ky=ky, kx=kx, kp=kp
     )
     
     logging.info('Calculating Hankel functions and derivatives')

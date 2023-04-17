@@ -128,10 +128,10 @@ def calculate_fields(
 
                 E = np.matmul(A.T, E)
                 E[:, region] *= E0[polarization] * np.exp(1j * (
-                    farfield_data.Kx[p, m] * bead_center[0] +
-                    farfield_data.Ky[p, m] * bead_center[1] +
-                    farfield_data.Kz[p, m] * bead_center[2])
-                ) / farfield_data.Kz[p, m]
+                    farfield_data.kx[p, m] * bead_center[0] +
+                    farfield_data.ky[p, m] * bead_center[1] +
+                    farfield_data.kz[p, m] * bead_center[2])
+                ) / farfield_data.kz[p, m]
 
                 Ex[:,:,:] += np.reshape(E[0,:], local_coordinates.coordinate_shape)
                 Ey[:,:,:] += np.reshape(E[1,:], local_coordinates.coordinate_shape)
@@ -162,10 +162,10 @@ def calculate_fields(
 
                     H = np.matmul(A.T, H)
                     H[:, region] *= E0[polarization] * np.exp(1j * (
-                        farfield_data.Kx[p, m] * bead_center[0] +
-                        farfield_data.Ky[p, m] * bead_center[1] +
-                        farfield_data.Kz[p, m] * bead_center[2])
-                    ) / farfield_data.Kz[p, m]
+                        farfield_data.kx[p, m] * bead_center[0] +
+                        farfield_data.ky[p, m] * bead_center[1] +
+                        farfield_data.kz[p, m] * bead_center[2])
+                    ) / farfield_data.kz[p, m]
 
                     Hx[:,:,:] += np.reshape(H[0,:], local_coordinates.coordinate_shape)
                     Hy[:,:,:] += np.reshape(H[1,:], local_coordinates.coordinate_shape)
