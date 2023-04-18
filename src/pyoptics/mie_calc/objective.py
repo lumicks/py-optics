@@ -91,7 +91,7 @@ class Objective:
 
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
-            
+        
         cos_theta = np.ones(sin_theta.shape)
         cos_theta[bfp_coords.aperture] = (
             1 - sin_theta[bfp_coords.aperture]**2
