@@ -12,8 +12,10 @@ All code is developed in-house at LUMICKS.
 
 1. Create and activate a virtual environment. With conda:
 
-       $ conda create -n py-optics python=3.8
+       $ conda create -n py-optics python=3.8 numpy scipy numba=0.55
        $ conda activate py-optics
+   
+   Note that immediately installing numpy and scipy with conda gives you the MKL optimized versions of theses libraries, which can take advantage of specific CPU features.
 
 2. Clone the repository:
 
