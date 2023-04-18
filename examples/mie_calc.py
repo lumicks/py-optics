@@ -76,10 +76,17 @@ objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium
 bfp_sampling_n = 9
 
 # %%
-num_pts = 201
+num_pts = 101
 half_extent = bead_diameter
-x = np.linspace(-half_extent, half_extent, num_pts)
-z = np.linspace(-half_extent, half_extent, num_pts)
+# np.linspace can return asymmetric values for negative and positive sides of an axis. 
+# The code below ensures that the negative values of x are the same
+# as the positive values of x, except for the sign. This helps to reduce the number 
+# of points to calculate by taking advantage of symmetry.
+x = np.zeros(num_pts * 2 - 1)
+_x = np.linspace(0, half_extent, num_pts)
+x[0:num_pts] = -_x[::-1]
+x[num_pts:] = _x[1:]
+z = x
 bead_center = (0,0,0)  # [m]
 Ex, Ey, Ez, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
                                                bead_center=bead_center, bfp_sampling_n=9, return_grid=True, verbose=True)
@@ -122,7 +129,7 @@ objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=
 
 # %%
 Ex, Ey, Ez, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead, x=0, y=y, z=z, 
-                                         bead_center=(0, 2.9e-6, 0), bfp_sampling_n=35, return_grid=True)
+                                         bead_center=(0, 2.9e-6, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
 plt.figure(figsize=(10, 8))
@@ -155,9 +162,18 @@ n_bead_UV =  0.06 + 1.76j  # [-] Silver at 345 nm
 lambda_vac_IR = 1064e-9    # [m]
 n_bead_IR =  0.04 + 7.60j  # [-] Silver at 1064 nm
 n_medium = 1.0
-num_pts = 201
-x = np.linspace(-1*bead_diameter, 1*bead_diameter, num_pts)
-z = np.linspace(-1*bead_diameter, 1*bead_diameter, num_pts)
+num_pts = 101
+half_extent = bead_diameter
+# np.linspace can return asymmetric values for negative and positive sides of an axis. 
+# The code below ensures that the negative values of x are the same
+# as the positive values of x, except for the sign. This helps to reduce the number 
+# of points to calculate by taking advantage of symmetry.
+x = np.zeros(num_pts * 2 - 1)
+_x = np.linspace(0, half_extent, num_pts)
+x[0:num_pts] = -_x[::-1]
+x[num_pts:] = _x[1:]
+z = x
+
 bead_UV = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead_UV, n_medium=n_medium, lambda_vac=lambda_vac_UV)
 bead_IR = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead_IR, n_medium=n_medium, lambda_vac=lambda_vac_IR)
 objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
@@ -173,14 +189,14 @@ Ex_IR, Ey_IR, Ez_IR, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, o
 # %%
 plt.figure(figsize=(21, 7.5))
 plt.subplot(1, 2, 1)
-plt.pcolor(Z, X, np.sqrt(np.abs(Ez_IR)**2 + np.abs(Ex_IR)**2), cmap='plasma', shading='auto')
+plt.pcolormesh(Z, X, np.sqrt(np.abs(Ez_IR)**2 + np.abs(Ex_IR)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|$E_{IR}$|')
 plt.xlabel('Z [$\mu$m]')
 plt.ylabel('X [$\mu$m]')
 
 plt.subplot(1, 2, 2)
-plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez_UV)**2 + np.abs(Ex_UV)**2), cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez_UV)**2 + np.abs(Ex_UV)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|$E_{UV}$|')
 plt.xlabel('Z [$\mu$m]')
@@ -191,14 +207,14 @@ plt.show()
 # %% tags=[]
 plt.figure(figsize=(21, 7.5))
 plt.subplot(1, 2, 1)
-plt.pcolor(Z * 1e9, X * 1e9, Ex_IR.imag, cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e9, X * 1e9, Ex_IR.imag, cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('imag($E_{x,IR}$) [V/m]')
 plt.xlabel('Z [nm]')
 plt.ylabel('X [nm]')
 
 plt.subplot(1,2,2)
-plt.pcolor(Z * 1e9, X * 1e9, Ex_UV.imag, cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e9, X * 1e9, Ex_UV.imag, cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('imag($E_{x,UV}$) [V/m]')
 plt.xlabel('Z [nm]')
@@ -214,7 +230,7 @@ bead_size = 1e-6       # [m]
 lambda_vac = 1.064e-6  # [m]
 n_bead =  1.57         # [-]
 n_medium = 1.33        # [-]
-num_pts = 101
+num_pts = 501
 x = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
@@ -228,7 +244,7 @@ Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=1, re
 
 # %%
 plt.figure(figsize=(10, 8))
-plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| [V/m]')
 plt.xlabel('Z [$\mu$m]')
@@ -245,7 +261,7 @@ Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=np.ma
 
 # %%
 plt.figure(figsize=(10,8))
-plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| [V/m]')
 plt.xlabel('Z [$\mu$m]')
@@ -257,7 +273,15 @@ plt.show()
 # Get the scattering coefficients $a_n$ and $b_n$
 
 # %%
-bead.ab_coeffs()
+an, bn = bead.ab_coeffs()
+
+plt.figure(figsize=(10,8))
+plt.semilogy(range(1, an.size + 1), np.abs(an), label='$|a_n|$')
+plt.semilogy(range(1, bn.size + 1), np.abs(bn), label='$|b_n|$')
+plt.xlabel('Order [n]')
+plt.legend()
+plt.title('$|a_n|$ and $|b_n|$')
+plt.show()
 
 # %% [markdown]
 # Only calculate the scattered field (so not the focused laser). Change the bead from small to larger to see the transitions from Rayleigh scattering to forward scattering
@@ -267,20 +291,18 @@ bead_size = 0.1e-6     # [m]
 lambda_vac = 1.064e-6  # [m]
 n_bead =  1.57         # [-]
 n_medium = 1.33        # [-]
-num_pts = 101
+num_pts = 401
 x = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
 z = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
 bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
-objective=mc.Objective(n_bfp=1.0, focal_length=4.43e-3, NA=.9, n_medium=1.33)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mc.fields_gaussian_focus(1.0, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
-                                         bead_center=(0, 0, 0), num_orders=None, total_field=False,
-                                         bfp_sampling_n=9, return_grid=True)
+Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead=bead, x=x, y=0, z=z, num_orders=None, total_field=False,
+                                           return_grid=True)
 
 # %%
 plt.figure(figsize=(10, 8))
-plt.pcolor(Z * 1e6, X * 1e6, np.log10(np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2)), cmap='plasma', shading='auto')
+plt.pcolormesh(Z * 1e6, X * 1e6, np.log10(np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2)), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| (scattered)')
 plt.xlabel('Z [$\mu$m]')
