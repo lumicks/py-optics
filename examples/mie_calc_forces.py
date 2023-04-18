@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.13.7
+#       jupytext_version: 1.14.1
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -18,13 +18,14 @@
 
 # %% tags=[]
 # %matplotlib inline
+import numpy as np
+import matplotlib.pyplot as plt
 import time, sys  # For progress bar
 from IPython.display import clear_output  # For progress bar
-import numpy as np
 from matplotlib import rc
-import matplotlib.pyplot as plt
 from pyoptics import mie_calc as mc
 from scipy.interpolate import interp1d
+from scipy.constants import epsilon_0, speed_of_light as C
 
 font = {'weight' : 'normal',
         'size'   : 16}
@@ -49,10 +50,10 @@ n_bead =  1.57          # [-]
 n_medium = 1.33         # [-]
 
 # %% tags=[]
-# instantiate the MieCalc object
-mie = mc.MieCalc(bead_diameter, n_bead, n_medium, lambda_vac)
+# instantiate a Bead object
+bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 # Tell use how many scattering orders are used according to the formula in literature:
-print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
+print(f'Number of scattering orders used by default: {bead.number_of_orders}')
 
 # %% [markdown] tags=[]
 # ## Properties of the objective
@@ -68,6 +69,8 @@ print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
 NA = 1.2                # [-]
 focal_length = 4.43e-3  # [m]
 n_bfp = 1.0             # [-] Other side of the water immersion objective is air
+# Instantiate an Objective. Note that n_medium has to be defined here as well
+objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 # %% [markdown]
 # ## Properties of the input beam
@@ -87,17 +90,18 @@ n_bfp = 1.0             # [-] Other side of the water immersion objective is air
 bfp_sampling_n=9
 
 # 100% is 1.75W into a single trapping beam before the objective, at trap split = 50%
-power_percentage = 25
+Pmax = 1.75  # [W]
+power_percentage = 25  # [%]
 
 # %%
 filling_factor = 0.9                                # [-]
 w0 = filling_factor * focal_length * NA / n_medium  # [m]
-P = 1.75 * power_percentage / 100.                  # [W]
+P = Pmax * power_percentage / 100.                  # [W]
 I0 = 2 * P / (np.pi * w0**2)                        # [W/m^2]
-E0 = (I0 * 2/(mc._EPS0 * mc._C * n_bfp))**0.5       # [V/m]
+E0 = (I0 * 2/(epsilon_0 * C * n_bfp))**0.5       # [V/m]
 
-def gaussian_beam(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi): 
-    Ex = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2) * E0
+def gaussian_beam(x_bfp, y_bfp, **kwargs): 
+    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
     return (Ex, None)
 
 
@@ -130,7 +134,7 @@ Fz = np.empty(z.shape)
 
 # %%
 for idx, zz in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, zz), 
+    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz[idx] = F[2]
     update_progress(idx / z.size)
@@ -157,7 +161,7 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
 for idx, xx in enumerate(x):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
+    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(xx, 0, z_eval), num_orders=None, integration_orders=None)
     Fx[idx] = F[0]
     update_progress(idx / x.size)
@@ -167,7 +171,7 @@ update_progress(1.)
 y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
 for idx, yy in enumerate(y):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
+    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, yy, z_eval), num_orders=None, integration_orders=None)
     Fy[idx] = F[1]
     update_progress(idx / y.size)
