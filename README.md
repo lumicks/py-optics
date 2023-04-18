@@ -27,6 +27,10 @@ All code is developed in-house at LUMICKS.
    Or, if you want to install the additional dependencies for the example Notebooks:
 
        $ pip install -e .[examples]
+   
+   To run the benchmarks, you'll need to install extra packages for testing:
+   
+	   $ pip install -e .[testing]
 
 Example Jupyter Notebooks are available in the `examples` directory:
 
