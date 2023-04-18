@@ -25,6 +25,14 @@ class Bead:
         self.n_medium = n_medium
         self.lambda_vac = lambda_vac
     
+    def __repr__(self) -> str:
+        return (
+            f'Diameter: {self.bead_diameter} [m]\n'
+            f'Refractive index: {self.n_bead}\n'
+            f'Refractive index medium: {self.n_medium}\n'
+            f'Wavelength: {self.lambda_vac} [m]\n'
+        )
+    
     @property
     def k(self) -> float:
         return 2 * np.pi * self.n_medium / self.lambda_vac
