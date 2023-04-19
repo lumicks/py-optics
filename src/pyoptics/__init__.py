@@ -1,5 +1,5 @@
 __title__ = 'pyoptics'
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 __description__ = 'Computational code for nanophotonics'
 __url__ = 'https://github.com/lumicks/py-optics'
