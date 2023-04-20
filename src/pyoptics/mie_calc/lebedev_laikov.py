@@ -1,69 +1,70 @@
-"""Lebedev-Laikov.F, translated to C with f2c (version 20160102), 
-   because I don't understand FORTRAN, then further translated by 
+"""Lebedev-Laikov.F, translated to C with f2c (version 20160102),
+   because I don't understand FORTRAN, then further translated by
    hand to Python.
 
-   This subroutine is part of a set of subroutines that generate 
-   Lebedev grids [1-6] for integration on a sphere. The original 
-   C-code [0] was kindly provided by Dr. Dmitri N. Laikov and 
-   translated into fortran by Dr. Christoph van Wuellen. 
-   This subroutine was translated using a C to fortran77 conversion 
-   tool written by Dr. Christoph van Wuellen. 
- 
-   Users of this code are asked to include reference [0] in their 
-   publications, and in the user- and programmers-manuals 
-   describing their codes. 
- 
-   This code was distributed through CCL (http://www.ccl.net/). 
- 
-   [0] V.I. Lebedev, and D.N. Laikov 
-       "A quadrature formula for the sphere of the 131st 
-        algebraic order of accuracy" 
-       Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481. 
- 
-   [1] V.I. Lebedev 
-       "A quadrature formula for the sphere of 59th algebraic 
-        order of accuracy" 
-       Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286. 
- 
-   [2] V.I. Lebedev, and A.L. Skorokhodov 
-       "Quadrature formulas of orders 41, 47, and 53 for the sphere" 
-       Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592. 
- 
-   [3] V.I. Lebedev 
-       "Spherical quadrature formulas exact to orders 25-29" 
-       Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107. 
- 
-   [4] V.I. Lebedev 
-       "Quadratures on a sphere" 
-       Computational Mathematics and Mathematical Physics, Vol. 16, 
-       1976, pp. 10-24. 
- 
-   [5] V.I. Lebedev 
-       "Values of the nodes and weights of ninth to seventeenth 
-        order Gauss-Markov quadrature formulae invariant under the 
-        octahedron group with inversion" 
-       Computational Mathematics and Mathematical Physics, Vol. 15, 
-       1975, pp. 44-51. 
-       
-      
-    Given a point on a sphere (specified by a and b), generate all 
-    the equivalent points under Oh symmetry, making grid points with 
-    weight v. 
-    The variable num is increased by the number of different points 
-    generated. 
- 
-    Depending on code, there are 6...48 different but equivalent 
-    points. 
- 
-    code=1:   (0,0,1) etc                                (  6 points) 
-    code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points) 
-    code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points) 
-    code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points) 
-    code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points) 
+   This subroutine is part of a set of subroutines that generate
+   Lebedev grids [1-6] for integration on a sphere. The original
+   C-code [0] was kindly provided by Dr. Dmitri N. Laikov and
+   translated into fortran by Dr. Christoph van Wuellen.
+   This subroutine was translated using a C to fortran77 conversion
+   tool written by Dr. Christoph van Wuellen.
+
+   Users of this code are asked to include reference [0] in their
+   publications, and in the user- and programmers-manuals
+   describing their codes.
+
+   This code was distributed through CCL (http://www.ccl.net/).
+
+   [0] V.I. Lebedev, and D.N. Laikov
+       "A quadrature formula for the sphere of the 131st
+        algebraic order of accuracy"
+       Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481.
+
+   [1] V.I. Lebedev
+       "A quadrature formula for the sphere of 59th algebraic
+        order of accuracy"
+       Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286.
+
+   [2] V.I. Lebedev, and A.L. Skorokhodov
+       "Quadrature formulas of orders 41, 47, and 53 for the sphere"
+       Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592.
+
+   [3] V.I. Lebedev
+       "Spherical quadrature formulas exact to orders 25-29"
+       Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107.
+
+   [4] V.I. Lebedev
+       "Quadratures on a sphere"
+       Computational Mathematics and Mathematical Physics, Vol. 16,
+       1976, pp. 10-24.
+
+   [5] V.I. Lebedev
+       "Values of the nodes and weights of ninth to seventeenth
+        order Gauss-Markov quadrature formulae invariant under the
+        octahedron group with inversion"
+       Computational Mathematics and Mathematical Physics, Vol. 15,
+       1975, pp. 44-51.
+
+
+    Given a point on a sphere (specified by a and b), generate all
+    the equivalent points under Oh symmetry, making grid points with
+    weight v.
+    The variable num is increased by the number of different points
+    generated.
+
+    Depending on code, there are 6...48 different but equivalent
+    points.
+
+    code=1:   (0,0,1) etc                                (  6 points)
+    code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points)
+    code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points)
+    code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points)
+    code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points)
     code=6:   (a,b,c) etc, c=sqrt(1-a^2-b^2), a/b input  ( 48 points) """
- 
+
 
 from math import sqrt
+
 
 def gen_oh(code: int, a=None, b=None, v=1.):
 
@@ -99,7 +100,7 @@ def gen_oh(code: int, a=None, b=None, v=1.):
         w[5] = v
 
         return x, y, z, w
-    
+
     def L2():
         x = [0] * 12
         y = [0] * 12
@@ -197,13 +198,13 @@ def gen_oh(code: int, a=None, b=None, v=1.):
         w[7] = v
 
         return x, y, z, w
-    
+
     def L4():
         x = [0] * 24
         y = [0] * 24
         z = [0] * 24
         w = [0] * 24
-        
+
         b = sqrt(1. - a * 2. * a)
         x[0] = a
         y[0] = a
@@ -308,7 +309,7 @@ def gen_oh(code: int, a=None, b=None, v=1.):
         y = [0] * 24
         z = [0] * 24
         w = [0] * 24
-        
+
         b = sqrt(1. - a * a)
         x[0] = a
         y[0] = b
@@ -406,7 +407,7 @@ def gen_oh(code: int, a=None, b=None, v=1.):
         y[23] = -(b)
         z[23] = -(a)
         w[23] = v
-        
+
         return x, y, z, w
 
     def L6():
@@ -609,7 +610,7 @@ def gen_oh(code: int, a=None, b=None, v=1.):
         w[47] = v
 
         return x, y, z, w
-        
+
     switcher = {
         1: L1,
         2: L2,
@@ -625,7 +626,7 @@ def gen_oh(code: int, a=None, b=None, v=1.):
 def _ld0006():
     v = .1666666666666667
     x, y, z, w = gen_oh(1, v=v)
-    
+
     return x, y, z, w
 
 
@@ -658,7 +659,7 @@ def _ld0026():
     y.extend(_y)
     z.extend(_z)
     w.extend(_w)
-    
+
     return x, y, z, w
 
 
@@ -708,6 +709,7 @@ def _ld0050():
     w.extend(_w)
 
     return x, y, z, w
+
 
 def _ld0074():
 
@@ -874,7 +876,7 @@ def _ld0146():
 
 
 def _ld0170():
-  
+
     v = .005544842902037365
     x, y, z, w = gen_oh(1, v=v)
     v = .006071332770670752
@@ -10339,50 +10341,52 @@ def _ld5810():
 
     return x, y, z, w
 
+
 _LEBEDEV = {
-    3: _ld0006 ,
-    5: _ld0014 ,
-    7: _ld0026 ,
-    9: _ld0038 ,
-    11: _ld0050 ,
-    13: _ld0074 ,
-    15: _ld0086 ,
-    17: _ld0110 ,
-    19: _ld0146 ,
-    21: _ld0170 ,
-    23: _ld0194 ,
-    25: _ld0230 ,
-    27: _ld0266 ,
-    29: _ld0302 ,
-    31: _ld0350 ,
-    35: _ld0434 ,
-    41: _ld0590 ,
-    47: _ld0770 ,
-    53: _ld0974 ,
-    59: _ld1202 ,
-    65: _ld1454 ,
-    71: _ld1730 ,
-    77: _ld2030 ,
-    83: _ld2354 ,
-    89: _ld2702 ,
-    95: _ld3074 ,
-    101: _ld3470 , 
-    107: _ld3890 , 
-    113: _ld4334 ,
-    119: _ld4802 ,
-    125: _ld5294 ,
+    3: _ld0006,
+    5: _ld0014,
+    7: _ld0026,
+    9: _ld0038,
+    11: _ld0050,
+    13: _ld0074,
+    15: _ld0086,
+    17: _ld0110,
+    19: _ld0146,
+    21: _ld0170,
+    23: _ld0194,
+    25: _ld0230,
+    27: _ld0266,
+    29: _ld0302,
+    31: _ld0350,
+    35: _ld0434,
+    41: _ld0590,
+    47: _ld0770,
+    53: _ld0974,
+    59: _ld1202,
+    65: _ld1454,
+    71: _ld1730,
+    77: _ld2030,
+    83: _ld2354,
+    89: _ld2702,
+    95: _ld3074,
+    101: _ld3470,
+    107: _ld3890,
+    113: _ld4334,
+    119: _ld4802,
+    125: _ld5294,
     131: _ld5810
 }
 
 _ORDER = (3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 35, 41, 47,
-    53, 59, 65, 71, 77, 83, 89, 95, 101, 107, 113, 119, 125, 131)
+          53, 59, 65, 71, 77, 83, 89, 95, 101, 107, 113, 119, 125, 131)
+
 
 def get_nearest_order(order: int):
     _order = int(order)
     if _order > 131:
         # TODO: should we issue a warning?
         return 131
-    
+
     if order < 0:
         raise ValueError("The order should not be below 1")
 
@@ -10390,10 +10394,13 @@ def get_nearest_order(order: int):
         _order += 1
     return _order
 
+
 def get_integration_locations(order: int):
     if order not in _ORDER:
-        raise ValueError("'order' has to be 3, 5, 7, 9, 11, 13, 15, 17, 19, " + 
-        "21, 23, 25, 27, 29, 31, 35, 41, 47, 53, 59, 65, 71, 77, 83, 89," + 
-        " 95, 101, 107, 113, 119, 125, or 131")
-    
+        raise ValueError(
+            "'order' has to be 3, 5, 7, 9, 11, 13, 15, 17, 19, " +
+            "21, 23, 25, 27, 29, 31, 35, 41, 47, 53, 59, 65, 71, 77, 83, 89," +
+            " 95, 101, 107, 113, 119, 125, or 131"
+        )
+
     return _LEBEDEV[order]()

@@ -1,12 +1,14 @@
 import numpy as np
 import scipy.special as sp
-from numba import njit
 from dataclasses import dataclass
+
 
 @dataclass
 class ExternalRadialData:
-    """Data class that holds spherical Hankel functions evaluated at radii outside the bead,
-    and related functions (derivatives)"""
+    """
+    Data class that holds spherical Hankel functions evaluated at radii outside
+    the bead, and related functions (derivatives)
+    """
     k0r: np.ndarray
     krH: np.ndarray
     dkrH_dkr: np.ndarray
@@ -14,8 +16,10 @@ class ExternalRadialData:
 
 @dataclass
 class InternalRadialData:
-    """Data class that holds spherical Bessel functions evaluated at radii inside the bead,
-    and related functions (derivatives)"""
+    """
+    Data class that holds spherical Bessel functions evaluated at radii inside
+    the bead, and related functions (derivatives)
+    """
     k1r: np.ndarray
     sphBessel: np.ndarray
     jn_over_k1r: np.ndarray
@@ -23,9 +27,11 @@ class InternalRadialData:
 
 
 def calculate_external(k: float, radii: np.ndarray, n_orders: int):
-    """Precompute the spherical Hankel functions and derivatives that only depend
+    """
+    Precompute the spherical Hankel functions and derivatives that only depend
     on the r coordinate. These functions will not change for any rotation of
-    the coordinate system."""
+    the coordinate system.
+    """
 
     # Only calculate the spherical bessel function for unique values of k0r
     k0r = k * radii
@@ -41,16 +47,18 @@ def calculate_external(k: float, radii: np.ndarray, n_orders: int):
             sqrt_x * (sp.jv(L + 0.5, k0r_unique) +
                       1j * sp.yv(L + 0.5, k0r_unique))
         )[inverse]
-        krH[L - 1, :] = k0r * sphHankel[L - 1,:]
+        krH[L - 1, :] = k0r * sphHankel[L - 1, :]
         dkrH_dkr[L - 1, :] = krh_1 - L * sphHankel[L - 1, :]
         krh_1 = krH[L - 1, :]
-    
+
     return ExternalRadialData(k0r, krH, dkrH_dkr)
 
 
 def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
-    """Precompute the spherical Bessel functions and related that only depend on
-    the r coordinate, for the fields inside of the sphere."""
+    """
+    Precompute the spherical Bessel functions and related that only depend on
+    the r coordinate, for the fields inside of the sphere.
+    """
 
     k1r = k1 * radii
     k1r_unique, inverse = np.unique(k1r, return_inverse=True)
@@ -58,7 +66,7 @@ def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
     jn_over_k1r = np.zeros(sphBessel.shape, dtype='complex128')
     jn_1 = np.zeros(sphBessel.shape, dtype='complex128')
     jprev = np.empty(k1r.shape[0], dtype='complex128')
-    jprev[k1r>0] = (
+    jprev[k1r > 0] = (
         np.sin(k1r[k1r > 0]) / k1r[k1r > 0]
     )
     jprev[k1r == 0] = 1
