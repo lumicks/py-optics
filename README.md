@@ -15,7 +15,7 @@ All code is developed in-house at LUMICKS.
        $ conda create -n py-optics python=3.8
        $ conda activate py-optics
    
-   On Windows, there is a potential performance improvement if numby and scipy are installed with conda, as they are optimized to use the Intel MKL libraries.
+   On Windows, there is a potential performance improvement if numpy and scipy are installed with conda, as they are optimized to use the Intel MKL libraries.
 
 2. Clone the repository:
 
