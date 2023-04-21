@@ -6,17 +6,17 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.1
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # # Calculating forces on a trapped bead
 
-# %% tags=[]
+# %%
 # %matplotlib inline
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,7 +31,7 @@ font = {'weight' : 'normal',
         'size'   : 16}
 rc('font', **font)
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # ## Definition of coordinate system
 # The optical axis (direction of the light to travel into) is the $+z$ axis. For an aberration-free system, the focus of the laser beam ends up at $(x, y, z) = (0, 0, 0)$ See also below:
 #
@@ -43,19 +43,19 @@ rc('font', **font)
 # ## Properties of the bead, the medium and the laser
 # The bead is described by a refractive index $n_{bead}$, a diameter $D$ and a location in space $(x_b, y_b, z_b)$, the latter two in meters. In the code, the diameter is given by `bead_diameter`. The refractive index is given by `n_bead` and the location is passed to the code as a tuple `bead_center` containing three floating point numbers. These numbers represent the $x$-, $y$- and $z$-location of the bead, respectively, in meters. The wavelength of the trapping light is given in meters as well, by the parameter `lambda_vac`. The wavelength is given as it occurs in vacuum ('air'), not in the medium. The refractive index of the medium $n_{medium}$ is given by the parameter `n_medium`.
 
-# %% tags=[]
+# %%
 bead_diameter = 4.4e-6  # [m]
 lambda_vac = 1064e-9    # [m]
 n_bead =  1.57          # [-]
 n_medium = 1.33         # [-]
 
-# %% tags=[]
+# %%
 # instantiate a Bead object
 bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 # Tell use how many scattering orders are used according to the formula in literature:
 print(f'Number of scattering orders used by default: {bead.number_of_orders}')
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # ## Properties of the objective
 # See the image below. The definition of the coordinate system remains as before, and the objective is described by the $\mathit{NA}=n_\mathit{medium} \sin(\theta)$, the focal length $f$ in meters, and the medium at the back focal plane (BFP), $n_\mathit{bfp}$. The parameter `NA` sets the $\mathit{NA}$ (unitless), `focal_length` sets the focal length $f$ (in meters) and the refractive index of the medium at the BFP, $n_\mathit{bfp}$, is set by `n_bfp` (unitless).
 # <figure>
@@ -64,7 +64,7 @@ print(f'Number of scattering orders used by default: {bead.number_of_orders}')
 # </figure>
 #                                                                           
 
-# %% tags=[]
+# %%
 # objective properties, for water immersion
 NA = 1.2                # [-]
 focal_length = 4.43e-3  # [m]
@@ -198,12 +198,12 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mie.forces_focus(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, 
-                                  focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n, 
+                                  bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mie.forces_focus(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n * 2, 
-                                  focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n * 2, 
+                                  bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
     update_progress(idx / z.size)
@@ -228,16 +228,17 @@ plt.show()
 # %% [markdown]
 # ### Gaining some speed
 # 1. *Decrease* the number of spherical harmonics `num_orders` and check the difference between the old and newly calculated forces.
-#     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff:
+#     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff.
 # 1. *Decrease* the number of plane waves in the back focal plane, and check the difference between the old and newly calculated forces.
 
 # %%
-an, bn = mie.ab_coeffs()
+an, bn = bead.ab_coeffs()
 plt.figure(figsize=(8, 6))
 plt.semilogy(range(1, an.size + 1), np.abs(an), label='$a_n$')
 plt.semilogy(range(1, bn.size + 1), np.abs(bn), label='$b_n$')
 plt.xlabel('Order')
 plt.ylabel('|$a_n$|, $|b_n|$ [-]')
+plt.title(f'Magnitude of scattering coefficients for {bead.bead_diameter * 1e6:.2f} $\mu$m bead')
 plt.legend()
 plt.grid()
 plt.show()
