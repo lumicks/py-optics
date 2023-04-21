@@ -134,7 +134,7 @@ Fz = np.empty(z.shape)
 
 # %%
 for idx, zz in enumerate(z):
-    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz[idx] = F[2]
     update_progress(idx / z.size)
@@ -161,7 +161,7 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
 for idx, xx in enumerate(x):
-    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(xx, 0, z_eval), num_orders=None, integration_orders=None)
     Fx[idx] = F[0]
     update_progress(idx / x.size)
@@ -171,7 +171,7 @@ update_progress(1.)
 y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
 for idx, yy in enumerate(y):
-    F = mc.forces_focused_fields(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, yy, z_eval), num_orders=None, integration_orders=None)
     Fy[idx] = F[1]
     update_progress(idx / y.size)
@@ -198,11 +198,11 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, 
+    F = mie.forces_focus(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, 
                                   focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n * 2, 
+    F = mie.forces_focus(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n * 2, 
                                   focal_length=focal_length, bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]

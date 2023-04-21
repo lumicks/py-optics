@@ -8,8 +8,8 @@
 from .bead import Bead
 from .interface import (
    fields_focus, 
-   fields_gaussian_focus,
+   fields_focus_gaussian,
    fields_plane_wave,
-   forces_focused_fields
+   forces_focus,
 )
 from .objective import Objective

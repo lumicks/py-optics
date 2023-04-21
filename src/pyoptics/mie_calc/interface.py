@@ -24,7 +24,7 @@ from .objective import (
 from .implementation import calculate_fields
 
 
-def fields_gaussian_focus(
+def fields_focus_gaussian(
     beam_power: float, filling_factor,
     objective: Objective,
     bead: Bead, bead_center=(0, 0, 0),
@@ -35,7 +35,8 @@ def fields_gaussian_focus(
     verbose=False,
     grid=True
 ):
-    """Calculate the three-dimensional electromagnetic field of a bead the
+    """
+    Calculate the three-dimensional electromagnetic field of a bead the
     focus of a of a Gaussian beam, using the angular spectrum of plane waves
     and Mie theory.
 
@@ -127,7 +128,8 @@ def fields_focus(
     verbose=False,
     grid=True
 ):
-    """Calculate the three-dimensional electromagnetic field of a bead in the
+    """
+    Calculate the three-dimensional electromagnetic field of a bead in the
     focus of an arbitrary input beam, going through an objective with a certain
     NA and focal length. Implemented with the angular spectrum of plane waves
     and Mie theory.
@@ -139,25 +141,32 @@ def fields_focus(
 
     Parameters
     ----------
-    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax), where
-        X_BFP is a grid of x locations in the back focal plane, determined by
-        the focal length and NA of the objective. Y_BFP is the corresponding
-        grid of y locations, and R is the radial distance from the center of
-        the back focal plane. Rmax is the largest distance that falls inside
-        the NA, but R will contain larger numbers as the back focal plane is
-        sampled with a square grid. The function must return a tuple (Ex, Ey),
-        which are the electric fields in the x- and y- direction, respectively,
-        at the sample locations in the back focal plane. The fields may be
-        complex, so a phase difference between x and y is possible. If only one
-        polarization is used, the other return value must be None, e.g., y
-        polarization would return (None, Ey). The fields are post-processed
-        such that any part that falls outside of the NA is set to zero.
-    objective : instance of the Objective class
-    bead : instance of the Bead class
-    x : array of x locations for evaluation, in meters
-    y : array of y locations for evaluation, in meters
-    z : array of z locations for evaluation, in meters
-    bead_center : tuple of three floating point numbers determining the x, y
+    f_input_field : function with signature `f(aperture, x_bfp, y_bfp, r_bfp,
+        r_max, bfp_sampling_n)`, where `x_bfp` is a grid of x locations in the
+        back focal plane, determined by the focal length and NA of the
+        objective. `y_bfp` is the corresponding grid of y locations, and
+        `r_bfp` is the radial distance from the center of the back focal plane.
+        r_max is the largest distance that falls inside the NA, but r_bfp will
+        contain larger numbers as the back focal plane is sampled with a square
+        grid. The function must return a tuple (Ex, Ey), which are the electric
+        fields in the x- and y- direction, respectively, at the sample
+        locations in the back focal plane. The fields may be complex, so a
+        phase difference between x and y is possible. If only one polarization
+        is used, the other return value must be None, e.g., y polarization
+        would return (None, Ey). The fields are post-processed such that any
+        part that falls outside of the NA is set to zero. This region is
+        indicated by the variable `aperture`, which has the same shape as
+        `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates whether
+        it is inside the NA of the objective with `True` or outside the NA with
+        `False`. The integer `bfp_sampling_n` is the number of samples of the
+        back focal plane from the center to the edge of the NA, and is given
+        for convenience or potential caching. This will be the number as passed
+        below to `fields_focus()`
+    objective : instance of the Objective class bead : instance of the Bead
+    class x : array of x locations for evaluation, in meters y : array of y
+    locations for evaluation, in meters z : array of z locations for
+    evaluation, in meters bead_center : tuple of three floating point numbers
+    determining the x, y
         and z position of the bead center in 3D space, in meters
     bfp_sampling_n : (Default value = 31) Number of discrete steps with which
         the back focal plane is sampled, from the center to the edge. The total
@@ -341,7 +350,8 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
                       total_field=True, magnetic_field=False,
                       verbose=False, grid=True
                       ):
-    """Calculate the electromagnetic field of a bead, subject to excitation
+    """
+    Calculate the electromagnetic field of a bead, subject to excitation
     by a plane wave. The plane wave can be at an angle theta and phi, and
     have a polarization state that is the combination of the (complex)
     amplitudes of a theta-polarization state and phi-polarized state. If
@@ -517,13 +527,14 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
     return ret
 
 
-def forces_focused_fields(
+def forces_focus(
     f_input_field, objective,
     bead, bead_center=(0, 0, 0),
     bfp_sampling_n=31, num_orders=None, integration_orders=None,
     verbose=False
 ):
-    """Calculate the forces on a bead in the focus of an arbitrary input
+    """
+    Calculate the forces on a bead in the focus of an arbitrary input
     beam, going through an objective with a certain NA and focal length.
     Implemented with the angular spectrum of plane waves and Mie theory.
 
@@ -552,10 +563,8 @@ def forces_focused_fields(
         return value must be None, e.g., y polarization would return (None,
         E_BFP_y). The fields are post-processed such that any part that
         falls outside of the NA is set to zero.
-    n_bfp : refractive index at the back focal plane of the objective
-        focused focal_length: focal length of the objective, in meters
-    focal_length : focal length of the objective, in meters
-    NA : Numerical Aperture n_medium * sin(theta_max) of the objective
+    objective : instance of the Objective class
+    bead : instance of the Bead class
     bead_center : tuple of three floating point numbers determining the
         x, y and z position of the bead center in 3D space, in meters
     bfp_sampling_n : (Default value = 31) Number of discrete steps with

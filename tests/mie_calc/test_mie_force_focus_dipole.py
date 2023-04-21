@@ -93,7 +93,7 @@ def test_force_focus(z_pos):
     
     for p in range(numpoints):
         for m in range(numpoints):
-            F = mc.forces_focused_fields(field_func_mie, objective, bead=bead, bead_center=(X[p, m], Y[p, m], z_pos), 
+            F = mc.forces_focus(field_func_mie, objective, bead=bead, bead_center=(X[p, m], Y[p, m], z_pos), 
                                           bfp_sampling_n=bfp_sampling_n, num_orders=None, integration_orders=None)
             Fx_mie[p,m] = F[0]
             Fy_mie[p,m] = F[1]

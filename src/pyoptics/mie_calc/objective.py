@@ -50,6 +50,9 @@ class Objective:
 
     @property
     def sin_theta_max(self):
+        """
+        Sine of the maxmimum acceptance angle of the objective
+        """
         return self.NA / self.n_medium
 
     def sine_theta_range(self, bfp_sampling_n):
@@ -62,8 +65,11 @@ class Objective:
     def sample_back_focal_plane(
         self, f_input_field, bfp_sampling_n: int
     ):
-        """Sample f_input_field with bfp_sampling_n samples and return the
-        coordinates and the fields as a tuple"""
+        """
+        Sample f_input_field with bfp_sampling_n samples and return the
+        coordinates in a BackFocalPlaneCoordinates object, and the fields as a
+        named tuple BackFocalPlaneFields(Ex, Ey).
+        """
 
         sin_theta = self.sine_theta_range(bfp_sampling_n)
         x_bfp, y_bfp = np.meshgrid(sin_theta, sin_theta)
@@ -89,6 +95,12 @@ class Objective:
         bfp_fields: BackFocalPlaneFields,
         lambda_vac: float
     ):
+        """
+        Refract the input beam at a Gaussian reference sphere [2], while taking
+        care that the power in a beamlet is modified according to angle and
+        media before and after the reference surface. Returns an instance of
+        the FarfieldData class.
+        """
         bfp_sampling_n = bfp_coords.bfp_sampling_n
         sin_theta = self.sine_theta_range(bfp_sampling_n)
         sin_theta_x, sin_theta_y = np.meshgrid(sin_theta, sin_theta)

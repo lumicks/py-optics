@@ -29,7 +29,7 @@ def test_gaussian_input(
     # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
     P = 1/4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
     
-    Exm, Eym, Ezm = mc.fields_gaussian_focus(P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
+    Exm, Eym, Ezm = mc.fields_focus_gaussian(P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
         bead_center=(0,0,0), bfp_sampling_n=bfp_sampling,
         return_grid=False, verbose=True, num_orders=None
     )
@@ -69,7 +69,7 @@ def test_gaussian_input_bead_shift(bead_center):
     # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
     P = 1/4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
     
-    Exm, Eym, Ezm = mc.fields_gaussian_focus(P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
+    Exm, Eym, Ezm = mc.fields_focus_gaussian(P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
         bead_center=(0,0,0), bfp_sampling_n=bfp_sampling,
         return_grid=False, verbose=True, num_orders=None)
     Exr, Eyr, Ezr = psf.focused_gauss(lambda_vac, n_bfp=n_bfp, n_medium=n_medium, focal_length=focal_length, filling_factor=filling_factor,

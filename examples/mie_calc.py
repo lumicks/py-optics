@@ -88,7 +88,7 @@ x[0:num_pts] = -_x[::-1]
 x[num_pts:] = _x[1:]
 z = x
 bead_center = (0,0,0)  # [m]
-Ex, Ey, Ez, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
                                                bead_center=bead_center, bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
@@ -128,7 +128,7 @@ bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda
 objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead, x=0, y=y, z=z, 
+Ex, Ey, Ez, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=0, y=y, z=z, 
                                          bead_center=(0, 2.9e-6, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
@@ -179,11 +179,11 @@ bead_IR = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead_IR, n_medium=n_medi
 objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
 
 # %%
-Ex_UV, Ey_UV, Ez_UV, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead_UV, x=x, y=0, z=z, 
+Ex_UV, Ey_UV, Ez_UV, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_UV, x=x, y=0, z=z, 
                                          bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
-Ex_IR, Ey_IR, Ez_IR, X, Y, Z = mc.fields_gaussian_focus(1, filling_factor=0.9, objective=objective, bead=bead_IR, x=x, y=0, z=z, 
+Ex_IR, Ey_IR, Ez_IR, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_IR, x=x, y=0, z=z, 
                                          bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%

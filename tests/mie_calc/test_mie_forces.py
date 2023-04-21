@@ -66,7 +66,7 @@ def test_plane_wave_forces_bfp(
             
             if not coords.aperture[p, m]:
                 continue
-            F = mc.forces_focused_fields(input_field_Etheta, objective=objective, bead=bead, 
+            F = mc.forces_focus(input_field_Etheta, objective=objective, bead=bead, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=num_orders)
 
             # direction of the plane wave, hence direction of the force
@@ -81,7 +81,7 @@ def test_plane_wave_forces_bfp(
             #check that the force direction is in the same direction as the plane wave
             np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-4)
             
-            F = mc.forces_focused_fields(input_field_Ephi, objective=objective, bead=bead, 
+            F = mc.forces_focus(input_field_Ephi, objective=objective, bead=bead, 
                                          bead_center=(0,0,0), bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=num_orders)
             Fn = np.squeeze(F/np.linalg.norm(F))
             
@@ -172,7 +172,7 @@ def test_plane_wave_dipole_forces_bfp(
                 continue
             
             bead_pos = np.squeeze(rng.random((3,1)))*200e-9
-            F = mc.forces_focused_fields(input_field_Etheta, objective=objective, bead=bead,
+            F = mc.forces_focus(input_field_Etheta, objective=objective, bead=bead,
                                          bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=num_orders)
             
             # direction of the plane wave, hence direction of the force
@@ -191,7 +191,7 @@ def test_plane_wave_dipole_forces_bfp(
             np.testing.assert_allclose(np.linalg.norm(F), Fdipole_mie, rtol=1e-2)
             
             
-            F = mc.forces_focused_fields(input_field_Ephi, objective=objective, bead=bead,
+            F = mc.forces_focus(input_field_Ephi, objective=objective, bead=bead,
                                          bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n, verbose=False, num_orders=num_orders)
             Fn = np.squeeze(F/np.linalg.norm(F))
             
