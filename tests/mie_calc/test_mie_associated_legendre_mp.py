@@ -5,13 +5,13 @@ import pyoptics.mie_calc as mc
 
 
 def associated_legendre_mp(n: int, x: mp.mpf):
-    """associated_legendre(n, x): Return the 1st order (m == 1) of the 
+    """associated_legendre(n, x): Return the 1st order (m == 1) of the
     associated Legendre polynomial of degree n, evaluated at x [-1..1]
 
-    Uses a Clenshaw recursive algorithm for the evaluation, specific for the 
+    Uses a Clenshaw recursive algorithm for the evaluation, specific for the
     1st order associated Legendre polynomials.
 
-    See Clenshaw, C. W. (July 1955). "A note on the summation of Chebyshev 
+    See Clenshaw, C. W. (July 1955). "A note on the summation of Chebyshev
     series". Mathematical Tables and Other Aids to Computation. 9 (51): 118
     """
     def _fi1(x):
@@ -35,7 +35,8 @@ def associated_legendre_mp(n: int, x: mp.mpf):
         bk1 = bk
     return _fi2(x) * bk1 - mp.mpf('1.5') * _fi1(x) * bk2
 
-@pytest.mark.parametrize('order', range(200,300, 3))
+
+@pytest.mark.parametrize('order', range(200, 300, 3))
 def test_legendre(order):
     """
     Test numpy float64 implementation of associated_legendre against a
@@ -43,7 +44,7 @@ def test_legendre(order):
     It should effectively be about a float192 (mp.dps = 45)
     """
     mp.mp.dps = 45
-    x = np.linspace(-1,1,101)
+    x = np.linspace(-1, 1, 101)
     y1 = mc.associated_legendre.associated_legendre(order, x)
     y2 = []
     for point in x:
