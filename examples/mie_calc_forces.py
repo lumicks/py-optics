@@ -6,31 +6,32 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.13.7
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # # Calculating forces on a trapped bead
 
-# %% tags=[]
+# %%
 # %matplotlib inline
+import numpy as np
+import matplotlib.pyplot as plt
 import time, sys  # For progress bar
 from IPython.display import clear_output  # For progress bar
-import numpy as np
 from matplotlib import rc
-import matplotlib.pyplot as plt
 from pyoptics import mie_calc as mc
 from scipy.interpolate import interp1d
+from scipy.constants import epsilon_0, speed_of_light as C
 
 font = {'weight' : 'normal',
         'size'   : 16}
 rc('font', **font)
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # ## Definition of coordinate system
 # The optical axis (direction of the light to travel into) is the $+z$ axis. For an aberration-free system, the focus of the laser beam ends up at $(x, y, z) = (0, 0, 0)$ See also below:
 #
@@ -42,19 +43,19 @@ rc('font', **font)
 # ## Properties of the bead, the medium and the laser
 # The bead is described by a refractive index $n_{bead}$, a diameter $D$ and a location in space $(x_b, y_b, z_b)$, the latter two in meters. In the code, the diameter is given by `bead_diameter`. The refractive index is given by `n_bead` and the location is passed to the code as a tuple `bead_center` containing three floating point numbers. These numbers represent the $x$-, $y$- and $z$-location of the bead, respectively, in meters. The wavelength of the trapping light is given in meters as well, by the parameter `lambda_vac`. The wavelength is given as it occurs in vacuum ('air'), not in the medium. The refractive index of the medium $n_{medium}$ is given by the parameter `n_medium`.
 
-# %% tags=[]
+# %%
 bead_diameter = 4.4e-6  # [m]
 lambda_vac = 1064e-9    # [m]
 n_bead =  1.57          # [-]
 n_medium = 1.33         # [-]
 
-# %% tags=[]
-# instantiate the MieCalc object
-mie = mc.MieCalc(bead_diameter, n_bead, n_medium, lambda_vac)
+# %%
+# instantiate a Bead object
+bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 # Tell use how many scattering orders are used according to the formula in literature:
-print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
+print(f'Number of scattering orders used by default: {bead.number_of_orders}')
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # ## Properties of the objective
 # See the image below. The definition of the coordinate system remains as before, and the objective is described by the $\mathit{NA}=n_\mathit{medium} \sin(\theta)$, the focal length $f$ in meters, and the medium at the back focal plane (BFP), $n_\mathit{bfp}$. The parameter `NA` sets the $\mathit{NA}$ (unitless), `focal_length` sets the focal length $f$ (in meters) and the refractive index of the medium at the BFP, $n_\mathit{bfp}$, is set by `n_bfp` (unitless).
 # <figure>
@@ -63,11 +64,13 @@ print(f'Number of scattering orders used by default: {mie.number_of_orders()}')
 # </figure>
 #                                                                           
 
-# %% tags=[]
+# %%
 # objective properties, for water immersion
 NA = 1.2                # [-]
 focal_length = 4.43e-3  # [m]
 n_bfp = 1.0             # [-] Other side of the water immersion objective is air
+# Instantiate an Objective. Note that n_medium has to be defined here as well
+objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 # %% [markdown]
 # ## Properties of the input beam
@@ -87,17 +90,18 @@ n_bfp = 1.0             # [-] Other side of the water immersion objective is air
 bfp_sampling_n=9
 
 # 100% is 1.75W into a single trapping beam before the objective, at trap split = 50%
-power_percentage = 25
+Pmax = 1.75  # [W]
+power_percentage = 25  # [%]
 
 # %%
 filling_factor = 0.9                                # [-]
 w0 = filling_factor * focal_length * NA / n_medium  # [m]
-P = 1.75 * power_percentage / 100.                  # [W]
+P = Pmax * power_percentage / 100.                  # [W]
 I0 = 2 * P / (np.pi * w0**2)                        # [W/m^2]
-E0 = (I0 * 2/(mc._EPS0 * mc._C * n_bfp))**0.5       # [V/m]
+E0 = (I0 * 2/(epsilon_0 * C * n_bfp))**0.5       # [V/m]
 
-def gaussian_beam(X_BFP, Y_BFP, R, Rmax, cosTheta, cosPhi, sinPhi): 
-    Ex = np.exp(-(X_BFP**2 + Y_BFP**2) / w0**2) * E0
+def gaussian_beam(x_bfp, y_bfp, **kwargs): 
+    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
     return (Ex, None)
 
 
@@ -130,7 +134,7 @@ Fz = np.empty(z.shape)
 
 # %%
 for idx, zz in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, bead_center=(0, 0, zz), 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz[idx] = F[2]
     update_progress(idx / z.size)
@@ -157,7 +161,7 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
 for idx, xx in enumerate(x):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(xx, 0, z_eval), num_orders=None, integration_orders=None)
     Fx[idx] = F[0]
     update_progress(idx / x.size)
@@ -167,7 +171,7 @@ update_progress(1.)
 y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
 for idx, yy in enumerate(y):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, focal_length=focal_length, 
+    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, yy, z_eval), num_orders=None, integration_orders=None)
     Fy[idx] = F[1]
     update_progress(idx / y.size)
@@ -194,12 +198,12 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n, 
-                                  focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n, 
+                                  bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mie.forces_focused_fields(gaussian_beam, NA=NA, bfp_sampling_n=bfp_sampling_n * 2, 
-                                  focal_length=focal_length, bead_center=(0, 0, k), 
+    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n * 2, 
+                                  bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
     update_progress(idx / z.size)
@@ -224,16 +228,17 @@ plt.show()
 # %% [markdown]
 # ### Gaining some speed
 # 1. *Decrease* the number of spherical harmonics `num_orders` and check the difference between the old and newly calculated forces.
-#     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff:
+#     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff.
 # 1. *Decrease* the number of plane waves in the back focal plane, and check the difference between the old and newly calculated forces.
 
 # %%
-an, bn = mie.ab_coeffs()
+an, bn = bead.ab_coeffs()
 plt.figure(figsize=(8, 6))
 plt.semilogy(range(1, an.size + 1), np.abs(an), label='$a_n$')
 plt.semilogy(range(1, bn.size + 1), np.abs(bn), label='$b_n$')
 plt.xlabel('Order')
 plt.ylabel('|$a_n$|, $|b_n|$ [-]')
+plt.title(f'Magnitude of scattering coefficients for {bead.bead_diameter * 1e6:.2f} $\mu$m bead')
 plt.legend()
 plt.grid()
 plt.show()
