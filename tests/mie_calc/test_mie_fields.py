@@ -8,15 +8,21 @@ from scipy.constants import (
 
 import pyoptics.mie_calc as mc
 
+data_location = 'test_data'
+data_path = os.path.abspath(os.path.dirname(__file__))
+data_path = os.path.join(data_path, data_location)
+
+data_available = True
+for dataset in (1, 2, 3, 4, 5):
+    data_available &= os.path.exists(os.path.join(data_path, f'ref{dataset}.npz'))
 
 # Reference data sets are calculated by miepy 0.5.0, by the script
 # `generate_benchmark_fields.py`
-
+@pytest.mark.skipif(not data_available, 
+                    reason="skip fields test, data not present")
 @pytest.mark.parametrize('dataset', [1, 2, 3, 4, 5])
 def test_mie_nearfield(dataset):
-    path = os.path.abspath(os.path.dirname(__file__))
-
-    data = np.load(os.path.join(path, f'ref{dataset}.npz'))
+    data = np.load(os.path.join(data_location, f'ref{dataset}.npz'))
     try:
         Exr = data['Ex']
         Eyr = data['Ey']
