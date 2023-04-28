@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 import pytest
 import os
@@ -13,16 +14,17 @@ data_path = os.path.abspath(os.path.dirname(__file__))
 data_path = os.path.join(data_path, data_location)
 
 data_available = True
-for dataset in (1, 2, 3, 4, 5):
-    data_available &= os.path.exists(os.path.join(data_path, f'ref{dataset}.npz'))
+for dataset in [f'ref{nr}.npz' for nr in range(1, 6)]:
+    data_available &= os.path.exists(os.path.join(data_path, dataset))
+
 
 # Reference data sets are calculated by miepy 0.5.0, by the script
 # `generate_benchmark_fields.py`
-@pytest.mark.skipif(not data_available, 
+@pytest.mark.skipif(not data_available,
                     reason="skip fields test, data not present")
-@pytest.mark.parametrize('dataset', [1, 2, 3, 4, 5])
-def test_mie_nearfield(dataset):
-    data = np.load(os.path.join(data_location, f'ref{dataset}.npz'))
+@pytest.mark.parametrize('dataset', (1, 2, 3, 4, 5))
+def test_mie_nearfield(dataset: int):
+    data = np.load(os.path.join(data_path, f'ref{dataset}.npz'))
     try:
         Exr = data['Ex']
         Eyr = data['Ey']
@@ -58,7 +60,8 @@ def test_mie_nearfield(dataset):
 @pytest.mark.parametrize(
     'bead_diameter, n_bead', [(4e-6, 1.5), (0.2e-6, 0.1 + 2j)]
 )
-def test_mie_nearfield_polarizations(bead_diameter, n_bead):
+def test_mie_nearfield_polarizations(bead_diameter: float,
+                                     n_bead: Union[float, complex]):
 
     x = np.linspace(-bead_diameter, bead_diameter, 99)
     bead = mc.Bead(bead_diameter, n_bead, n_medium=1.33, lambda_vac=1064e-9)
