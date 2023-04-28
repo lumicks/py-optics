@@ -8,12 +8,12 @@ from .associated_legendre import (
 
 
 @njit(cache=True)
-def _exec_lookup(source, lookup, p, m):
+def _exec_lookup(source, lookup, r, c):
     """
     Compile the retrieval of the lookup table with Numba, as it's slightly
     faster
     """
-    return source[:, lookup[p, m]]
+    return source[:, lookup[r, c]]
 
 
 class AssociatedLegendreData:
@@ -38,17 +38,17 @@ class AssociatedLegendreData:
         self._associated_legendre_dtheta = associated_legendre_dtheta
         self._inverse = inverse
 
-    def associated_legendre(self, p: int, m: int):
-        return _exec_lookup(self._associated_legendre, self._inverse, p, m)
+    def associated_legendre(self, r: int, c: int):
+        return _exec_lookup(self._associated_legendre, self._inverse, r, c)
 
-    def associated_legendre_over_sin_theta(self, p: int, m: int):
+    def associated_legendre_over_sin_theta(self, r: int, c: int):
         return _exec_lookup(
-            self._associated_legendre_over_sin_theta, self._inverse, p, m
+            self._associated_legendre_over_sin_theta, self._inverse, r, c
         )
 
-    def associated_legendre_dtheta(self, p: int, m: int):
+    def associated_legendre_dtheta(self, r: int, c: int):
         return _exec_lookup(
-            self._associated_legendre_dtheta, self._inverse, p, m
+            self._associated_legendre_dtheta, self._inverse, r, c
         )
 
 
@@ -63,34 +63,32 @@ def _loop_over_rotations(
     cos(theta) to reduce the computational load calculating Legendre
     polynomials.
     """
-
+    rows, cols = np.nonzero(aperture)
     cosTs = np.zeros((*aperture.shape, radii.size))
-    n_pupil_samples = aperture.shape[0]
 
     index = radii == 0
-    for m in prange(n_pupil_samples):
-        for p in range(n_pupil_samples):
-            if not aperture[p, m]:
-                continue
-            ct = cosTs[p, m, :]
-            # Rotate the coordinate system such that the x-polarization on the
-            # bead coincides with theta polarization in global space
-            # however, cos(theta) is the same for phi polarization!
-            # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @
-            #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
-            # coords = A @ local_coords
-            # z = coords[2, :]
-            z = (
-                local_coords[2, :] * cos_theta[p, m] - (
-                    local_coords[0, :] * cos_phi[p, m] +
-                    local_coords[1, :] * sin_phi[p, m]
-                ) * sin_theta[p, m]
-            )
+    for r, c in zip(rows, cols):
+        # this line is a workaround for a TypingError in Numba:
+        ct = cosTs[r, c, :]
+        
+        # Rotate the coordinate system such that the x-polarization on the
+        # bead coincides with theta polarization in global space
+        # however, cos(theta) is the same for phi polarization!
+        # A = (_R_th(cos_theta[p,m], sin_theta[p,m]) @
+        #     _R_phi(cos_phi[p,m], -sin_phi[p,m]))
+        # coords = A @ local_coords
+        # z = coords[2, :]
+        z = (
+            local_coords[2, :] * cos_theta[r, c] - (
+                local_coords[0, :] * cos_phi[r, c] +
+                local_coords[1, :] * sin_phi[r, c]
+            ) * sin_theta[r, c]
+        )
 
-            # Retrieve an array of all values of cos(theta)
-            ct[:] = z / radii  # cos(theta)
-            ct[index] = 1
-            cosTs[p, m, :] = ct
+        # Retrieve an array of all values of cos(theta)
+        ct[:] = z / radii  # cos(theta)
+        ct[index] = 1
+        cosTs[r, c, :] = ct
 
     return cosTs
 
