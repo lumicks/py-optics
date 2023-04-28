@@ -1,4 +1,4 @@
-name: test
+name: Perform integrity checks on numerical accuracy
 on: push
 jobs:
   test:
