@@ -1,7 +1,7 @@
 name: Perform integrity checks on numerical accuracy
 on: push
 jobs:
-  test:
+  integrity_check:
     runs-on: [self-hosted, linux]
     steps:
     - uses: lumicks/boilerplate/.github/actions/checkout@main
