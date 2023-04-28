@@ -29,9 +29,10 @@ def calculate_fields(
     total_field: bool = True,
     magnetic_field: bool = False,
 ):
-    """Calculate the internal & external field from precalculated,
-    but compressed, Legendre polynomials
-    Compromise between speed and memory use"""
+    """
+    Calculate the internal & external field from precalculated, but compressed,
+    Associated Legendre polynomials. Compromise between speed and memory use.
+    """
     if internal:
         r = local_coordinates.r_inside
         local_coords = local_coordinates.xyz_stacked(inside=True)
@@ -198,7 +199,12 @@ def scattered_field_fixed_r(
     sinP: np.ndarray,
     total_field=True
 ):
-
+    """
+    Calculate the scattered electric field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Hankel
+    functions, Associated Legendre polynomials and derivatives. 
+    """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -244,7 +250,12 @@ def internal_field_fixed_r(
     alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
     cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray
 ):
-
+    """
+    Calculate the internal electric field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Bessel
+    functions, Associated Legendre polynomials and derivatives. 
+    """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -290,7 +301,12 @@ def scattered_H_field_fixed_r(
     sinP: np.ndarray, n_medium: float,
     total_field=True
 ):
-
+    """
+    Calculate the scattered magnetic field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Hankel
+    functions, Associated Legendre polynomials and derivatives. 
+    """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -340,7 +356,12 @@ def internal_H_field_fixed_r(
     cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray,
     n_bead: np.complex128
 ):
-
+    """
+    Calculate the internal magnetic field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Bessel
+    functions, Associated Legendre polynomials and derivatives. 
+    """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
