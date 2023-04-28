@@ -1,0 +1,14 @@
+name: Perform integrity checks on numerical accuracy
+on: push
+jobs:
+  integrity_check:
+    runs-on: [self-hosted, linux]
+    steps:
+    - uses: lumicks/boilerplate/.github/actions/checkout@main
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Install dependencies
+      run: pip install .[testing] pytest-xdist
+    - name: pytest
+      run: pytest -n auto

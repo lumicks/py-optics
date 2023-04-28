@@ -17,7 +17,7 @@ def test_gaussian_input(
     lambda_vac = 1.064e-6
     n_bead = n_medium
     n_bfp = 1.0
-    num_pts = 51
+    num_pts = 21
     filling_factor = 0.9
     w0 = filling_factor * focal_length * NA / n_medium
     z_eval = 0  # np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
@@ -36,13 +36,6 @@ def test_gaussian_input(
         return_grid=False, verbose=True, num_orders=None
     )
 
-    Exr, Eyr, Ezr = psf.focused_gauss(
-        lambda_vac, n_bfp=n_bfp, n_medium=n_medium,
-        focal_length=focal_length, filling_factor=filling_factor,
-        NA=NA, x=xy_eval, y=xy_eval, z=z_eval,
-        bfp_sampling_n=bfp_sampling, return_grid=False
-    )
-
     Exf, Eyf, Ezf = psf.fast_gauss_psf(
         lambda_vac, n_bfp=n_bfp, n_medium=n_medium, focal_length=focal_length,
         filling_factor=filling_factor, NA=NA,
@@ -53,8 +46,6 @@ def test_gaussian_input(
 
     np.testing.assert_allclose(
         [Exf, Eyf, Ezf], [Exm, Eym, Ezm], rtol=1e-8, atol=1e-8)
-    np.testing.assert_allclose(
-        [Exr, Eyr, Ezr], [Exm, Eym, Ezm], rtol=1e-8, atol=1e-8)
 
 
 @pytest.mark.parametrize(

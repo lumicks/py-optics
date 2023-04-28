@@ -10,7 +10,7 @@ from pyoptics import mie_calc as mc
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 @pytest.mark.parametrize("n_bead", [1.5, 2.1, 0.2 + 3.0j])
-def test_plane_wave_forces_bfp(
+def test_plane_wave_absorption_scattering(
     focal_length, n_medium, NA, n_bead, n_bfp=1.0, bfp_sampling_n=3,
     lambda_vac=1064e-9
 ):
@@ -135,8 +135,3 @@ def test_plane_wave_forces_bfp(
                 Psca, Psca_theory, rtol=1e-8, atol=1e-4)
             np.testing.assert_allclose(
                 Pabs, Pabs_theory, rtol=1e-8, atol=1e-4)
-
-
-if __name__ == "__main__":
-    test_plane_wave_forces_bfp(
-        4.43e-3, 1.33, 1.2, 0.2 + 3.0j, bfp_sampling_n=7)

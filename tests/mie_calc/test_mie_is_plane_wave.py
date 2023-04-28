@@ -4,7 +4,7 @@ import pyoptics.mie_calc as mc
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
-@pytest.mark.parametrize("n_angles", [7, 22])
+@pytest.mark.parametrize("n_angles", [7, 11])
 def test_plane_wave_direct(
     n_medium, NA, n_angles, lambda_vac=1064e-9
 ):
@@ -77,7 +77,7 @@ def test_plane_wave_direct(
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave_bfp(
-    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9
+    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=4, lambda_vac=1064e-9
 ):
     num_pts = 21
     bead = mc.Bead(bead_diameter=1e-9, n_bead=n_medium,

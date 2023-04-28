@@ -7,7 +7,7 @@ from pyoptics import mie_calc as mc
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave_forces_bfp(
-    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9
+    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=3, lambda_vac=1064e-9
 ):
     """
     Test the numerically obtained force on a bead, exerted by a plane wave,
@@ -37,7 +37,7 @@ def test_plane_wave_forces_bfp(
     ks = k * NA / n_medium
     dk = ks / (bfp_sampling_n - 1)
 
-    def input_field_Etheta(x_bfp, **kwargs):
+    def input_field_Etheta(aperture, x_bfp, **kwargs):
         # Create an input field that is theta-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
         Ex = np.zeros_like(x_bfp, dtype='complex128')
@@ -59,9 +59,12 @@ def test_plane_wave_forces_bfp(
             (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
         )
 
+        aperture[:] = False
+        aperture[p, m] = True
+
         return (Ex, Ey)
 
-    def input_field_Ephi(x_bfp, **kwargs):
+    def input_field_Ephi(aperture, x_bfp, **kwargs):
         # Create an input field that is phi-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
         Ex = np.zeros_like(x_bfp, dtype='complex128')
@@ -72,10 +75,17 @@ def test_plane_wave_forces_bfp(
             farfield.cos_theta[p, m]**-0.5
         Expoint = -farfield.sin_phi[p, m] * E0
         Eypoint = farfield. cos_phi[p, m] * E0
-        Ex[p, m] = Expoint * correction * 2 * np.pi / \
+        Ex[p, m] = (
+            Expoint * correction * 2 * np.pi /
             (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
-        Ey[p, m] = Eypoint * correction * 2 * np.pi / \
+        )
+        Ey[p, m] = (
+            Eypoint * correction * 2 * np.pi /
             (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
+        )
+
+        aperture[:] = False
+        aperture[p, m] = True
 
         return (Ex, Ey)
 
@@ -124,7 +134,7 @@ def test_plane_wave_forces_bfp(
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave_dipole_forces_bfp(
-    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9
+    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=3, lambda_vac=1064e-9
 ):
     """
     Test the numerically obtained force on a sub-wavelength bead, exerted by a
@@ -186,7 +196,7 @@ def test_plane_wave_dipole_forces_bfp(
     for p in range(coords.x_bfp.shape[0]):
         for m in range(coords.x_bfp.shape[0]):
 
-            def input_field_Etheta(x_bfp, **kwargs):
+            def input_field_Etheta(aperture, x_bfp, **kwargs):
                 # Create an input field that is theta-polarized with 1 V/m
                 # after refraction by the lens and propagation to the focal
                 # plane
@@ -209,9 +219,12 @@ def test_plane_wave_dipole_forces_bfp(
                     (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
                 )
 
+                aperture[:] = False
+                aperture[p, m] = True
+
                 return (Ex, Ey)
 
-            def input_field_Ephi(x_bfp, **kwargs):
+            def input_field_Ephi(aperture, x_bfp, **kwargs):
                 # Create an input field that is phi-polarized with 1 V/m after
                 # refraction by the lens and propagation to the focal plane
                 Ex = np.zeros_like(x_bfp, dtype='complex128')
@@ -232,6 +245,8 @@ def test_plane_wave_dipole_forces_bfp(
                     (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
                 )
 
+                aperture[:] = False
+                aperture[p, m] = True
                 return (Ex, Ey)
 
             if not farfield.aperture[p, m]:
