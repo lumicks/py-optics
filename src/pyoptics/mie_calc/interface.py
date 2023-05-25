@@ -739,7 +739,7 @@ def absorbed_power_focus(
     Py = (np.conj(Hx) * Ez - np.conj(Hz) * Ex).real
     Pz = (np.conj(Hy) * Ex - np.conj(Hx) * Ey).real
 
-    #integral of - dot(P, n) over spherical surface
+    # Integral of - dot(P, n) over spherical surface
     Pabs = - np.sum((Px * x + Py * y + Pz * z) * w)
 
     return Pabs * (bead.bead_diameter * 0.51)**2 * 2 * np.pi

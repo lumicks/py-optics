@@ -66,21 +66,24 @@ def calculate_fields(
 
     # Skip points outside aperture
     rows, cols = np.nonzero(farfield_data.aperture)
-    for p, m in zip(rows, cols):
+    for row, col in zip(rows, cols):
 
         matrices = [
-            R_th(farfield_data.cos_theta[p, m],
-                    farfield_data.sin_theta[p, m]) @
-            R_phi(farfield_data.cos_phi[p, m],
-                    -farfield_data.sin_phi[p, m]),
+            R_th(farfield_data.cos_theta[row, col],
+                 farfield_data.sin_theta[row, col]) @
+            R_phi(farfield_data.cos_phi[row, col],
+                  -farfield_data.sin_phi[row, col]),
             R_phi(0, -1) @
-            R_th(farfield_data.cos_theta[p, m],
-                    farfield_data.sin_theta[p, m]) @
-            R_phi(farfield_data.cos_phi[p, m],
-                    -farfield_data.sin_phi[p, m])
+            R_th(farfield_data.cos_theta[row, col],
+                 farfield_data.sin_theta[row, col]) @
+            R_phi(farfield_data.cos_phi[row, col],
+                  -farfield_data.sin_phi[row, col])
         ]
 
-        E0 = [farfield_data.Einf_theta[p, m], farfield_data.Einf_phi[p, m]]
+        E0 = [
+            farfield_data.Einf_theta[row, col],
+            farfield_data.Einf_phi[row, col]
+        ]
 
         for polarization in range(2):
             A = matrices[polarization]
@@ -100,11 +103,11 @@ def calculate_fields(
 
                 # Expand the legendre derivatives from the unique version
                 # of cos(theta)
-                alp_expanded[:] = legendre_data.associated_legendre(p, m)
+                alp_expanded[:] = legendre_data.associated_legendre(row, col)
                 alp_sin_expanded[:] = \
-                    legendre_data.associated_legendre_over_sin_theta(p, m)
+                    legendre_data.associated_legendre_over_sin_theta(row, col)
                 alp_deriv_expanded[:] = \
-                    legendre_data.associated_legendre_dtheta(p, m)
+                    legendre_data.associated_legendre_dtheta(row, col)
 
             rho_l = np.hypot(x, y)
             cosP = np.empty(rho_l.shape)
@@ -139,10 +142,10 @@ def calculate_fields(
 
             E = np.matmul(A.T, E)
             E[:, region] *= E0[polarization] * np.exp(1j * (
-                farfield_data.kx[p, m] * bead_center[0] +
-                farfield_data.ky[p, m] * bead_center[1] +
-                farfield_data.kz[p, m] * bead_center[2])
-            ) / farfield_data.kz[p, m]
+                farfield_data.kx[row, col] * bead_center[0] +
+                farfield_data.ky[row, col] * bead_center[1] +
+                farfield_data.kz[row, col] * bead_center[2])
+            ) / farfield_data.kz[row, col]
 
             Ex[:, :, :] += np.reshape(
                 E[0, :], local_coordinates.coordinate_shape)
@@ -176,10 +179,10 @@ def calculate_fields(
 
                 H = np.matmul(A.T, H)
                 H[:, region] *= E0[polarization] * np.exp(1j * (
-                    farfield_data.kx[p, m] * bead_center[0] +
-                    farfield_data.ky[p, m] * bead_center[1] +
-                    farfield_data.kz[p, m] * bead_center[2])
-                ) / farfield_data.kz[p, m]
+                    farfield_data.kx[row, col] * bead_center[0] +
+                    farfield_data.ky[row, col] * bead_center[1] +
+                    farfield_data.kz[row, col] * bead_center[2])
+                ) / farfield_data.kz[row, col]
 
                 Hx[:, :, :] += np.reshape(
                     H[0, :], local_coordinates.coordinate_shape)
@@ -203,7 +206,7 @@ def scattered_field_fixed_r(
     Calculate the scattered electric field for plane wave excitation, at the
     coordinates defined by r, theta and phi. Note that these are not explicitly
     used, but are implicitly present in the evaluations of the Hankel
-    functions, Associated Legendre polynomials and derivatives. 
+    functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -254,7 +257,7 @@ def internal_field_fixed_r(
     Calculate the internal electric field for plane wave excitation, at the
     coordinates defined by r, theta and phi. Note that these are not explicitly
     used, but are implicitly present in the evaluations of the Bessel
-    functions, Associated Legendre polynomials and derivatives. 
+    functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -305,7 +308,7 @@ def scattered_H_field_fixed_r(
     Calculate the scattered magnetic field for plane wave excitation, at the
     coordinates defined by r, theta and phi. Note that these are not explicitly
     used, but are implicitly present in the evaluations of the Hankel
-    functions, Associated Legendre polynomials and derivatives. 
+    functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -360,7 +363,7 @@ def internal_H_field_fixed_r(
     Calculate the internal magnetic field for plane wave excitation, at the
     coordinates defined by r, theta and phi. Note that these are not explicitly
     used, but are implicitly present in the evaluations of the Bessel
-    functions, Associated Legendre polynomials and derivatives. 
+    functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')

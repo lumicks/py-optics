@@ -70,7 +70,7 @@ def _loop_over_rotations(
     for r, c in zip(rows, cols):
         # this line is a workaround for a TypingError in Numba:
         ct = cosTs[r, c, :]
-        
+
         # Rotate the coordinate system such that the x-polarization on the
         # bead coincides with theta polarization in global space
         # however, cos(theta) is the same for phi polarization!
