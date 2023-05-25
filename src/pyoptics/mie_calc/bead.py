@@ -5,12 +5,12 @@ import scipy.special as sp
 class Bead:
     def __init__(self, bead_diameter=1e-6, n_bead=1.57, n_medium=1.33,
                  lambda_vac=1064e-9):
-        """Create a new instance of the MieCalc class. The class describes
-        the situation of a spherical bead with a diameter of bead_diameter
-        (in meters) and having a refractive index n_bead, where the bead is
-        embedded in a medium with a refractive index n_medium. The wavelength
-        for any calculation is lambda_vac, which is the wavelength in vacuum
-        (in meters)
+        """
+        The `Bead` class describes the situation of a spherical bead with a
+        diameter of bead_diameter (in meters) and having a refractive index
+        n_bead, where the bead is embedded in a medium with a refractive index
+        n_medium. The wavelength for any calculation is lambda_vac, which is
+        the wavelength in vacuum (in meters)
 
         Parameters
         ----------
@@ -18,7 +18,7 @@ class Bead:
         n_bead : refractive index of the bead
         n_medium : refractive index of the medium
         lambda_vac : wavelength of the light in meters, in vacuum (so not the
-        medium)
+            medium)
         """
 
         self.bead_diameter = bead_diameter
@@ -137,7 +137,8 @@ class Bead:
         return an, bn
 
     def cd_coeffs(self, num_orders=None):
-        """Return the coefficients for the internal field of the bead.
+        """
+        Return the coefficients for the internal field of the bead.
 
         Parameters
         ----------
@@ -192,7 +193,8 @@ class Bead:
         return cn, dn
 
     def extinction_eff(self, num_orders=None):
-        """Return the extinction efficiency Qext (for plane wave excitation),
+        """
+        Return the extinction efficiency Qext (for plane wave excitation),
         defined as Qext = Cext/(pi r**2), where Cext is the exctinction cross
         section and r is the bead radius.
 
@@ -215,7 +217,8 @@ class Bead:
         )
 
     def scattering_eff(self, num_orders=None):
-        """Return the scattering efficiency Qsca (for plane wave excitation),
+        """
+        Return the scattering efficiency Qsca (for plane wave excitation),
         defined as Qsca = Csca/(pi r**2), where Csca is the scattering cross
         section and r is the bead radius.
 
@@ -238,7 +241,8 @@ class Bead:
         )
 
     def pressure_eff(self, num_orders=None):
-        """Return the pressure efficiency Qpr (for plane wave excitation),
+        """
+        Return the pressure efficiency Qpr (for plane wave excitation),
         defined as Qpr = Qext - Qsca <cos(theta)>, where <cos(theta)> is the
         mean scattering angle.
 

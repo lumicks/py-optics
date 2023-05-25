@@ -29,9 +29,10 @@ def calculate_fields(
     total_field: bool = True,
     magnetic_field: bool = False,
 ):
-    """Calculate the internal & external field from precalculated,
-    but compressed, Legendre polynomials
-    Compromise between speed and memory use"""
+    """
+    Calculate the internal & external field from precalculated, but compressed,
+    Associated Legendre polynomials. Compromise between speed and memory use.
+    """
     if internal:
         r = local_coordinates.r_inside
         local_coords = local_coordinates.xyz_stacked(inside=True)
@@ -61,132 +62,134 @@ def calculate_fields(
     an, bn = bead.ab_coeffs(n_orders)
     cn, dn = bead.cd_coeffs(n_orders)
 
-    n_pupil_samples = farfield_data.Einf_phi.shape[0]
     cosT = np.empty(r.shape)
-    for m in range(n_pupil_samples):
-        for p in range(n_pupil_samples):
-            # Skip points outside aperture
-            if not farfield_data.aperture[p, m]:
-                continue
-            matrices = [
-                R_th(farfield_data.cos_theta[p, m],
-                     farfield_data.sin_theta[p, m]) @
-                R_phi(farfield_data.cos_phi[p, m],
-                      -farfield_data.sin_phi[p, m]),
-                R_phi(0, -1) @
-                R_th(farfield_data.cos_theta[p, m],
-                     farfield_data.sin_theta[p, m]) @
-                R_phi(farfield_data.cos_phi[p, m],
-                      -farfield_data.sin_phi[p, m])
-            ]
 
-            E0 = [farfield_data.Einf_theta[p, m], farfield_data.Einf_phi[p, m]]
+    # Skip points outside aperture
+    rows, cols = np.nonzero(farfield_data.aperture)
+    for row, col in zip(rows, cols):
 
-            for polarization in range(2):
-                A = matrices[polarization]
-                coords = A @ local_coords
-                x = coords[0, :]
-                y = coords[1, :]
-                z = coords[2, :]
+        matrices = [
+            R_th(farfield_data.cos_theta[row, col],
+                 farfield_data.sin_theta[row, col]) @
+            R_phi(farfield_data.cos_phi[row, col],
+                  -farfield_data.sin_phi[row, col]),
+            R_phi(0, -1) @
+            R_th(farfield_data.cos_theta[row, col],
+                 farfield_data.sin_theta[row, col]) @
+            R_phi(farfield_data.cos_phi[row, col],
+                  -farfield_data.sin_phi[row, col])
+        ]
 
-                if polarization == 0:
-                    if internal:
-                        cosT[r > 0] = z[r > 0] / r[r > 0]
-                        cosT[r == 0] = 1
-                    else:
-                        cosT[:] = z / r
-                    cosT[cosT > 1] = 1
-                    cosT[cosT < -1] = -1
+        E0 = [
+            farfield_data.Einf_theta[row, col],
+            farfield_data.Einf_phi[row, col]
+        ]
 
-                    # Expand the legendre derivatives from the unique version
-                    # of cos(theta)
-                    alp_expanded[:] = legendre_data.associated_legendre(p, m)
-                    alp_sin_expanded[:] = \
-                        legendre_data.associated_legendre_over_sin_theta(p, m)
-                    alp_deriv_expanded[:] = \
-                        legendre_data.associated_legendre_dtheta(p, m)
+        for polarization in range(2):
+            A = matrices[polarization]
+            coords = A @ local_coords
+            x = coords[0, :]
+            y = coords[1, :]
+            z = coords[2, :]
 
-                rho_l = np.hypot(x, y)
-                cosP = np.empty(rho_l.shape)
-                sinP = np.empty(rho_l.shape)
-                where = rho_l > 0
-                cosP[where] = x[where] / rho_l[where]
-                sinP[where] = y[where] / rho_l[where]
-                cosP[rho_l == 0] = 1
-                sinP[rho_l == 0] = 0
-
-                E[:] = 0
+            if polarization == 0:
                 if internal:
-                    E[:, region] = internal_field_fixed_r(
+                    cosT[r > 0] = z[r > 0] / r[r > 0]
+                    cosT[r == 0] = 1
+                else:
+                    cosT[:] = z / r
+                cosT[cosT > 1] = 1
+                cosT[cosT < -1] = -1
+
+                # Expand the legendre derivatives from the unique version
+                # of cos(theta)
+                alp_expanded[:] = legendre_data.associated_legendre(row, col)
+                alp_sin_expanded[:] = \
+                    legendre_data.associated_legendre_over_sin_theta(row, col)
+                alp_deriv_expanded[:] = \
+                    legendre_data.associated_legendre_dtheta(row, col)
+
+            rho_l = np.hypot(x, y)
+            cosP = np.empty(rho_l.shape)
+            sinP = np.empty(rho_l.shape)
+            where = rho_l > 0
+            cosP[where] = x[where] / rho_l[where]
+            sinP[where] = y[where] / rho_l[where]
+            cosP[rho_l == 0] = 1
+            sinP[rho_l == 0] = 0
+
+            E[:] = 0
+            if internal:
+                E[:, region] = internal_field_fixed_r(
+                    cn, dn,
+                    internal_radial_data.sphBessel,
+                    internal_radial_data.jn_over_k1r,
+                    internal_radial_data.jn_1,
+                    alp_expanded,
+                    alp_sin_expanded, alp_deriv_expanded,
+                    cosT, cosP, sinP
+                )
+            else:
+                E[:, region] = scattered_field_fixed_r(
+                    an, bn,
+                    external_radial_data.krH,
+                    external_radial_data.dkrH_dkr,
+                    external_radial_data.k0r,
+                    alp_expanded, alp_sin_expanded,
+                    alp_deriv_expanded, cosT, cosP, sinP,
+                    total_field
+                )
+
+            E = np.matmul(A.T, E)
+            E[:, region] *= E0[polarization] * np.exp(1j * (
+                farfield_data.kx[row, col] * bead_center[0] +
+                farfield_data.ky[row, col] * bead_center[1] +
+                farfield_data.kz[row, col] * bead_center[2])
+            ) / farfield_data.kz[row, col]
+
+            Ex[:, :, :] += np.reshape(
+                E[0, :], local_coordinates.coordinate_shape)
+            Ey[:, :, :] += np.reshape(
+                E[1, :], local_coordinates.coordinate_shape)
+            Ez[:, :, :] += np.reshape(
+                E[2, :], local_coordinates.coordinate_shape)
+
+            if magnetic_field:
+                H[:] = 0
+                if internal:
+                    H[:, region] = internal_H_field_fixed_r(
                         cn, dn,
                         internal_radial_data.sphBessel,
                         internal_radial_data.jn_over_k1r,
                         internal_radial_data.jn_1,
                         alp_expanded,
                         alp_sin_expanded, alp_deriv_expanded,
-                        cosT, cosP, sinP
+                        cosT, cosP, sinP, bead.n_bead
                     )
                 else:
-                    E[:, region] = scattered_field_fixed_r(
+                    H[:, region] = scattered_H_field_fixed_r(
                         an, bn,
                         external_radial_data.krH,
                         external_radial_data.dkrH_dkr,
                         external_radial_data.k0r,
                         alp_expanded, alp_sin_expanded,
                         alp_deriv_expanded, cosT, cosP, sinP,
-                        total_field
+                        bead.n_medium, total_field
                     )
 
-                E = np.matmul(A.T, E)
-                E[:, region] *= E0[polarization] * np.exp(1j * (
-                    farfield_data.kx[p, m] * bead_center[0] +
-                    farfield_data.ky[p, m] * bead_center[1] +
-                    farfield_data.kz[p, m] * bead_center[2])
-                ) / farfield_data.kz[p, m]
+                H = np.matmul(A.T, H)
+                H[:, region] *= E0[polarization] * np.exp(1j * (
+                    farfield_data.kx[row, col] * bead_center[0] +
+                    farfield_data.ky[row, col] * bead_center[1] +
+                    farfield_data.kz[row, col] * bead_center[2])
+                ) / farfield_data.kz[row, col]
 
-                Ex[:, :, :] += np.reshape(
-                    E[0, :], local_coordinates.coordinate_shape)
-                Ey[:, :, :] += np.reshape(
-                    E[1, :], local_coordinates.coordinate_shape)
-                Ez[:, :, :] += np.reshape(
-                    E[2, :], local_coordinates.coordinate_shape)
-
-                if magnetic_field:
-                    H[:] = 0
-                    if internal:
-                        H[:, region] = internal_H_field_fixed_r(
-                            cn, dn,
-                            internal_radial_data.sphBessel,
-                            internal_radial_data.jn_over_k1r,
-                            internal_radial_data.jn_1,
-                            alp_expanded,
-                            alp_sin_expanded, alp_deriv_expanded,
-                            cosT, cosP, sinP, bead.n_bead
-                        )
-                    else:
-                        H[:, region] = scattered_H_field_fixed_r(
-                            an, bn,
-                            external_radial_data.krH,
-                            external_radial_data.dkrH_dkr,
-                            external_radial_data.k0r,
-                            alp_expanded, alp_sin_expanded,
-                            alp_deriv_expanded, cosT, cosP, sinP,
-                            bead.n_medium, total_field
-                        )
-
-                    H = np.matmul(A.T, H)
-                    H[:, region] *= E0[polarization] * np.exp(1j * (
-                        farfield_data.kx[p, m] * bead_center[0] +
-                        farfield_data.ky[p, m] * bead_center[1] +
-                        farfield_data.kz[p, m] * bead_center[2])
-                    ) / farfield_data.kz[p, m]
-
-                    Hx[:, :, :] += np.reshape(
-                        H[0, :], local_coordinates.coordinate_shape)
-                    Hy[:, :, :] += np.reshape(
-                        H[1, :], local_coordinates.coordinate_shape)
-                    Hz[:, :, :] += np.reshape(
-                        H[2, :], local_coordinates.coordinate_shape)
+                Hx[:, :, :] += np.reshape(
+                    H[0, :], local_coordinates.coordinate_shape)
+                Hy[:, :, :] += np.reshape(
+                    H[1, :], local_coordinates.coordinate_shape)
+                Hz[:, :, :] += np.reshape(
+                    H[2, :], local_coordinates.coordinate_shape)
 
 
 @njit(cache=True)
@@ -199,7 +202,12 @@ def scattered_field_fixed_r(
     sinP: np.ndarray,
     total_field=True
 ):
-
+    """
+    Calculate the scattered electric field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Hankel
+    functions, Associated Legendre polynomials and derivatives.
+    """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -245,7 +253,12 @@ def internal_field_fixed_r(
     alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
     cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray
 ):
-
+    """
+    Calculate the internal electric field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Bessel
+    functions, Associated Legendre polynomials and derivatives.
+    """
     # Radial, theta and phi-oriented fields
     Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -291,7 +304,12 @@ def scattered_H_field_fixed_r(
     sinP: np.ndarray, n_medium: float,
     total_field=True
 ):
-
+    """
+    Calculate the scattered magnetic field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Hankel
+    functions, Associated Legendre polynomials and derivatives.
+    """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
@@ -341,7 +359,12 @@ def internal_H_field_fixed_r(
     cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray,
     n_bead: np.complex128
 ):
-
+    """
+    Calculate the internal magnetic field for plane wave excitation, at the
+    coordinates defined by r, theta and phi. Note that these are not explicitly
+    used, but are implicitly present in the evaluations of the Bessel
+    functions, Associated Legendre polynomials and derivatives.
+    """
     # Radial, theta and phi-oriented fields
     Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
     Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
