@@ -1,2 +1,2 @@
 include README.* LICENSE.* setup.cfg setup.py *.toml
-graft src
+graft lumicks
