@@ -4,8 +4,8 @@ from scipy.constants import (
     speed_of_light as _C,
     epsilon_0 as _EPS0,
 )
-import pyoptics.mie_calc as mc
-import pyoptics.fast_psf_calc as psf
+import lumicks.pyoptics.trapping as trp
+import lumicks.pyoptics.psf as psf
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
@@ -22,15 +22,15 @@ def test_gaussian_input(
     w0 = filling_factor * focal_length * NA / n_medium
     z_eval = 0  # np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
     xy_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
-    bead = mc.Bead(bead_size, n_bead, n_medium, lambda_vac)
+    bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     bfp_sampling = 31
-    objective = mc.Objective(
+    objective = trp.Objective(
         NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
     P = 1/4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
 
-    Exm, Eym, Ezm = mc.fields_focus_gaussian(
+    Exm, Eym, Ezm = trp.fields_focus_gaussian(
         P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
         bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling,
         return_grid=False, verbose=True, num_orders=None
@@ -64,15 +64,15 @@ def test_gaussian_input_bead_shift(bead_center):
     n_bfp = 1.0
     z_eval = 0  # np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
     xy_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
-    bead = mc.Bead(bead_size, n_bead, n_medium, lambda_vac)
-    objective = mc.Objective(
+    bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
+    objective = trp.Objective(
         NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
     bfp_sampling = 31
 
     # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
     P = 1/4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
 
-    Exm, Eym, Ezm = mc.fields_focus_gaussian(
+    Exm, Eym, Ezm = trp.fields_focus_gaussian(
         P, filling_factor, objective, bead, x=xy_eval, y=xy_eval, z=z_eval,
         bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling,
         return_grid=False, verbose=True, num_orders=None

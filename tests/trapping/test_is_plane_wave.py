@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-import pyoptics.mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -29,8 +29,8 @@ def test_plane_wave_direct(
         for m in range(n_angles):
             if not aperture[p, m]:
                 continue
-            bead = mc.Bead(1e-9, n_medium, n_medium, lambda_vac)
-            Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(
+            bead = trp.Bead(1e-9, n_medium, n_medium, lambda_vac)
+            Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
                 bead, x=xy_eval, y=xy_eval, z=z_eval,
                 theta=theta[p, m], phi=phi[p, m],
                 polarization=(1, 0), return_grid=True, verbose=False
@@ -54,7 +54,7 @@ def test_plane_wave_direct(
                 np.ones(Ex.shape)
             )
 
-            Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(
+            Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
                 bead, x=xy_eval, y=xy_eval, z=z_eval,
                 theta=theta[p, m], phi=phi[p, m],
                 polarization=(0, 1), return_grid=True, verbose=False
@@ -80,9 +80,9 @@ def test_plane_wave_bfp(
     focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=4, lambda_vac=1064e-9
 ):
     num_pts = 21
-    bead = mc.Bead(bead_diameter=1e-9, n_bead=n_medium,
+    bead = trp.Bead(bead_diameter=1e-9, n_bead=n_medium,
                    n_medium=n_medium, lambda_vac=lambda_vac)
-    objective = mc.Objective(
+    objective = trp.Objective(
         NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     def dummy(x_bfp, **kwargs):
@@ -146,7 +146,7 @@ def test_plane_wave_bfp(
 
                 return (Ex, Ey)
 
-            Ex, Ey, Ez, X, Y, Z = mc.fields_focus(
+            Ex, Ey, Ez, X, Y, Z = trp.fields_focus(
                 input_field_Etheta, bead=bead, objective=objective,
                 x=xy_eval, y=0, z=z_eval,
                 bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False
@@ -169,7 +169,7 @@ def test_plane_wave_bfp(
                 np.ones(Ex.shape)
             )
 
-            Ex, Ey, Ez, X, Y, Z = mc.fields_focus(
+            Ex, Ey, Ez, X, Y, Z = trp.fields_focus(
                 input_field_Ephi, bead=bead, objective=objective,
                 x=xy_eval, y=0, z=z_eval,
                 bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False

@@ -1,21 +1,6 @@
-# ---
-# jupyter:
-#   jupytext:
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.11.1
-#   kernelspec:
-#     display_name: Python 3
-#     language: python
-#     name: python3
-# ---
-
 import pytest
 import numpy as np
-import pyoptics.mie_calc as mc
-
+import lumicks.pyoptics.trapping as trp
 
 @pytest.mark.parametrize(
     'order', (
@@ -24,7 +9,7 @@ import pyoptics.mie_calc as mc
     )
 )
 def test_lebedev_laikov(order):
-    x, y, z, w = mc.lebedev_laikov.get_integration_locations(order)
+    x, y, z, w = trp.lebedev_laikov.get_integration_locations(order)
     R = np.hypot(np.hypot(x, y), z)
     np.testing.assert_allclose(R, np.ones(R.shape))
     np.testing.assert_allclose(np.sum(w), 1)

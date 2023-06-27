@@ -1,7 +1,9 @@
 import numpy as np
 import mpmath as mp
 import pytest
-import pyoptics.mie_calc as mc
+from lumicks.pyoptics.trapping.associated_legendre import (
+    associated_legendre
+)
 
 
 def associated_legendre_mp(n: int, x: mp.mpf):
@@ -45,7 +47,7 @@ def test_legendre(order):
     """
     mp.mp.dps = 45
     x = np.linspace(-1, 1, 101)
-    y1 = mc.associated_legendre.associated_legendre(order, x)
+    y1 = associated_legendre(order, x)
     y2 = []
     for point in x:
         y2.append(float(associated_legendre_mp(order, point)))

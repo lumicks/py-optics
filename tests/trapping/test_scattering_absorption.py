@@ -4,7 +4,7 @@ from scipy.constants import (
     epsilon_0 as _EPS0,
     speed_of_light as _C
 )
-from pyoptics import mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -19,7 +19,7 @@ def test_plane_wave_absorption_scattering(
     excited by a plane wave, against the theoretically expected value that is
     based solely on the evaluation of the scattering coefficients.
     """
-    objective = mc.Objective(focal_length=focal_length,
+    objective = trp.Objective(focal_length=focal_length,
                              n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
     def dummy(x_bfp, **kwargs):
@@ -32,7 +32,7 @@ def test_plane_wave_absorption_scattering(
     bead_size = 0.5e-6  # larger than dipole approximation is valid for
     E0 = 2.2
     intensity = 0.5 * E0**2 * _EPS0 * _C * n_medium
-    bead = mc.Bead(bead_size, n_bead, n_medium, lambda_vac)
+    bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     num_orders = None  # int(bead.number_of_orders * 1.5)
 
     Csca = bead.scattering_eff() * np.pi * bead.bead_diameter**2 / 4
@@ -98,13 +98,13 @@ def test_plane_wave_absorption_scattering(
 
             if not coords.aperture[p, m]:
                 continue
-            Psca = mc.scattered_power_focus(
+            Psca = trp.scattered_power_focus(
                 input_field_Etheta, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
             )
 
-            Pabs = mc.absorbed_power_focus(
+            Pabs = trp.absorbed_power_focus(
                 input_field_Etheta, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
@@ -117,13 +117,13 @@ def test_plane_wave_absorption_scattering(
             np.testing.assert_allclose(
                 Pabs, Pabs_theory, rtol=1e-8, atol=1e-4)
 
-            Psca = mc.scattered_power_focus(
+            Psca = trp.scattered_power_focus(
                 input_field_Ephi, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
             )
 
-            Pabs = mc.absorbed_power_focus(
+            Pabs = trp.absorbed_power_focus(
                 input_field_Ephi, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders

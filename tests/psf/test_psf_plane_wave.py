@@ -1,32 +1,12 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:percent
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.1
-#   kernelspec:
-#     display_name: Python 3.8 (XPython)
-#     language: python
-#     name: xpython
-# ---
-
-# %%
-# %matplotlib inline
 import numpy as np
-import numpy.testing
 import pytest
+import lumicks.pyoptics.psf as psf
 
-# %% tags=[]
-import pyoptics.fast_psf_calc as psf
 skip = False
 theta = 0
 phi = 0
 
 
-# %%
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave(
