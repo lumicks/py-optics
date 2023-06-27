@@ -100,7 +100,7 @@ Ex_ref, Ey_ref, Ez_ref = psf.focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_
 # Change `bfp_sampling_n` from 5 to 50 to 125, and see how that drastically brings the result closer to the ground truth
 
 # %%
-Ex, Ey, Ez = psf.focused_gauss(1064e-9, 1.0, 1.33, 4.43e-3, 0.9, 1.2, x, y, xrange, bfp_sampling_n=125)
+Ex, Ey, Ez = psf.focused_gauss(1064e-9, 1.0, 1.33, 4.43e-3, 0.9, 1.2, x, y, xrange, bfp_sampling_n=5)
 
 # %% [markdown]
 # Plot the field components:
