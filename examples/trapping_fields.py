@@ -6,22 +6,22 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.1
+#       jupytext_version: 1.14.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# %% [markdown] tags=[]
+# %% [markdown]
 # # Calculating field around a bead
 
-# %% tags=[]
+# %%
 # %matplotlib inline
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from pyoptics import mie_calc as mc
+from lumicks.pyoptics import trapping as trp
 font = {'weight' : 'normal',
         'size'   : 16}
 rc('font', **font)
@@ -45,7 +45,7 @@ bead_diameter = 1.0e-6  # [m]
 lambda_vac = 1.064e-6   # [m]
 n_bead =  1.57          # [-]
 n_medium = 1.33         # [-]
-bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
+bead = trp.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 
 # %% [markdown]
 # ## Properties of the objective
@@ -58,7 +58,7 @@ bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, la
 focal_length = 4.43e-3  # [m]
 NA = 1.2                # [-]
 n_bfp = 1.0             # [-]
-objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
+objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 # %% [markdown]
 # ## Properties of the input beam
@@ -88,7 +88,7 @@ x[0:num_pts] = -_x[::-1]
 x[num_pts:] = _x[1:]
 z = x
 bead_center = (0,0,0)  # [m]
-Ex, Ey, Ez, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
+Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=x, y=0, z=z, 
                                                bead_center=bead_center, bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
@@ -103,7 +103,7 @@ plt.show()
 # %% [markdown]
 # Imaginary part of the z-component of the E field:
 
-# %% tags=[]
+# %%
 plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6, X * 1e6, Ez.imag, cmap='plasma', shading='auto')
 plt.colorbar()
@@ -124,11 +124,11 @@ n_medium = 1.0
 num_pts = 101
 y = np.linspace(-0.5 * bead_size, 1.5 * bead_size, num_pts)
 z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
-bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
-objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
+bead = trp.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
+objective = trp.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=0, y=y, z=z, 
+Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead, x=0, y=y, z=z, 
                                          bead_center=(0, 2.9e-6, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
@@ -143,7 +143,7 @@ plt.show()
 # %% [markdown]
 # Imaginary part of Ex. Modify the code to check that Ez and Ey are practically zero too:
 
-# %% tags=[]
+# %%
 plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6,Y * 1e6, Ex.imag, cmap='plasma', shading='auto')
 plt.xlabel('Z [$\mu$m]')
@@ -174,16 +174,16 @@ x[0:num_pts] = -_x[::-1]
 x[num_pts:] = _x[1:]
 z = x
 
-bead_UV = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead_UV, n_medium=n_medium, lambda_vac=lambda_vac_UV)
-bead_IR = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead_IR, n_medium=n_medium, lambda_vac=lambda_vac_IR)
-objective = mc.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
+bead_UV = trp.Bead(bead_diameter=bead_diameter, n_bead=n_bead_UV, n_medium=n_medium, lambda_vac=lambda_vac_UV)
+bead_IR = trp.Bead(bead_diameter=bead_diameter, n_bead=n_bead_IR, n_medium=n_medium, lambda_vac=lambda_vac_IR)
+objective = trp.Objective(NA=0.9, focal_length=4.43e-3, n_medium=n_medium, n_bfp=1.0)
 
 # %%
-Ex_UV, Ey_UV, Ez_UV, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_UV, x=x, y=0, z=z, 
+Ex_UV, Ey_UV, Ez_UV, X, Y, Z = trp.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_UV, x=x, y=0, z=z, 
                                          bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
-Ex_IR, Ey_IR, Ez_IR, X, Y, Z = mc.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_IR, x=x, y=0, z=z, 
+Ex_IR, Ey_IR, Ez_IR, X, Y, Z = trp.fields_focus_gaussian(1, filling_factor=0.9, objective=objective, bead=bead_IR, x=x, y=0, z=z, 
                                          bead_center=(0, 0, 0), bfp_sampling_n=9, return_grid=True, verbose=True)
 
 # %%
@@ -204,7 +204,7 @@ plt.ylabel('X [$\mu$m]')
 
 plt.show()
 
-# %% tags=[]
+# %%
 plt.figure(figsize=(21, 7.5))
 plt.subplot(1, 2, 1)
 plt.pcolormesh(Z * 1e9, X * 1e9, Ex_IR.imag, cmap='plasma', shading='auto')
@@ -233,14 +233,14 @@ n_medium = 1.33        # [-]
 num_pts = 501
 x = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
-bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
+bead = trp.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 
 # %% [markdown]
 # Limit the number of orders to 1 (dipole) by using the `num_orders` argument. Note the incorrect representation of the fields.
 # Change `num_orders` to `None` or remove it to restore default behavior, which is to use the recommended number of orders from literature
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=1, return_grid=True)
+Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=1, return_grid=True)
 
 # %%
 plt.figure(figsize=(10, 8))
@@ -257,7 +257,7 @@ plt.show()
 # %%
 num_ord = bead.number_of_orders
 print(f'Number of orders is {num_ord}')
-Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=np.max((num_ord // 2, 1)), return_grid=True)
+Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=np.max((num_ord // 2, 1)), return_grid=True)
 
 # %%
 plt.figure(figsize=(10,8))
@@ -294,10 +294,10 @@ n_medium = 1.33        # [-]
 num_pts = 401
 x = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
 z = np.linspace(-2 * bead_size, 2 * bead_size, num_pts)
-bead = mc.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
+bead = trp.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = mc.fields_plane_wave(bead=bead, x=x, y=0, z=z, num_orders=None, total_field=False,
+Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(bead=bead, x=x, y=0, z=z, num_orders=None, total_field=False,
                                            return_grid=True)
 
 # %%
