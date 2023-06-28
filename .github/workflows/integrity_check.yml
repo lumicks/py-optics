@@ -2,13 +2,15 @@ name: pytest
 on: push
 jobs:
   integrity_check:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
-    - uses: lumicks/boilerplate/.github/actions/checkout@main
+    - uses: actions/checkout@v3
+      with:
+        lfs: true
     - uses: actions/setup-python@v4
       with:
         python-version: "3.9"
     - name: Install dependencies
       run: pip install .[testing] pytest-xdist
-    - name: pytest
+    - name: Pytest
       run: pytest -n auto

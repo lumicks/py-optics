@@ -64,7 +64,11 @@ def _loop_over_rotations(
     polynomials.
     """
     rows, cols = np.nonzero(aperture)
-    cosTs = np.zeros((*aperture.shape, radii.size))
+    
+    # Weird construct to work around tuple unpacking bug in Numba
+    # https://github.com/numba/numba/issues/8772
+    shape = (aperture.shape[0], aperture.shape[1], radii.size)
+    cosTs = np.zeros(shape)
 
     index = radii == 0
     for r, c in zip(rows, cols):
