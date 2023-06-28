@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
-from pyoptics import mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -14,7 +14,7 @@ def test_plane_wave_forces_bfp(
     against the theoretically expected value that is based solely on the
     evaluation of the scattering coefficients.
     """
-    objective = mc.Objective(focal_length=focal_length,
+    objective = trp.Objective(focal_length=focal_length,
                              n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
     def dummy(x_bfp, **kwargs):
@@ -27,7 +27,7 @@ def test_plane_wave_forces_bfp(
     n_bead = 2.1
     bead_size = 1e-6  # larger than dipole approximation is valid for
     E0 = 2.2
-    bead = mc.Bead(bead_size, n_bead, n_medium, lambda_vac)
+    bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     num_orders = bead.number_of_orders * 2
     Fpr = (
         bead.pressure_eff(num_orders) * np.pi * bead.bead_diameter**2 / 8 *
@@ -94,7 +94,7 @@ def test_plane_wave_forces_bfp(
 
             if not coords.aperture[p, m]:
                 continue
-            F = mc.forces_focus(
+            F = trp.forces_focus(
                 input_field_Etheta, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
@@ -115,7 +115,7 @@ def test_plane_wave_forces_bfp(
             # plane wave
             np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-4)
 
-            F = mc.forces_focus(
+            F = trp.forces_focus(
                 input_field_Ephi, objective=objective, bead=bead,
                 bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
@@ -143,7 +143,7 @@ def test_plane_wave_dipole_forces_bfp(
     approximation with a correction for the radiation reaction, and on the
     exact dipole term based on Mie theory.
     """
-    objective = mc.Objective(focal_length=focal_length,
+    objective = trp.Objective(focal_length=focal_length,
                              n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
     def dummy(x_bfp, **kwargs):
@@ -158,7 +158,7 @@ def test_plane_wave_dipole_forces_bfp(
     bead_size = 20e-9
     E0 = 10.9
 
-    bead = mc.Bead(bead_size, n_bead, n_medium, lambda_vac)
+    bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     num_orders = bead.number_of_orders * 2
     k = bead.k
     ks = k * NA / n_medium
@@ -253,7 +253,7 @@ def test_plane_wave_dipole_forces_bfp(
                 continue
 
             bead_pos = np.squeeze(rng.random((3, 1)))*200e-9
-            F = mc.forces_focus(
+            F = trp.forces_focus(
                 input_field_Etheta, objective=objective, bead=bead,
                 bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders
@@ -282,7 +282,7 @@ def test_plane_wave_dipole_forces_bfp(
             np.testing.assert_allclose(
                 np.linalg.norm(F), Fdipole_mie, rtol=1e-2)
 
-            F = mc.forces_focus(
+            F = trp.forces_focus(
                 input_field_Ephi, objective=objective, bead=bead,
                 bead_center=bead_pos, bfp_sampling_n=bfp_sampling_n,
                 verbose=False, num_orders=num_orders

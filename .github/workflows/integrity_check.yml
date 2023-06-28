@@ -1,4 +1,4 @@
-name: Perform integrity checks on numerical accuracy
+name: pytest
 on: push
 jobs:
   integrity_check:

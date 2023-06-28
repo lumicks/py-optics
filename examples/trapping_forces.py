@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.14.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import time, sys  # For progress bar
 from IPython.display import clear_output  # For progress bar
 from matplotlib import rc
-from pyoptics import mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 from scipy.interpolate import interp1d
 from scipy.constants import epsilon_0, speed_of_light as C
 
@@ -51,7 +51,7 @@ n_medium = 1.33         # [-]
 
 # %%
 # instantiate a Bead object
-bead = mc.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
+bead = trp.Bead(bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 # Tell use how many scattering orders are used according to the formula in literature:
 print(f'Number of scattering orders used by default: {bead.number_of_orders}')
 
@@ -70,7 +70,7 @@ NA = 1.2                # [-]
 focal_length = 4.43e-3  # [m]
 n_bfp = 1.0             # [-] Other side of the water immersion objective is air
 # Instantiate an Objective. Note that n_medium has to be defined here as well
-objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
+objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 # %% [markdown]
 # ## Properties of the input beam
@@ -87,6 +87,8 @@ objective = mc.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium
 # %%
 # approximation of the focus, higher is better and slower (scales with N**2)
 # best to check the correct range by plotting fields!
+# Note that the number here is relatively low for demonstration purposes
+# In general, a convergence check is required to verify the computed results
 bfp_sampling_n=9
 
 # 100% is 1.75W into a single trapping beam before the objective, at trap split = 50%
@@ -134,7 +136,7 @@ Fz = np.empty(z.shape)
 
 # %%
 for idx, zz in enumerate(z):
-    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
+    F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz[idx] = F[2]
     update_progress(idx / z.size)
@@ -161,7 +163,7 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
 for idx, xx in enumerate(x):
-    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
+    F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(xx, 0, z_eval), num_orders=None, integration_orders=None)
     Fx[idx] = F[0]
     update_progress(idx / x.size)
@@ -171,7 +173,7 @@ update_progress(1.)
 y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
 for idx, yy in enumerate(y):
-    F = mc.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
+    F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, yy, z_eval), num_orders=None, integration_orders=None)
     Fy[idx] = F[1]
     update_progress(idx / y.size)
@@ -198,11 +200,11 @@ plt.show()
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
 for idx, k in enumerate(z):
-    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n, 
+    F = trp.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz1[idx] = F[2]
-    F = mc.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n * 2, 
+    F = trp.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n * 2, 
                                   bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
@@ -217,7 +219,7 @@ plt.plot(z * 1e9, Fz2 * 1e12, label=f'bfp_sampling = {bfp_sampling_n * 2}')
 plt.xlabel('z [nm]')
 plt.ylabel('F [pN]')
 plt.legend()
-plt.title(f'{bead_diameter * 1e6} um bead, Fz at X = Y = 0')
+plt.title(f'{bead_diameter * 1e6} um bead, $F_z$ at X = Y = 0')
 plt.subplot(1, 2, 2)
 plt.plot(z * 1e9, (Fz1 - Fz2) * 1e12)
 plt.xlabel('z [nm]')

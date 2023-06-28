@@ -7,7 +7,7 @@ from scipy.constants import (
     mu_0 as MU0,
 )
 
-import pyoptics.mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 
 data_location = 'test_data'
 data_path = os.path.abspath(os.path.dirname(__file__))
@@ -43,8 +43,8 @@ def test_mie_nearfield(dataset: int):
     finally:
         data.close()
 
-    bead = mc.Bead(bead_diam, n_bead, n_medium, lambda_vac)
-    Ex, Ey, Ez, Hx, Hy, Hz = mc.fields_plane_wave(
+    bead = trp.Bead(bead_diam, n_bead, n_medium, lambda_vac)
+    Ex, Ey, Ez, Hx, Hy, Hz = trp.fields_plane_wave(
         bead, x, y, z, num_orders=num_orders, return_grid=False,
         magnetic_field=True, total_field=False
     )
@@ -64,11 +64,11 @@ def test_mie_nearfield_polarizations(bead_diameter: float,
                                      n_bead: Union[float, complex]):
 
     x = np.linspace(-bead_diameter, bead_diameter, 99)
-    bead = mc.Bead(bead_diameter, n_bead, n_medium=1.33, lambda_vac=1064e-9)
-    Ext, Eyt, Ezt = mc.fields_plane_wave(
+    bead = trp.Bead(bead_diameter, n_bead, n_medium=1.33, lambda_vac=1064e-9)
+    Ext, Eyt, Ezt = trp.fields_plane_wave(
         bead, x=x, y=x, z=x, return_grid=False, total_field=True
     )
-    Exp, Eyp, Ezp = mc.fields_plane_wave(
+    Exp, Eyp, Ezp = trp.fields_plane_wave(
         bead, x=x, y=x, z=x, polarization=(0, 1), return_grid=False,
         total_field=True
     )

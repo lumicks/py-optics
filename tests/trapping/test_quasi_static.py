@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-import pyoptics.mie_calc as mc
+import lumicks.pyoptics.trapping as trp
 
 
 @pytest.mark.parametrize("n_medium", [1.0, 1.33, 1.5])
@@ -12,12 +12,12 @@ def test_quasi_static_field(
     # approximated with quasistatic solution:
     E = 3/(2 + n_bead**2/n_medium**2)
 
-    bead = mc.Bead(1e-3, n_bead, n_medium, 1)
-    Ex, Ey, Ez = mc.fields_plane_wave(
+    bead = trp.Bead(1e-3, n_bead, n_medium, 1)
+    Ex, Ey, Ez = trp.fields_plane_wave(
         bead, x=0, y=0, z=0, theta=0, phi=0, polarization=(1, 0))
 
     np.testing.assert_allclose([Ex, Ey, Ez], [E, 0, 0], rtol=1e-4, atol=1e-14)
-    Ex, Ey, Ez = mc.fields_plane_wave(
+    Ex, Ey, Ez = trp.fields_plane_wave(
         bead, x=0, y=0, z=0, theta=0, phi=0, polarization=(0, 1))
 
     np.testing.assert_allclose([Ex, Ey, Ez], [0, E, 0], rtol=1e-4, atol=1e-14)

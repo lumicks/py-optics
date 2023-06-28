@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.1
+#       jupytext_version: 1.14.6
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -18,12 +18,10 @@
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
+import lumicks.pyoptics.psf as psf
 
-# %% tags=[]
-from pyoptics import fast_psf_calc as psf
-
-# %% tags=[]
-font = {'family' : 'normal',
+# %%
+font = {'family' : 'sans',
         'weight' : 'normal',
         'size'   : 16}
 matplotlib.rc('font', **font)
@@ -55,7 +53,7 @@ Ex, Ey, Ez, X, Y, Z = psf.fast_gauss_psf(lambda_vac=1064e-9, n_bfp=1.0, n_medium
 # %% [markdown]
 # Now plot the fields:
 
-# %% tags=[] jupyter={"source_hidden": true}
+# %% jupyter={"source_hidden": true}
 for field, title in ((Ex,'Ex plane wave'),(Ex_ref,'Ex ground truth'),(Ey,'Ey plane wave'),(Ey_ref,'Ey ground truth'),
                     (Ez,'Ez plane wave'),(Ez_ref,'Ez ground truth')):
     plt.figure(figsize=((12,6)))
@@ -70,7 +68,7 @@ for field, title in ((Ex,'Ex plane wave'),(Ex_ref,'Ex ground truth'),(Ey,'Ey pla
 # %% [markdown]
 # And plot the differences:
 
-# %% jupyter={"source_hidden": true} tags=[]
+# %% jupyter={"source_hidden": true}
 for field, title in [(Ex_ref-Ex, 'Ex'), (Ey_ref-Ey, 'Ey'), (Ez_ref-Ez, 'Ez')]:
     plt.figure(figsize=((15,6)))
     plt.subplot(1,2,1)
@@ -107,7 +105,7 @@ Ex, Ey, Ez = psf.focused_gauss(1064e-9, 1.0, 1.33, 4.43e-3, 0.9, 1.2, x, y, xran
 # %% [markdown]
 # Plot the field components:
 
-# %% tags=[]
+# %%
 for field_ref, field_czt, title in [(Ex_ref, Ex, 'Ex'), (Ey_ref, Ey, 'Ey'), (Ez_ref, Ez, 'Ez')]:
     plt.figure(figsize=(20,4))
     plt.subplot(1,2,1)
@@ -129,7 +127,7 @@ for field_ref, field_czt, title in [(Ex_ref, Ex, 'Ex'), (Ey_ref, Ey, 'Ey'), (Ez_
 # %% [markdown]
 # And plot the error:
 
-# %% tags=[]
+# %%
 for field1, field2, title in [(Ex_ref, Ex, 'Ex'), (Ey_ref, Ey, 'Ey'), (Ez_ref, Ez, 'Ez')]:
     plt.figure(figsize=(8,6))
     plt.plot(xrange, field1.real - field2.real, label='real')
@@ -187,5 +185,3 @@ for title, field1, field2 in [('X: Ex - Y:Ey', Exc_x, Eyc_y), ('X: Ey - Y:Ex', E
     plt.gca().set_title('imag')
     plt.colorbar()
     plt.show()
-
-# %%

@@ -4,8 +4,8 @@ from scipy.constants import (
     epsilon_0 as _EPS0
 )
 
-from pyoptics import fast_psf_calc as psf
-from pyoptics import mie_calc as mc
+import lumicks.pyoptics.psf as psf
+import lumicks.pyoptics.trapping as trp
 
 
 n_medium = 1.33
@@ -22,9 +22,9 @@ focal_length = 4.43e-3
 n_bfp = 1.0
 bfp_sampling_n = 11
 w0 = filling_factor * focal_length * NA / n_medium
-objective = mc.Objective(NA=NA, focal_length=focal_length,
+objective = trp.Objective(NA=NA, focal_length=focal_length,
                          n_medium=n_medium, n_bfp=n_bfp)
-bead = mc.Bead(bead_size, n_bead, n_medium, 1064e-9)
+bead = trp.Bead(bead_size, n_bead, n_medium, 1064e-9)
 
 # quasi-static polarizability
 a_s = 4 * np.pi * _EPS0 * n_medium**2 * \
@@ -111,7 +111,7 @@ def test_force_focus(z_pos):
 
     for p in range(numpoints):
         for m in range(numpoints):
-            F = mc.forces_focus(
+            F = trp.forces_focus(
                 field_func_mie, objective, bead=bead,
                 bead_center=(X[p, m], Y[p, m], z_pos),
                 bfp_sampling_n=bfp_sampling_n, num_orders=None,

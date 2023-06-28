@@ -1,11 +1,16 @@
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](license.md)
+[![Build Status](https://github.com/lumicks/py-optics/actions/workflows/integrity_check.yml/badge.svg?branch=main)](https://github.com/lumicks/py-optics/actions/workflows/integrity_check.yml?query=branch%3Amain)
+
 # py-optics
 
 Python code to aid with calculations for nanophotonics. Currently it contains:
 
-- *fast_psf_calc*: code that calculates the point spread function (electromagnetic field distribution) of a focused laser beam with arbitrary wavefront. The code takes polarization into account
-- *mie_calc*: code that calculates the electromagnetic field distribution of a spherical particle at an arbitrary distance relative to a focused laser
+- *lumicks.pyoptics.psf*: code that calculates the point spread function (electromagnetic field distribution) of a focused laser beam with arbitrary wavefront. The code takes polarization into account
+- *lumicks.pyoptics.trapping*: code that calculates the electromagnetic field distribution of a spherical particle at an arbitrary distance relative to a focused laser
 
 All code is developed in-house at LUMICKS.
+
+Py-optics is free to use under the conditions of the [Apache-2.0 open source license](LICENSE.md).
 
 
 ## How to get started
