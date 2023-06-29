@@ -1,6 +1,6 @@
 """Chirp Z transforms"""
 
-from mkl_fft._numpy_fft import fft, ifft
+from scipy.fft import fft, ifft, next_fast_len
 import numpy as np
 
 def init_czt(x, M, w, a):
@@ -30,7 +30,7 @@ def init_czt(x, M, w, a):
     expand_shape = (1, *newshape[1:])
     tile_shape = [1] * (len(newshape)-1)
 
-    L =  1 << ((M + N - 1) - 1).bit_length()  # pyfftw.next_fast_len(M + N  -1)
+    L =  next_fast_len(M + N - 1)
 
     k = np.arange(np.max((M, N))).T
     ww = w**(k**2 / 2)
@@ -119,7 +119,7 @@ def czt(x, M, w, a):
     expand_shape = (1, *newshape[1:])
     tile_shape = [1] * (len(newshape)-1)
 
-    L = 1 << ((M + N - 1) - 1).bit_length()
+    L = next_fast_len(M + N - 1)
 
     k = np.arange(np.max((M, N))).T
     ww = w**(k**2 / 2)
