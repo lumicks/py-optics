@@ -2,14 +2,19 @@ name: pytest
 on: push
 jobs:
   integrity_check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.11"]
     steps:
     - uses: actions/checkout@v3
       with:
         lfs: true
-    - uses: actions/setup-python@v4
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
       with:
-        python-version: "3.9"
+        python-version: ${{ matrix.python-version }}
         cache: 'pip'
         cache-dependency-path: setup.py
     - name: Install dependencies

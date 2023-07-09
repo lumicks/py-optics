@@ -13,7 +13,7 @@ n_bead = 5
 bead_size = 20e-9  # [m]
 k = 2*np.pi*n_medium / 1064e-9
 
-numpoints = 11
+numpoints = 5
 dim = 2e-6
 zrange = np.linspace(-dim/2, dim/2, numpoints)
 filling_factor = 0.9
