@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.6
+#       jupytext_version: 1.14.7
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -19,12 +19,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import lumicks.pyoptics.psf as psf
-
-# %%
-font = {'family' : 'sans',
-        'weight' : 'normal',
-        'size'   : 16}
-matplotlib.rc('font', **font)
+from lumicks.pyoptics.psf.reference import focused_gauss_ref
+from lumicks.pyoptics.psf.direct import focused_gauss
 
 # %% [markdown]
 # # Visual comparison
@@ -36,7 +32,7 @@ numpoints = 81
 xyrange = 5e-6
 xrange = np.linspace(-xyrange, xyrange, numpoints)
 
-Ex_ref, Ey_ref, Ez_ref = psf.focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
+Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
                                                focal_length=4.43e-3, filling_factor=0.9, NA=1.2, x=xrange, y=xrange,z=0)
 
 # %% [markdown]
@@ -44,7 +40,7 @@ Ex_ref, Ey_ref, Ez_ref = psf.focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_
 # Change `bfp_sampling_n` below to see aliasing (`bfp_sampling_n=5`), or to largely suppress it in this area (`bfp_sampling_n=30`)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = psf.fast_gauss_psf(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
+Ex, Ey, Ez, X, Y, Z = psf.fast_gauss(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
                                         focal_length=4.43e-3, filling_factor=0.9, NA=1.2, 
                                         xrange=xyrange*2, yrange=xyrange*2, z=0, 
                                          numpoints_x=numpoints, numpoints_y=numpoints,
@@ -93,14 +89,14 @@ point = np.random.standard_normal((2,))*2000e-9
 x = point[0]
 y = point[1]
 
-Ex_ref, Ey_ref, Ez_ref = psf.focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
+Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(lambda_vac=1064e-9, n_bfp=1.0, n_medium=1.33, 
                                                focal_length=4.43e-3, filling_factor=0.9, NA=1.2, x=x, y=y,z=xrange)
 
 # %% [markdown]
 # Change `bfp_sampling_n` from 5 to 50 to 125, and see how that drastically brings the result closer to the ground truth
 
 # %%
-Ex, Ey, Ez = psf.focused_gauss(1064e-9, 1.0, 1.33, 4.43e-3, 0.9, 1.2, x, y, xrange, bfp_sampling_n=5)
+Ex, Ey, Ez = focused_gauss(1064e-9, 1.0, 1.33, 4.43e-3, 0.9, 1.2, x, y, xrange, bfp_sampling_n=5)
 
 # %% [markdown]
 # Plot the field components:
@@ -152,19 +148,21 @@ focal_length = 4.43e-3
 n_medium = 1.33
 w0 = filling_factor * focal_length * NA / n_medium
 
-def field_func_x(X_BFP, Y_BFP, *args):
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)
+def field_func_x(_, x_bfp, y_bfp, *args):
+    # The first argument is not used
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
     return (Ein, None)
 
 
-def field_func_y(X_BFP, Y_BFP, *args):
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)
+def field_func_y(_, x_bfp, y_bfp, *args):
+    # The first argument is not used
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
     return (None, Ein)
 
 
-Exc_x, Eyc_x, Ezc_x, Xx, Yx, Zx = psf.fast_psf_calc(field_func_x, 1064e-9, 1.0, 1.33, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
+Exc_x, Eyc_x, Ezc_x, Xx, Yx, Zx = psf.fast_psf(field_func_x, 1064e-9, 1.0, 1.33, 4.43e-3, 1.2, xrange=dim, numpoints_x=numpoints, 
                                            yrange=0, numpoints_y=1, z=zrange, bfp_sampling_n=125, return_grid=True)
-Exc_y, Eyc_y, Ezc_y, Xy, Yy, Zy = psf.fast_psf_calc(field_func_y, 1064e-9, 1.0, 1.33, 4.43e-3, 1.2, xrange=0, numpoints_x=1, 
+Exc_y, Eyc_y, Ezc_y, Xy, Yy, Zy = psf.fast_psf(field_func_y, 1064e-9, 1.0, 1.33, 4.43e-3, 1.2, xrange=0, numpoints_x=1, 
                                            yrange=dim, numpoints_y=numpoints, z=zrange, bfp_sampling_n=125, return_grid=True)
 
 

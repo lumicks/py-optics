@@ -6,7 +6,7 @@ References:
 This implementation is original code and not based on any other software
 """
 
-from pyoptics.fast_psf_calc import czt
+from ..czt import czt
 import numpy as np
 
 
@@ -41,12 +41,12 @@ def czt_nf_to_ff(Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
     phase_fix_1 = np.tile(phase_fix, (1, Ex.shape[0]))
     phase_fix_2 = np.tile(phase_fix, (1, bfp_sampling_n))
 
-    fEx = np.transpose((czt.czt(Ex, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
-    fEx = czt.czt(fEx, bfp_sampling_n, w, a) * phase_fix_2
-    fEy = np.transpose((czt.czt(Ey, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
-    fEy = czt.czt(fEy, bfp_sampling_n, w, a) * phase_fix_2
-    fEz = np.transpose((czt.czt(Ez, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
-    fEz = czt.czt(fEz, bfp_sampling_n, w, a) * phase_fix_2
+    fEx = np.transpose((czt(Ex, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
+    fEx = czt(fEx, bfp_sampling_n, w, a) * phase_fix_2
+    fEy = np.transpose((czt(Ey, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
+    fEy = czt(fEy, bfp_sampling_n, w, a) * phase_fix_2
+    fEz = np.transpose((czt(Ez, bfp_sampling_n, w, a)) * phase_fix_1, (1,0))
+    fEz = czt(fEz, bfp_sampling_n, w, a) * phase_fix_2
     
     sp = np.linspace(-NA/n_medium, NA/n_medium, bfp_sampling_n)
     Sx, Sy = np.meshgrid(sp, sp)
