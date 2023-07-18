@@ -6,7 +6,7 @@ from scipy.constants import (
 )
 import lumicks.pyoptics.trapping as trp
 import lumicks.pyoptics.psf as psf
-
+from lumicks.pyoptics.psf.direct import focused_gauss
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -36,7 +36,7 @@ def test_gaussian_input(
         return_grid=False, verbose=True, num_orders=None
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss_psf(
+    Exf, Eyf, Ezf = psf.fast_gauss(
         lambda_vac, n_bfp=n_bfp, n_medium=n_medium, focal_length=focal_length,
         filling_factor=filling_factor, NA=NA,
         xrange=4*lambda_vac, numpoints_x=num_pts, yrange=4*lambda_vac,
@@ -77,13 +77,13 @@ def test_gaussian_input_bead_shift(bead_center):
         bead_center=(0, 0, 0), bfp_sampling_n=bfp_sampling,
         return_grid=False, verbose=True, num_orders=None
     )
-    Exr, Eyr, Ezr = psf.focused_gauss(
+    Exr, Eyr, Ezr = focused_gauss(
         lambda_vac, n_bfp=n_bfp, n_medium=n_medium, focal_length=focal_length,
         filling_factor=filling_factor, NA=NA, x=xy_eval, y=xy_eval, z=z_eval,
         bfp_sampling_n=bfp_sampling, return_grid=False
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss_psf(
+    Exf, Eyf, Ezf = psf.fast_gauss(
         lambda_vac, n_bfp=n_bfp, n_medium=n_medium, focal_length=focal_length,
         filling_factor=filling_factor, NA=NA, xrange=4*lambda_vac,
         numpoints_x=num_pts, yrange=4*lambda_vac, numpoints_y=num_pts,

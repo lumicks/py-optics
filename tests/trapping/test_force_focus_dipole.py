@@ -34,65 +34,83 @@ a_s = 4 * np.pi * _EPS0 * n_medium**2 * \
 a = a_s + 1j * k**3 / (6*np.pi*_EPS0*n_medium**2) * a_s**2
 
 
+def get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n):
+    sin_theta = r_bfp / focal_length
+    cos_theta = np.ones_like(sin_theta)
+    cos_theta[aperture] = (1 - sin_theta[aperture]**2)**0.5
+    region = sin_theta > 0
+    cos_phi = np.empty_like(sin_theta)
+    sin_phi = np.empty_like(sin_theta)
+    cos_phi[region] = x_bfp[region] / (focal_length * sin_theta[region])
+    cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+    sin_phi[region] = y_bfp[region] / (focal_length * sin_theta[region])
+    sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
+    sin_phi[np.logical_not(aperture)] = 0
+    cos_phi[np.logical_not(aperture)] = 1
+    return cos_theta, sin_theta, cos_phi, sin_phi
+
+
 def field_func_mie(x_bfp, y_bfp, **kwargs):
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
+    return (Ein, None)
+
+
+def field_func(_, x_bfp, y_bfp, *args):
 
     Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
     return (Ein, None)
 
 
-def field_func(X_BFP, Y_BFP, R, Rmax, Th, Phi):
-
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)
-    return (Ein, None)
-
-
-def field_func_kx(X_BFP, Y_BFP, R, Rmax, Th, Phi):
+def field_func_kx(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to X
+    _, sin_theta, cos_phi, __ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
     k = 2*np.pi*n_medium / 1064e-9
-    Kp = k * np.sin(Th)
-    Kx = -Kp * np.cos(Phi)
+    Kp = k * sin_theta
+    Kx = -Kp * cos_phi
 
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)*1j*Kx
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Kx
     return (Ein, None)
 
 
-def field_func_ky(X_BFP, Y_BFP, R, Rmax, Th, Phi):
+def field_func_ky(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to Y
+    _, sin_theta, __, sin_phi = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
     k = 2*np.pi*n_medium / 1064e-9
-    Kp = k * np.sin(Th)
-    Ky = -Kp * np.sin(Phi)
+    Kp = k * sin_theta
+    Ky = -Kp * sin_phi
 
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)*1j*Ky
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Ky
     return (Ein, None)
 
 
-def field_func_kz(X_BFP, Y_BFP, R, Rmax, Th, Phi):
+def field_func_kz(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to Z
+    cos_theta, _, __, ___ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
     k = 2*np.pi*n_medium / 1064e-9
-    Kz = k * np.cos(Th)
+    Kz = k * cos_theta
 
-    Ein = np.exp(-((X_BFP)**2 + Y_BFP**2)/w0**2)*1j*Kz
+    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Kz
     return (Ein, None)
 
 
 @pytest.mark.parametrize('z_pos', zrange)
 def test_force_focus(z_pos):
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf_calc(
+    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
         field_func, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
         numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
         bfp_sampling_n=bfp_sampling_n, return_grid=True
     )
-    Exdx, Eydx, Ezdx = psf.fast_psf_calc(
+    Exdx, Eydx, Ezdx = psf.fast_psf(
         field_func_kx, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
         numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
         bfp_sampling_n=bfp_sampling_n, return_grid=False
     )
-    Exdy, Eydy, Ezdy = psf.fast_psf_calc(
+    Exdy, Eydy, Ezdy = psf.fast_psf(
         field_func_ky, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
         numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
         bfp_sampling_n=bfp_sampling_n, return_grid=False
     )
-    Exdz, Eydz, Ezdz = psf.fast_psf_calc(
+    Exdz, Eydz, Ezdz = psf.fast_psf(
         field_func_kz, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
         numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
         bfp_sampling_n=bfp_sampling_n, return_grid=False

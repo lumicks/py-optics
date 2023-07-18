@@ -134,19 +134,21 @@ def fast_psf(
     Parameters
     ----------
     f_input_field : callable
-        function with signature f(aperture, x_bfp, y_bfp, r_bfp, r_max), where x_bfp is a grid of x
-        locations in the back focal plane, determined by the focal length and NA of the objective.
-        The corresponding grid for y is y_bfp, and r_bfp is the radial distance from the center of
-        the back focal plane. The float r_max is the largest distance that falls inside the NA, but
-        r_bfp will contain larger numbers as the back focal plane is sampled with a square grid. The
-        function must return a tuple (E_bfp_x, E_bfp_y), which are the electric fields in the x- and
-        y- direction, respectively, at the sample locations in the back focal plane. In other words,
-        E_bfp_x describes the electric field of the input beam which is polarized along the x-axis.
-        Similarly, E_bfp_y describes the y-polarized part of the input beam. The fields may be
-        complex, so a phase difference between x and y is possible. If only one polarization is
-        used, the other return value must be None, e.g., y polarization would return (None,
-        E_bfp_y). The fields are post-processed such that any part that falls outside of the NA is
-        set to zero.
+        function with signature f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n), where x_bfp
+        is a grid of x locations in the back focal plane, determined by the focal length and NA of
+        the objective. The corresponding grid for y is y_bfp, and r_bfp is the radial distance from
+        the center of the back focal plane. The float r_max is the largest distance that falls
+        inside the NA, but r_bfp will contain larger numbers as the back focal plane is sampled with
+        a square grid. The number of samples from the center to the edge of the NA in horizontal or
+        vertical direction is bfp_sampling_n. This number is forwarded to the callable for
+        convenience. The function must return a tuple (E_bfp_x, E_bfp_y), which are the electric
+        fields in the x- and y- direction, respectively, at the sample locations in the back focal
+        plane. In other words, E_bfp_x describes the electric field of the input beam which is
+        polarized along the x-axis. Similarly, E_bfp_y describes the y-polarized part of the input
+        beam. The fields may be complex, so a phase difference between x and y is possible. If only
+        one polarization is used, the other return value must be None, e.g., y polarization would
+        return (None, E_bfp_y). The fields are post-processed such that any part that falls outside
+        of the NA is set to zero.
     lambda_vac : float
         wavelength of the light [m]
     n_bfp : float

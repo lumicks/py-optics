@@ -8,6 +8,19 @@ import lumicks.pyoptics.trapping as trp
 def test_plane_wave_direct(
     n_medium, NA, n_angles, lambda_vac=1064e-9
 ):
+    """Test to make sure trapping.fields_plane_wave() returns a plane wave.
+
+    Parameters
+    ----------
+    n_medium : float
+        refractive index of the medium [-]
+    NA : float
+        numerical aperture of the objective [-]
+    n_angles : int
+        number of angles to try.
+    lambda_vac : float, optional
+        wavelength in vacuum, by default 1064e-9 [m]
+    """
     k = 2*np.pi*n_medium / lambda_vac
 
     z_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, 21)
@@ -79,6 +92,24 @@ def test_plane_wave_direct(
 def test_plane_wave_bfp(
     focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=4, lambda_vac=1064e-9
 ):
+    """Test to make sure that each sample of the back focal plane generates a plane wave
+
+    Parameters
+    ----------
+    focal_length : float
+        focal length of the objective [m]
+    n_medium : float
+        refractive index of the medium [-]
+    NA : float
+        numerical aperture of the objective [-]
+    n_bfp : float, optional
+        refractive index of the medium at the back focal plane, by default 1.0 [-]
+    bfp_sampling_n : int, optional
+        number of samples of the back focal plane, by default 4
+    lambda_vac : float, optional
+        wavelength in vacuum, by default 1064e-9 [m]
+
+    """
     num_pts = 21
     bead = trp.Bead(bead_diameter=1e-9, n_bead=n_medium,
                    n_medium=n_medium, lambda_vac=lambda_vac)
