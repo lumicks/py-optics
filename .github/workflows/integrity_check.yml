@@ -5,7 +5,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.9", "3.11"]
     steps:
     - uses: actions/checkout@v3
@@ -21,5 +21,28 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install .[testing] pytest-xdist
+    - name: Link OpenMP on MacOS
+      run: |
+        if [ "$RUNNER_OS" == "macOS" ]; then
+            # Fix libiomp5.dylib, as found in STUMPY: https://github.com/TDAmeritrade/stumpy
+            echo "Install OpenMP via Conda"
+            conda install -c intel -y openmp
+            echo "Checking $CONDA/lib for OpenMP"
+            ls $CONDA/lib/libiomp5.dylib
+            echo "Changing  @rpath for the omppool.cpython-x-darwin.so shared object to look in $CONDA/lib"
+            ls "$(python -c 'import site; print(site.getsitepackages()[0])')"/numba/np/ufunc/omppool.*.so | xargs install_name_tool -change @rpath/libiomp5.dylib $CONDA/lib/libiomp5.dylib
+            # Fix libomp.dylib
+            echo "Linking OpenMP into /usr/local/lib"
+            brew link --force libomp
+            echo "Checking /usr/local/lib for OpenMP"
+            ls /usr/local/lib/libomp.dylib
+            echo "Changing  @rpath for the omppool.cpython-x-darwin.so shared object to look in /usr/local/lib"
+            ls "$(python -c 'import site; print(site.getsitepackages()[0])')"/numba/np/ufunc/omppool.*.so | xargs install_name_tool -change @rpath/libomp.dylib /usr/local/lib/libomp.dylib
+            echo "Checking Numba OpenMP Access"
+            python -c "from numba.np.ufunc import omppool" 
+        fi
+      shell: bash
+    - name: Numba environment report
+      run: python -m numba -s
     - name: Pytest
       run: pytest -n auto
