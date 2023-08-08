@@ -1,6 +1,7 @@
 import numpy as np
 from dataclasses import dataclass, asdict
 from collections import namedtuple
+from .farfield_data import FarfieldData
 
 
 @dataclass
@@ -9,6 +10,7 @@ class BackFocalPlaneCoordinates:
     Class to store data necessary for doing calculations with the back focal
     plane
     """
+
     aperture: np.ndarray
     x_bfp: np.ndarray
     y_bfp: np.ndarray
@@ -17,25 +19,7 @@ class BackFocalPlaneCoordinates:
     bfp_sampling_n: int
 
 
-BackFocalPlaneFields = namedtuple('BackFocalPlaneFields', ['Ex', 'Ey'])
-
-
-@dataclass
-class FarfieldData:
-    """Class to store data necessary for doing calculations with the far field
-    after transformation from back focal plane
-    """
-    cos_phi: np.ndarray
-    sin_phi: np.ndarray
-    cos_theta: np.ndarray
-    sin_theta: np.ndarray
-    kx: np.ndarray
-    ky: np.ndarray
-    kz: np.ndarray
-    kp: np.ndarray
-    Einf_theta: np.ndarray
-    Einf_phi: np.ndarray
-    aperture: np.ndarray
+BackFocalPlaneFields = namedtuple("BackFocalPlaneFields", ["Ex", "Ey"])
 
 
 @dataclass
@@ -43,6 +27,7 @@ class Objective:
     """
     Class to describe the essential properties of an objective
     """
+
     NA: float
     focal_length: float
     n_bfp: float
@@ -62,9 +47,7 @@ class Objective:
         sin_theta[bfp_sampling_n:] = _sin_theta[1:]
         return sin_theta
 
-    def sample_back_focal_plane(
-        self, f_input_field, bfp_sampling_n: int
-    ):
+    def sample_back_focal_plane(self, f_input_field, bfp_sampling_n: int):
         """
         Sample f_input_field with bfp_sampling_n samples and return the
         coordinates in a BackFocalPlaneCoordinates object, and the fields as a
@@ -82,8 +65,13 @@ class Objective:
         r_max = self.sin_theta_max * self.focal_length
         aperture = sin_theta <= self.sin_theta_max
         bfp_coords = BackFocalPlaneCoordinates(
-            aperture=aperture, x_bfp=x_bfp, y_bfp=y_bfp,
-            r_bfp=r_bfp, r_max=r_max, bfp_sampling_n=bfp_sampling_n)
+            aperture=aperture,
+            x_bfp=x_bfp,
+            y_bfp=y_bfp,
+            r_bfp=r_bfp,
+            r_max=r_max,
+            bfp_sampling_n=bfp_sampling_n,
+        )
 
         Ex_bfp, Ey_bfp = f_input_field(**asdict(bfp_coords))
 
@@ -93,7 +81,7 @@ class Objective:
         self,
         bfp_coords: BackFocalPlaneCoordinates,
         bfp_fields: BackFocalPlaneFields,
-        lambda_vac: float
+        lambda_vac: float,
     ):
         """
         Refract the input beam at a Gaussian reference sphere [2], while taking
@@ -110,22 +98,16 @@ class Objective:
         k = 2 * np.pi * self.n_medium / lambda_vac
 
         cos_theta = np.ones(sin_theta.shape)
-        cos_theta[bfp_coords.aperture] = (
-            1 - sin_theta[bfp_coords.aperture]**2
-        )**0.5
+        cos_theta[bfp_coords.aperture] = (1 - sin_theta[bfp_coords.aperture] ** 2) ** 0.5
 
         cos_phi = np.ones_like(sin_theta)
         sin_phi = np.zeros_like(sin_theta)
         region = sin_theta > 0
 
-        cos_phi[region] = (
-            sin_theta_x[region] / sin_theta[region]
-        )
+        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
 
         cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
-        sin_phi[region] = (
-            sin_theta_y[region] / sin_theta[region]
-        )
+        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
         sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
         sin_phi[np.logical_not(bfp_coords.aperture)] = 0
         cos_phi[np.logical_not(bfp_coords.aperture)] = 1
@@ -143,8 +125,7 @@ class Objective:
         for bfp_field in bfp_fields:
             if bfp_field is not None:
                 E = np.complex128(
-                    np.sqrt(self.n_bfp / self.n_medium) *
-                    bfp_field * np.sqrt(cos_theta)
+                    np.sqrt(self.n_bfp / self.n_medium) * bfp_field * np.sqrt(cos_theta)
                 )
                 E[np.logical_not(bfp_coords.aperture)] = 0
             else:
@@ -152,17 +133,19 @@ class Objective:
             E_inf.append(E)
 
         # Get p- and s-polarized parts
-        Einf_theta = (
-            E_inf[0] * cos_phi + E_inf[1] * sin_phi
-        )
-        Einf_phi = (
-            E_inf[1] * cos_phi - E_inf[0] * sin_phi
-        )
+        Einf_theta = E_inf[0] * cos_phi + E_inf[1] * sin_phi
+        Einf_phi = E_inf[1] * cos_phi - E_inf[0] * sin_phi
 
         return FarfieldData(
-            cos_phi=cos_phi, sin_phi=sin_phi,
-            cos_theta=cos_theta, sin_theta=sin_theta,
-            kx=kx, ky=ky, kz=kz, kp=kp,
-            Einf_theta=Einf_theta, Einf_phi=Einf_phi,
-            aperture=bfp_coords.aperture
+            cos_phi=cos_phi,
+            sin_phi=sin_phi,
+            cos_theta=cos_theta,
+            sin_theta=sin_theta,
+            kx=kx,
+            ky=ky,
+            kz=kz,
+            kp=kp,
+            Einf_theta=Einf_theta,
+            Einf_phi=Einf_phi,
+            aperture=bfp_coords.aperture,
         )
