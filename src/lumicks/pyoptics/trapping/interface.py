@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.constants import (
     speed_of_light as _C,
-    epsilon_0 as _EPS0,
-    mu_0 as _MU0
+    epsilon_0 as EPS0,
+    mu_0 as MU0
 )
 import logging
 
@@ -16,7 +16,10 @@ from .radial_data import (
     calculate_external,
     calculate_internal
 )
-from .local_coordinates import LocalBeadCoordinates
+from .local_coordinates import (
+    LocalBeadCoordinates,
+    CoordLocation,
+)
 from .objective import (
     Objective,
     FarfieldData
@@ -102,7 +105,7 @@ def fields_focus_gaussian(
         filling_factor * objective.focal_length * objective.NA / bead.n_medium
     )  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
-    E0 = (I0 * 2/(_EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
+    E0 = (I0 * 2/(EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
 
     def gaussian_beam(x_bfp, y_bfp, **kwargs):
         Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
@@ -246,23 +249,20 @@ def fields_focus(
     logging.info(
         'Calculating Associated Legendre polynomials for external fields')
     legendre_data_ext = calculate_legendre(
-        local_coordinates.xyz_stacked(inside=False),
-        local_coordinates.r_outside,
-        bfp_coords.aperture,
-        farfield_data.cos_theta,
-        farfield_data.sin_theta,
-        farfield_data.cos_phi,
-        farfield_data.sin_phi,
-        n_orders
+        location=CoordLocation.OUTSIDE_BEAD,
+        local_coordinates=local_coordinates,
+        farfield_data=farfield_data,
+        n_orders=n_orders
     )
 
     Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-    Ey = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-    Ez = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    Ey = np.zeros_like(Ex)
+    Ez = np.zeros_like(Ex)
+
     if magnetic_field:
-        Hx = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-        Hy = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-        Hz = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+        Hx = np.zeros_like(Ex)
+        Hy = np.zeros_like(Ex)
+        Hz = np.zeros_like(Ex)
     else:
         Hx = 0
         Hy = 0
@@ -288,14 +288,10 @@ def fields_focus(
     logging.info(
         'Calculating Associated Legendre polynomials for internal fields')
     legendre_data_int = calculate_legendre(
-        local_coordinates.xyz_stacked(inside=True),
-        local_coordinates.r_inside,
-        bfp_coords.aperture,
-        farfield_data.cos_theta,
-        farfield_data.sin_theta,
-        farfield_data.cos_phi,
-        farfield_data.sin_phi,
-        n_orders
+        location=CoordLocation.INSIDE_BEAD,
+        local_coordinates=local_coordinates,
+        farfield_data=farfield_data,
+        n_orders=n_orders
     )
 
     logging.info('Calculating internal fields')
@@ -315,9 +311,9 @@ def fields_focus(
     phase = -1j * objective.focal_length * (
         np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi)
     )
-    Ex *= phase
-    Ey *= phase
-    Ez *= phase
+    
+    for component in (Ex, Ey, Ez):
+        component *= phase
 
     Ex = np.squeeze(Ex)
     Ey = np.squeeze(Ey)
@@ -326,9 +322,8 @@ def fields_focus(
     ret = (Ex, Ey, Ez)
 
     if magnetic_field:
-        Hx *= phase
-        Hy *= phase
-        Hz *= phase
+        for component in (Hx, Hy, Hz):
+            component *= phase
         Hx = np.squeeze(Hx)
         Hy = np.squeeze(Hy)
         Hz = np.squeeze(Hz)
@@ -442,24 +437,17 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
     logging.info(
         'Calculating Associated Legendre polynomials for external fields')
     legendre_data_ext = calculate_legendre(
-        local_coordinates.xyz_stacked(inside=False),
-        local_coordinates.r_outside,
-        farfield_data.aperture,
-        farfield_data.cos_theta,
-        farfield_data.sin_theta,
-        farfield_data.cos_phi,
-        farfield_data.sin_phi,
-        n_orders
+        CoordLocation.OUTSIDE_BEAD, local_coordinates, farfield_data, n_orders
     )
 
     Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-    Ey = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-    Ez = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-
+    Ey = np.zeros_like(Ex)
+    Ez = np.zeros_like(Ex)
+    
     if magnetic_field:
-        Hx = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-        Hy = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
-        Hz = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+        Hx = np.zeros_like(Ex)
+        Hy = np.zeros_like(Ex)
+        Hz = np.zeros_like(Ex)
     else:
         Hx = 0
         Hy = 0
@@ -484,14 +472,7 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
     logging.info(
         'Calculating Associated Legendre polynomials for internal fields')
     legendre_data_int = calculate_legendre(
-        local_coordinates.xyz_stacked(inside=True),
-        local_coordinates.r_inside,
-        farfield_data.aperture,
-        farfield_data.cos_theta,
-        farfield_data.sin_theta,
-        farfield_data.cos_phi,
-        farfield_data.sin_phi,
-        n_orders
+        CoordLocation.INSIDE_BEAD, local_coordinates, farfield_data, n_orders
     )
 
     logging.info('Calculating internal fields')
@@ -609,8 +590,8 @@ def forces_focus(
         total_field=True, magnetic_field=True, verbose=verbose,
         grid=False
     )
-    _eps = _EPS0 * bead.n_medium**2
-    _mu = _MU0
+    _eps = EPS0 * bead.n_medium**2
+    _mu = MU0
 
     Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
     Te12 = _eps * np.real(Ex * np.conj(Ey))

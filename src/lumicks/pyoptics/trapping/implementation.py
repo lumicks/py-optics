@@ -1,11 +1,14 @@
 import numpy as np
 from numba import njit
 from scipy.constants import (
-    mu_0 as _MU0,
-    speed_of_light as _C
+    mu_0 as MU0,
+    speed_of_light as C
 )
 
-from .local_coordinates import LocalBeadCoordinates
+from .local_coordinates import  (
+    LocalBeadCoordinates,
+    CoordLocation,
+)
 from .radial_data import (
     ExternalRadialData,
     InternalRadialData
@@ -35,14 +38,14 @@ def calculate_fields(
     """
     if internal:
         r = local_coordinates.r_inside
-        local_coords = local_coordinates.xyz_stacked(inside=True)
+        local_coords = local_coordinates.xyz_stacked(CoordLocation.INSIDE_BEAD)
         region = np.atleast_1d(
             np.squeeze(local_coordinates.region_inside_bead)
         )
         n_orders = internal_radial_data.sphBessel.shape[0]
     else:
         r = local_coordinates.r_outside
-        local_coords = local_coordinates.xyz_stacked(inside=False)
+        local_coords = local_coordinates.xyz_stacked(CoordLocation.OUTSIDE_BEAD)
         region = np.atleast_1d(
             np.squeeze(local_coordinates.region_outside_bead)
         )
@@ -50,14 +53,9 @@ def calculate_fields(
     if r.size == 0:
         return
 
-    E = np.empty((3, local_coordinates.r.shape[1]), dtype='complex128')
+    E = np.empty((3, local_coordinates.r(CoordLocation.EVERYWHERE).size), dtype='complex128')
     if magnetic_field:
         H = np.empty(E.shape, dtype='complex128')
-
-    # preallocate memory for expanded legendre derivatives
-    alp_expanded = np.empty((n_orders, r.size))
-    alp_sin_expanded = np.empty(alp_expanded.shape)
-    alp_deriv_expanded = np.empty(alp_expanded.shape)
 
     an, bn = bead.ab_coeffs(n_orders)
     cn, dn = bead.cd_coeffs(n_orders)
@@ -103,11 +101,9 @@ def calculate_fields(
 
                 # Expand the legendre derivatives from the unique version
                 # of cos(theta)
-                alp_expanded[:] = legendre_data.associated_legendre(row, col)
-                alp_sin_expanded[:] = \
-                    legendre_data.associated_legendre_over_sin_theta(row, col)
-                alp_deriv_expanded[:] = \
-                    legendre_data.associated_legendre_dtheta(row, col)
+                alp_expanded = legendre_data.associated_legendre(row, col)
+                alp_sin_expanded = legendre_data.associated_legendre_over_sin_theta(row, col)
+                alp_deriv_expanded = legendre_data.associated_legendre_dtheta(row, col)
 
             rho_l = np.hypot(x, y)
             cosP = np.empty(rho_l.shape)
@@ -147,12 +143,8 @@ def calculate_fields(
                 farfield_data.kz[row, col] * bead_center[2])
             ) / farfield_data.kz[row, col]
 
-            Ex[:, :, :] += np.reshape(
-                E[0, :], local_coordinates.coordinate_shape)
-            Ey[:, :, :] += np.reshape(
-                E[1, :], local_coordinates.coordinate_shape)
-            Ez[:, :, :] += np.reshape(
-                E[2, :], local_coordinates.coordinate_shape)
+            for idx, component in enumerate((Ex, Ey, Ez)):
+                component[:, :, :] += np.reshape(E[idx, :], local_coordinates.coordinate_shape)
 
             if magnetic_field:
                 H[:] = 0
@@ -184,12 +176,8 @@ def calculate_fields(
                     farfield_data.kz[row, col] * bead_center[2])
                 ) / farfield_data.kz[row, col]
 
-                Hx[:, :, :] += np.reshape(
-                    H[0, :], local_coordinates.coordinate_shape)
-                Hy[:, :, :] += np.reshape(
-                    H[1, :], local_coordinates.coordinate_shape)
-                Hz[:, :, :] += np.reshape(
-                    H[2, :], local_coordinates.coordinate_shape)
+                for idx, component in enumerate((Hx, Hy, Hz)):
+                    component[:, :, :] += np.reshape(H[idx, :], local_coordinates.coordinate_shape)
 
 
 @njit(cache=True)
@@ -335,9 +323,9 @@ def scattered_H_field_fixed_r(
 
     # Extra factor of -1 as B&H does not include the Condon–Shortley phase,
     # but our associated Legendre polynomials do include it
-    Hr *= -sinP / (k0r)**2 * n_medium / (_C * _MU0)
-    Ht *= -sinP / (k0r) * n_medium / (_C * _MU0)
-    Hp *= -cosP / (k0r) * n_medium / (_C * _MU0)
+    Hr *= -sinP / (k0r)**2 * n_medium / (C * MU0)
+    Ht *= -sinP / (k0r) * n_medium / (C * MU0)
+    Hp *= -cosP / (k0r) * n_medium / (C * MU0)
 
     # Cartesian components
     Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
@@ -345,7 +333,7 @@ def scattered_H_field_fixed_r(
     Hz = Hr * cos_theta - Ht * sinT
     if total_field:
         # Incident field (E field x-polarized)
-        Hi = np.exp(1j * k0r * cos_theta) * n_medium / (_C * _MU0)
+        Hi = np.exp(1j * k0r * cos_theta) * n_medium / (C * MU0)
         return np.concatenate((Hx, Hy + Hi, Hz), axis=0)
     else:
         return np.concatenate((Hx, Hy, Hz), axis=0)
@@ -390,9 +378,9 @@ def internal_H_field_fixed_r(
             )
         )
 
-    Hr *= sinP * n_bead / (_C * _MU0)
-    Ht *= -sinP * n_bead / (_C * _MU0)
-    Hp *= cosP * n_bead / (_C * _MU0)
+    Hr *= sinP * n_bead / (C * MU0)
+    Ht *= -sinP * n_bead / (C * MU0)
+    Hp *= cosP * n_bead / (C * MU0)
     # Cartesian components
     Hx = Hr * sinT * cosP + Ht * cos_theta * cosP - Hp * sinP
     Hy = Hr * sinT * sinP + Ht * cos_theta * sinP + Hp * cosP
