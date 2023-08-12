@@ -1,48 +1,10 @@
 import numpy as np
 from numba import njit, prange
 from dataclasses import fields
-from .associated_legendre import associated_legendre_dtheta, associated_legendre_over_sin_theta
-from .local_coordinates import CoordLocation, LocalBeadCoordinates
+from .associated_legendre import associated_legendre_over_sin_theta
+from .local_coordinates import Coordinates
 from .farfield_data import FarfieldData
-
-
-@njit(cache=True)
-def _exec_lookup(source, lookup, r, c):
-    """
-    Compile the retrieval of the lookup table with Numba, as it's slightly
-    faster
-    """
-    return source[:, lookup[r, c]]
-
-
-class AssociatedLegendreData:
-    __slots__ = (
-        "_associated_legendre",
-        "_associated_legendre_over_sin_theta",
-        "_associated_legendre_dtheta",
-        "_inverse",
-    )
-
-    def __init__(
-        self,
-        associated_legendre: np.ndarray,
-        associated_legendre_over_sin_theta: np.ndarray,
-        associated_legendre_dtheta: np.ndarray,
-        inverse: np.ndarray,
-    ) -> None:
-        self._associated_legendre = associated_legendre
-        self._associated_legendre_over_sin_theta = associated_legendre_over_sin_theta
-        self._associated_legendre_dtheta = associated_legendre_dtheta
-        self._inverse = inverse
-
-    def associated_legendre(self, r: int, c: int):
-        return _exec_lookup(self._associated_legendre, self._inverse, r, c)
-
-    def associated_legendre_over_sin_theta(self, r: int, c: int):
-        return _exec_lookup(self._associated_legendre_over_sin_theta, self._inverse, r, c)
-
-    def associated_legendre_dtheta(self, r: int, c: int):
-        return _exec_lookup(self._associated_legendre_dtheta, self._inverse, r, c)
+from .data_lookup import DataLookup
 
 
 @njit(cache=True, parallel=True)
@@ -97,8 +59,7 @@ def _loop_over_rotations(
 
 
 @njit(cache=True, parallel=True)
-def _do_legendre_calc(
-    unique_cos_theta: np.ndarray,
+def _alp_sin_theta_with_parity(
     unique_abs_cos_theta: np.ndarray,
     sign_inv: np.ndarray,
     max_negative_index: int,
@@ -109,52 +70,42 @@ def _do_legendre_calc(
     n_order orders, plus derived quantities
     """
 
-    # Allocate memory for the Associated Legendre Polynomials and derivatives
-    alp = np.zeros((n_orders, sign_inv.size))
-    alp_deriv = np.zeros_like(alp)
-    alp_sin = np.zeros_like(alp)
+    # Allocate memory for the Associated Legendre Polynomials divided by sin(theta)
+    alp_sin_theta = np.zeros((n_orders, sign_inv.size))
 
     # Parity for order L: parity[0] == 1, for L == 1
     parity = (-1) ** np.arange(n_orders)
-    sin_theta = (((1 + unique_abs_cos_theta) * (1 - unique_abs_cos_theta)) ** 0.5)[sign_inv]
     for L in prange(1, n_orders + 1):
-        alp_sin[L - 1, :] = associated_legendre_over_sin_theta(L, unique_abs_cos_theta)[sign_inv]
-        alp[L - 1, :] = alp_sin[L - 1, :] * sin_theta
+        alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, unique_abs_cos_theta)[sign_inv]
 
         if parity[L - 1] == -1 and max_negative_index is not None:
-            alp[L - 1, : max_negative_index + 1] *= -1
-            alp_sin[L - 1, : max_negative_index + 1] *= -1
+            alp_sin_theta[L - 1, : max_negative_index + 1] *= -1
 
-    for L in prange(1, n_orders + 1):
-        alp_prev = alp_sin[L - 2, :] if L > 1 else None
-        alp_deriv[L - 1, :] = associated_legendre_dtheta(
-            L, unique_cos_theta, (alp_sin[L - 1, :], alp_prev)
-        )
-
-    return alp, alp_sin, alp_deriv
+    return alp_sin_theta
 
 
 def calculate_legendre(
-    location: CoordLocation,
-    local_coordinates: LocalBeadCoordinates,
+    coordinates: Coordinates,
     farfield_data: FarfieldData,
     n_orders: int,
 ):
     """
-    Find the value of cos(theta) for all local coordinates (x, y, z) after rotating
-    the coordinates along all possible directions, defined by the angles in the
-    back focal plane.
+    Calculate the value of the Associated Legendre Functions of order `n_orders` and degree 1 for
+    the unique values of cos(theta). These values are found by rotating all local coordinates (x, y,
+    z) over all possible angles, as defined by the plane waves coming from the back focal plane.
     """
 
     # Unpack data class members to a dict for Numba
-    kwargs = {
+    farfield_args = {
         field.name: getattr(farfield_data, field.name)
         for field in fields(farfield_data)
         if field.name in ("aperture", "cos_theta", "sin_theta", "cos_phi", "sin_phi")
     }
-    local_coords_stacked = local_coordinates.xyz_stacked(location)
-    radii = local_coordinates.r(location)
-    local_cos_theta = _loop_over_rotations(local_coords_stacked, radii, **kwargs)
+    local_cos_theta = _loop_over_rotations(
+        coordinates.xyz_stacked,
+        coordinates.r,
+        **farfield_args
+    )
 
     shape = local_cos_theta.shape
     local_cos_theta = np.reshape(local_cos_theta, local_cos_theta.size)
@@ -176,7 +127,7 @@ def calculate_legendre(
 
     unique_abs_cos_theta, sign_inv = np.unique(np.abs(unique_cos_theta), return_inverse=True)
 
-    alp, alp_sin, alp_deriv = _do_legendre_calc(
-        unique_cos_theta, unique_abs_cos_theta, sign_inv, max_negative_index, n_orders
+    alp_sin_theta = _alp_sin_theta_with_parity(
+        unique_abs_cos_theta, sign_inv, max_negative_index, n_orders
     )
-    return AssociatedLegendreData(alp, alp_sin, alp_deriv, inverse)
+    return DataLookup(alp_sin_theta, inverse)

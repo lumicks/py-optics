@@ -18,7 +18,8 @@ from .radial_data import (
 )
 from .local_coordinates import (
     LocalBeadCoordinates,
-    CoordLocation,
+    ExternalBeadCoordinates,
+    InternalBeadCoordinates,
 )
 from .objective import (
     Objective,
@@ -230,6 +231,8 @@ def fields_focus(
     local_coordinates = LocalBeadCoordinates(
         x, y, z, bead.bead_diameter, bead_center, grid=grid
     )
+    internal_coordinates = InternalBeadCoordinates(local_coordinates)
+    external_coordinates = ExternalBeadCoordinates(local_coordinates)
 
     an, _ = bead.ab_coeffs(num_orders)
     n_orders = an.size
@@ -244,13 +247,12 @@ def fields_focus(
 
     logging.info('Calculating Hankel functions and derivatives')
     external_radial_data = calculate_external(
-        bead.k, local_coordinates.r_outside, n_orders)
+        bead.k, external_coordinates.r, n_orders)
 
     logging.info(
         'Calculating Associated Legendre polynomials for external fields')
     legendre_data_ext = calculate_legendre(
-        location=CoordLocation.OUTSIDE_BEAD,
-        local_coordinates=local_coordinates,
+        external_coordinates,
         farfield_data=farfield_data,
         n_orders=n_orders
     )
@@ -273,7 +275,7 @@ def fields_focus(
     calculate_fields(
         Ex, Ey, Ez, Hx, Hy, Hz,
         bead=bead, bead_center=bead_center,
-        local_coordinates=local_coordinates,
+        local_coordinates=external_coordinates,
         farfield_data=farfield_data, legendre_data=legendre_data_ext,
         external_radial_data=external_radial_data,
         internal=False,
@@ -282,14 +284,13 @@ def fields_focus(
 
     logging.info('Calculating Bessel functions and derivatives')
     internal_radial_data = calculate_internal(
-        bead.k1, local_coordinates.r_inside, n_orders
+        bead.k1, internal_coordinates.r, n_orders
     )
 
     logging.info(
         'Calculating Associated Legendre polynomials for internal fields')
     legendre_data_int = calculate_legendre(
-        location=CoordLocation.INSIDE_BEAD,
-        local_coordinates=local_coordinates,
+        internal_coordinates,
         farfield_data=farfield_data,
         n_orders=n_orders
     )
@@ -298,7 +299,7 @@ def fields_focus(
     calculate_fields(
         Ex, Ey, Ez, Hx, Hy, Hz,
         bead=bead, bead_center=bead_center,
-        local_coordinates=local_coordinates,
+        local_coordinates=internal_coordinates,
         farfield_data=farfield_data, legendre_data=legendre_data_int,
         internal_radial_data=internal_radial_data,
         internal=True,
@@ -405,6 +406,8 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
 
     local_coordinates = LocalBeadCoordinates(
         x, y, z, bead.bead_diameter, grid=grid)
+    internal_coordinates = InternalBeadCoordinates(local_coordinates)
+    external_coordinates = ExternalBeadCoordinates(local_coordinates)
 
     an, _ = bead.ab_coeffs(num_orders)
     n_orders = an.size
@@ -432,12 +435,14 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
 
     logging.info('Calculating Hankel functions and derivatives')
     external_radial_data = calculate_external(
-        bead.k, local_coordinates.r_outside, n_orders)
+        bead.k, external_coordinates.r, n_orders)
 
     logging.info(
         'Calculating Associated Legendre polynomials for external fields')
     legendre_data_ext = calculate_legendre(
-        CoordLocation.OUTSIDE_BEAD, local_coordinates, farfield_data, n_orders
+        external_coordinates,
+        farfield_data,
+        n_orders
     )
 
     Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
@@ -457,7 +462,7 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
 
     calculate_fields(
         Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=(0, 0, 0), local_coordinates=local_coordinates,
+        bead=bead, bead_center=(0, 0, 0), local_coordinates=external_coordinates,
         farfield_data=farfield_data, legendre_data=legendre_data_ext,
         external_radial_data=external_radial_data,
         internal=False,
@@ -466,19 +471,21 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
 
     logging.info('Calculating Bessel functions and derivatives')
     internal_radial_data = calculate_internal(
-        bead.k1, local_coordinates.r_inside, n_orders
+        bead.k1, internal_coordinates.r, n_orders
     )
 
     logging.info(
         'Calculating Associated Legendre polynomials for internal fields')
     legendre_data_int = calculate_legendre(
-        CoordLocation.INSIDE_BEAD, local_coordinates, farfield_data, n_orders
+        internal_coordinates,
+        farfield_data,
+        n_orders
     )
 
     logging.info('Calculating internal fields')
     calculate_fields(
         Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=(0, 0, 0), local_coordinates=local_coordinates,
+        bead=bead, bead_center=(0, 0, 0), local_coordinates=internal_coordinates,
         farfield_data=farfield_data, legendre_data=legendre_data_int,
         internal_radial_data=internal_radial_data,
         internal=True,

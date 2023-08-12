@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from enum import Enum
 
@@ -7,8 +8,25 @@ class CoordLocation(Enum):
     OUTSIDE_BEAD = 1
     EVERYWHERE = 2
 
+class Coordinates:
+    @property
+    def coordinate_shape(self):
+        raise RuntimeError("Cannot instantiate base class Coordinates")
+    
+    @property
+    def r(self):
+        raise RuntimeError("Cannot instantiate base class Coordinates")
+    
+    @property
+    def region(self):
+        raise RuntimeError("Cannot instantiate base class Coordinates")
 
-class LocalBeadCoordinates:
+    @property
+    def xyz_stacked(self):
+        raise RuntimeError("Cannot instantiate base class Coordinates")
+
+
+class LocalBeadCoordinates(Coordinates):
     __slots__ = (
         "_bead_diameter",
         "_outside_bead",
@@ -47,66 +65,101 @@ class LocalBeadCoordinates:
         self._outside_bead = self._r > bead_diameter / 2
         self._inside_bead = self._r <= bead_diameter / 2
 
-    def r(self, location: CoordLocation):
+    def get_xyz_stacked(self, location: CoordLocation):
         if location == CoordLocation.INSIDE_BEAD:
-            return self.r_inside
+            return np.vstack((self._x_inside, self._y_inside, self._z_inside))
         if location == CoordLocation.OUTSIDE_BEAD:
-            return self.r_outside
+            return np.vstack((self._x_outside, self._y_outside, self._z_outside))
         if location == CoordLocation.EVERYWHERE:
-            return self._r
+            return np.vstack((self._x_local, self._y_local, self._z_local))
         else:
             raise ValueError("Unsupported location for coordinates given")
 
     @property
-    def r_inside(self):
+    def _r_inside(self):
         return self._r[self._inside_bead]
 
     @property
-    def r_outside(self):
+    def _r_outside(self):
         return self._r[self._outside_bead]
-
+    
     @property
-    def x_inside(self):
+    def _x_inside(self):
         return self._x_local[self._inside_bead]
 
     @property
-    def y_inside(self):
+    def _y_inside(self):
         return self._y_local[self._inside_bead]
 
     @property
-    def z_inside(self):
+    def _z_inside(self):
         return self._z_local[self._inside_bead]
-
+    
     @property
-    def x_outside(self):
+    def _x_outside(self):
         return self._x_local[self._outside_bead]
 
     @property
-    def y_outside(self):
+    def _y_outside(self):
         return self._y_local[self._outside_bead]
 
     @property
-    def z_outside(self):
+    def _z_outside(self):
         return self._z_local[self._outside_bead]
 
     @property
-    def region_inside_bead(self):
+    def _region_inside_bead(self):
         return self._inside_bead
 
     @property
-    def region_outside_bead(self):
+    def _region_outside_bead(self):
         return self._outside_bead
 
     @property
     def coordinate_shape(self):
         return self._xyz_shape
+    
+    @property
+    def xyz_stacked(self):
+        return self.get_xyz_stacked(CoordLocation.EVERYWHERE)
 
-    def xyz_stacked(self, location: CoordLocation):
-        if location == CoordLocation.INSIDE_BEAD:
-            return np.vstack((self.x_inside, self.y_inside, self.z_inside))
-        if location == CoordLocation.OUTSIDE_BEAD:
-            return np.vstack((self.x_outside, self.y_outside, self.z_outside))
-        if location == CoordLocation.EVERYWHERE:
-            return np.vstack((self._x_local, self._y_local, self._z_local))
-        else:
-            raise ValueError("Unsupported location for coordinates given")
+class InternalBeadCoordinates(Coordinates):
+    def __init__(self, local_coordinates: LocalBeadCoordinates) -> None:
+        self._local_coordinates = local_coordinates
+    
+    @property
+    def xyz_stacked(self):
+        return self._local_coordinates.get_xyz_stacked(CoordLocation.INSIDE_BEAD)
+    
+    @property
+    def r(self):
+        return self._local_coordinates._r_inside
+    
+    @property
+    def region(self):
+        return self._local_coordinates._region_inside_bead
+    
+    @property
+    def coordinate_shape(self):
+        return self._local_coordinates.coordinate_shape
+    
+
+class ExternalBeadCoordinates(Coordinates):
+    def __init__(self, local_coordinates: LocalBeadCoordinates) -> None:
+        self._local_coordinates = local_coordinates
+    
+    @property
+    def xyz_stacked(self):
+        return self._local_coordinates.get_xyz_stacked(CoordLocation.OUTSIDE_BEAD)
+    
+    @property
+    def r(self):
+        return self._local_coordinates._r_outside
+
+    @property
+    def region(self):
+        return self._local_coordinates._region_outside_bead
+    
+    @property
+    def coordinate_shape(self):
+        return self._local_coordinates.coordinate_shape
