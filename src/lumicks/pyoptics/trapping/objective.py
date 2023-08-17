@@ -22,21 +22,43 @@ class BackFocalPlaneCoordinates:
 BackFocalPlaneFields = namedtuple("BackFocalPlaneFields", ["Ex", "Ey"])
 
 
-@dataclass
 class Objective:
     """
     Class to describe the essential properties of an objective
     """
 
-    NA: float
-    focal_length: float
-    n_bfp: float
-    n_medium: float
+    def __init__(self, NA: float, focal_length: float, n_bfp: float, n_medium: float):
+        self.NA = NA
+        self.focal_length = focal_length
+        self.n_bfp = n_bfp
+        self.n_medium = n_medium
+        
+    def __str__(self) -> str:
+        return (
+            '\n'.join(
+                [
+                    'Objective',
+                    '---------',
+                    f'NA: {self.NA}',
+                    f'focal length: {self.focal_length} [m]',
+                    f'refractive index at back focal plane: {self.n_bfp}',
+                    f'refractive index of medium: {self.n_medium}'
+                ]
+            )
+        )
+    
+    def __repr__(self) -> str:
+        return (
+            f'Objective(NA={self.NA}, '
+            f'focal_length={self.focal_length}, '
+            f'n_bfp={self.n_bfp}, '
+            f'n_medium={self.n_medium})'
+        )
 
     @property
     def sin_theta_max(self):
         """
-        Sine of the maxmimum acceptance angle of the objective
+        Sine of the maximum acceptance angle of the objective
         """
         return self.NA / self.n_medium
 
@@ -49,7 +71,7 @@ class Objective:
 
     def sample_back_focal_plane(self, f_input_field, bfp_sampling_n: int):
         """
-        Sample f_input_field with bfp_sampling_n samples and return the
+        Sample `f_input_field` with `bfp_sampling_n` samples and return the
         coordinates in a BackFocalPlaneCoordinates object, and the fields as a
         named tuple BackFocalPlaneFields(Ex, Ey).
         """
@@ -84,10 +106,10 @@ class Objective:
         lambda_vac: float,
     ):
         """
-        Refract the input beam at a Gaussian reference sphere [2], while taking
+        Refract the input beam at a Gaussian reference sphere, while taking
         care that the power in a beamlet is modified according to angle and
         media before and after the reference surface. Returns an instance of
-        the FarfieldData class.
+        the `FarfieldData` class.
         """
         bfp_sampling_n = bfp_coords.bfp_sampling_n
         sin_theta = self.sine_theta_range(bfp_sampling_n)

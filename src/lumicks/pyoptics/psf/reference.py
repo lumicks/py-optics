@@ -12,43 +12,49 @@ def focused_gauss_ref(
     NA: float, x: np.array, y: np.array, z: np.array
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
-    Gaussian beam, using the angular spectrum of plane waves method, see [1],
-    chapter 3.
+    Gaussian beam, using the angular spectrum of plane waves method, see [1]_, chapter 3.
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes electric
-    fields in the x, y, and z directions.
+    This function correctly incorporates the polarized nature of light in a focus. In other words,
+    the polarization state at the focus includes electric fields in the x, y, and z directions.
 
-    This function does not rely on the discretization of the back focal plane of
-    the objective. In contrast, it is a semi-analytical expression that
-    involves numerical integration over only one coordinate. Therefore, it is
-    by far the most accurate numerical evaluation of the point spread function.
-    However, it is also slower. This function is useful to assert convergence
-    of the results that are obtained with methods that discretize the back
-    focal plane.
+    This function does not rely on the discretization of the back focal plane of the objective. In
+    contrast, it is a semi-analytical expression that involves numerical integration over only one
+    coordinate. Therefore, it is by far the most accurate numerical evaluation of the point spread
+    function. However, it is also slower. This function is useful to assert convergence of the
+    results that are obtained with methods that discretize the back focal plane.
 
-    [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
-        Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
+    Parameters
+    ----------
+    lambda_vac : float
+        Wavelength of the light, in meters. n_bfp: float: refractive index at the back focal plane
+        of the objective n_medium: float: refractive index of the medium into which the light is
+        focused
+    focal_length : float
+        Focal length of the objective in meters
+    filling_factor : float
+        Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
+        waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
+    NA : float
+        Numerical Aperture n_medium * sin(theta_max) of the objective 
+    x : np.array
+        Array of x locations for evaluation 
+    y : np.array
+        Array of y locations for evaluation
+    z : np.array
+        Array of z locations for evaluation. The final locations are determined by the output of
+        numpy.meshgrid(x, y, z)
 
-    Args:
-      lambda_vac: float: wavelength of the light, in meters.
-      n_bfp: float: refractive index at the back focal plane of the objective
-      n_medium: float: refractive index of the medium into which the light is
-    focused
-      focal_length: float: focal length of the objective
-      filling_factor: float: filling factor of the Gaussian beam over the
-    aperture, defined as w0/R. Here, w0 is the waist of the Gaussian beam
-    and R is the radius of the aperture. Range 0...Inf
-      NA: float: Numerical Aperture n_medium * sin(theta_max) of the objective
-      x: np.array: array of x locations for evaluation
-      y: np.array: array of y locations for evaluation
-      z: np.array: array of z locations for evaluation. The final locations are
-    determined by the output of numpy.meshgrid(x, y, z)
+    Returns
+    -------
+    Ex : np.ndarray
+        The electric field along x, as a function of (x, y, z)
+    Ey : np.ndarray
+        The electric field along y, as a function of (x, y, z)
+    Ez : np.ndarray
+        The electric field along z, as a function of (x, y, z)
 
-    Returns:
-      Ex: the electric field along x, as a function of (x, y, z)
-      Ey: the electric field along y, as a function of (x, y, z)
-      Ez: the electric field along z, as a function of (x, y, z)
+    ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+            Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
 
     """
 
@@ -129,123 +135,117 @@ def focused_dipole_ref(
     dipole_moment, lambda_vac: float, n_bfp: float, n_medium: float, focal_length: float,
     NA: float, focal_length_tube: float, x: np.array, y: np.array, z: np.array, return_grid=False
 ):
-  """Calculate the 3-dimensional, vectorial Point Spread Function of a
-  Gaussian beam, using the angular spectrum of plane waves method, see [1],
-  chapter 3.
+    """Calculate the 3-dimensional, vectorial Point Spread Function of a
+    dipole in a homogeneous medium, using the angular spectrum of plane waves method. See [1]_,
+    chapter 4.
 
-  This function correctly incorporates the polarized nature of light in a
-  focus. In other words, the polarization state at the focus includes electric
-  fields in the x, y, and z directions.
+    This function correctly incorporates the polarized nature of light in a focus. In other words,
+    the polarization state at the focus includes electric fields in the x and y directions. The
+    field strength in the z direction is considered to be negligible, as it is assumed that the
+    focal length of the tube lens is long enough that a paraxial approximation is valid.
 
-  This function does not rely on the discretization of the back focal plane of
-  the objective. In contrast, it is a semi-analytical expression that
-  involves numerical integration over only one coordinate. Therefore, it is
-  by far the most accurate numerical evaluation of the point spread function.
-  However, it is also slower. This function is useful to assert convergence
-  of the results that are obtained with methods that discretize the back
-  focal plane.
+    This function does not rely on the discretization of the back focal plane of the objective. In
+    contrast, it is a semi-analytical expression that involves numerical integration over only the
+    single coordinate theta.
+    
+    Parameters
+    ----------
+    dipole_moment : tuple(px, py, pz)
+        Tuple of length 3 that determines the strength and orientation of the diple, in Coulomb
+        meter
+    lambda_vac : float
+        Wavelength of the light, in meters.
+    n_bfp : float
+        Refractive index at the back focal plane of the objective
+    n_medium : float
+        Refractive index of the medium into which the light is focused
+    focal_length : float
+        Focal length of the objective, in meters
+    NA : float
+        Numerical Aperture = $n_{medium} \sin(\\theta_{max})$ of the objective
+    focal_length_tube : float x : np.array
+        Array of x locations for evaluation
+    y : np.array
+        Array of y locations for evaluation
+    z : np.array
+        Array of z locations for evaluation. The final locations are determined by the output of
+        numpy.meshgrid(x, y, z)
+    return_grid : bool, optional
+        Return the smapling grid that is spanned by x, y and z. By default False.
 
-  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
-      Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
-
-  Args:
-    lambda_vac: float: wavelength of the light, in meters.
-    n_bfp: float: refractive index at the back focal plane of the objective
-    n_medium: float: refractive index of the medium into which the light is
-  focused
-    focal_length: float: focal length of the objective
-    filling_factor: float: filling factor of the Gaussian beam over the
-  aperture, defined as w0/R. Here, w0 is the waist of the Gaussian beam
-  and R is the radius of the aperture. Range 0...Inf
-    NA: float: Numerical Aperture n_medium * sin(theta_max) of the objective
-    x: np.array: array of x locations for evaluation
-    y: np.array: array of y locations for evaluation
-    z: np.array: array of z locations for evaluation. The final locations are
-    determined by the output of numpy.meshgrid(x, y, z)
-
-  Returns:
-    Ex: the electric field along x, as a function of (x, y, z)
-    Ey: the electric field along y, as a function of (x, y, z)
-    Ez: the electric field along z, as a function of (x, y, z)
+    Returns
+    -------
+    Ex : np.ndarray
+        The electric field along x, as a function of (x, y, z)
+    Ey : np.ndarray
+        The electric field along y, as a function of (x, y, z)
+    X : np.ndarray
+        The coordinates in X (only when `return_grid==True`)
+    Y : np.ndarray
+        The coordinates in Y (only when `return_grid==True`)
+    Z : np.ndarray
+        The coordinates in Z (only when `return_grid==True`)
+    
+    ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+            Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
 
   """
 
-  x, y, z = np.atleast_1d(x, y, z)
-  X, Y = np.meshgrid(x, y, indexing='ij')
+    x, y, z = np.atleast_1d(x, y, z)
+    X, Y = np.meshgrid(x, y, indexing='ij')
 
-  # Calculate all (polar) distances r in the grid, as measured from (0,0)
-  r_orig = np.hypot(X, Y)
-  # Then transform the matrix into a vector
-  r = np.reshape(r_orig, (1, -1))
+    # Calculate all (polar) distances r in the grid, as measured from (0,0)
+    r_orig = np.hypot(X, Y)
+    # Then transform the matrix into a vector
+    r = np.reshape(r_orig, (1, -1))
 
-  # Now get the unique numbers in that vector, so we only calculate the
-  # integral for unique distances r
-  r, idx_r = np.unique(r, return_inverse=True)
+    # Now get the unique numbers in that vector, so we only calculate the
+    # integral for unique distances r
+    r, idx_r = np.unique(r, return_inverse=True)
 
-  phi = np.arctan2(Y, X)
+    phi = np.arctan2(Y, X)
 
-  k = 2 * np.pi / lambda_vac * n_medium
-  k_ = 2 * np.pi / lambda_vac * n_bfp
+    k = 2 * np.pi / lambda_vac * n_medium
+    k_ = 2 * np.pi / lambda_vac * n_bfp
 
-  th_max = np.arcsin(NA / n_medium)
+    th_max = np.arcsin(NA / n_medium)
 
-  # Storage for the results of the integrals
-  I0 = np.zeros(r.shape[0], dtype='complex128')
-  I1 = np.zeros(r.shape[0], dtype='complex128')
-  I2 = np.zeros(r.shape[0], dtype='complex128')
+    # Storage for the results of the integrals
+    I0 = np.zeros(r.shape[0], dtype='complex128')
+    I1 = np.zeros(r.shape[0], dtype='complex128')
+    I2 = np.zeros(r.shape[0], dtype='complex128')
 
-  f = focal_length
-  f_ = focal_length_tube
+    f = focal_length
+    f_ = focal_length_tube
 
-  # Storage for the actual fields
-  Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-  Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
+    # Storage for the actual fields
+    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
+    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
 
-  for z_idx, zz in enumerate(z):
-    for idx, rr in enumerate(r):
-        # These are the integrands as defined in [1]
-        def __I00r(th):
-            return (np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) * 
-            sp.jv(0, k_ * rr * np.sin(th) * f/f_) * 
-            np.cos(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2)))
+    for z_idx, zz in enumerate(z):
+        for idx, rr in enumerate(r):
+            # These are the integrands as defined in [1]
+            def __I00(th):
+                return (np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) * 
+                sp.jv(0, k_ * rr * np.sin(th) * f/f_) * 
+                np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2)))
 
-        def __I00i(th):
-            return (np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) * 
-            sp.jv(0, k_ * rr * np.sin(th) * f/f_) * 
-            np.sin(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2)))
+            def __I01(th):
+                return (
+                    np.cos(th)**0.5 * np.sin(th)**2 * 
+                    sp.jv(1, k_ * rr * np.sin(th) * f/f_) * 
+                    np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
+                )
 
-        def __I01r(th):
-            return (
-              np.cos(th)**0.5 * np.sin(th)**2 * 
-              sp.jv(1, k_ * rr * np.sin(th) * f/f_) * 
-              np.cos(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
-            )
+            def __I02(th):
+                return (np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
+                sp.jv(2, k_ * rr * np.sin(th) * f/f_) * 
+                np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
+                )
 
-        def __I01i(th):
-            return (
-              np.cos(th)**0.5 * np.sin(th)**2 * 
-              sp.jv(1, k_ * rr * np.sin(th) * f/f_) * 
-              np.sin(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
-            )
-
-        def __I02r(th):
-            return (np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
-            sp.jv(2, k_ * rr * np.sin(th) * f/f_) * 
-            np.cos(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
-            )
-
-        def __I02i(th):
-            return (np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
-            sp.jv(2, k_ * rr * np.sin(th) * f/f_) * 
-            np.sin(k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
-            )
-
-        I0[idx] = (quad(__I00r, 0, th_max)[0] +
-                    1j * quad(__I00i, 0, th_max)[0])
-        I1[idx] = (quad(__I01r, 0, th_max)[0] +
-                    1j * quad(__I01i, 0, th_max)[0])
-        I2[idx] = (quad(__I02r, 0, th_max)[0] +
-                    1j * quad(__I02i, 0, th_max)[0])
+            I0[idx] = quad(__I00, 0, th_max, complex_func=True)[0]
+            I1[idx] = quad(__I01, 0, th_max, complex_func=True)[0]
+            I2[idx] = quad(__I02, 0, th_max, complex_func=True)[0]
 
     # Transform the results back to the grid
     sx = X.shape
@@ -261,15 +261,15 @@ def focused_dipole_ref(
     Ey[:, :, z_idx] += (I0_ - I2_ * np. cos(2 * phi)) * dipole_moment[1]
     Ey[:, :, z_idx] += (2j * I1_ * np.sin(phi)) * dipole_moment[2]
 
-  factor = (
-    (n_medium / n_bfp)**0.5 * 1j * k_ * f * np.exp(1j * (k * f - k_ * f_)) / 
-    (8 * np.pi * f_) * (2 * np.pi)**2 / (lambda_vac**2 * EPS0)
-  )
+    factor = (
+        (n_medium / n_bfp)**0.5 * 1j * k_ * f * np.exp(1j * (k * f - k_ * f_)) / 
+        (8 * np.pi * f_) * (2 * np.pi)**2 / (lambda_vac**2 * EPS0)
+    )
 
-  if return_grid:
-    return X, Y, np.squeeze(factor * Ex), np.squeeze(factor * Ey)
-  else:
-    return np.squeeze(factor * Ex), np.squeeze(factor * Ey)
+    retval = (np.squeeze(factor * Ex), np.squeeze(factor * Ey))
+    if return_grid:
+        retval += (X, Y,) 
+    return retval
 
 
 def focused_dipole_paraxial_xy(

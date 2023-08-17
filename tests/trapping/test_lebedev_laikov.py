@@ -13,3 +13,8 @@ def test_lebedev_laikov(order):
     R = np.hypot(np.hypot(x, y), z)
     np.testing.assert_allclose(R, np.ones(R.shape))
     np.testing.assert_allclose(np.sum(w), 1)
+    
+@pytest.mark.parametrize('order', (-1, 0,132.2))
+def test_lebedev_laikov_args(order):
+    with pytest.raises(ValueError, match=f"A value of {order} is not supported"):
+        trp.lebedev_laikov.get_nearest_order(order)

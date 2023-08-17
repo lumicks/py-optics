@@ -40,67 +40,86 @@ def fields_focus_gaussian(
     grid=True
 ):
     """
-    Calculate the three-dimensional electromagnetic field of a bead the
-    focus of a of a Gaussian beam, using the angular spectrum of plane waves
-    and Mie theory.
+    Calculate the three-dimensional electromagnetic field of a bead the focus of a of a Gaussian
+    beam, using the angular spectrum of plane waves and Mie theory [1]_[2]_.
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes
-    electric fields in the x, y, and z directions. The input is taken to be
-    polarized along the x direction.
+    This function correctly incorporates the polarized nature of light in a focus. In other words,
+    the polarization state at the focus includes electric fields in the x, y, and z directions. The
+    input is taken to be polarized along the x direction.
 
     Parameters
     ----------
-    beam_power : power of the laser beam before entering the objective, in
-        Watt.
-    filling_factor : filling factor of the Gaussian beam over the
-        aperture, defined as w0/R. Here, w0 is the waist of the Gaussian
-        beam and R is the radius of the aperture. Range 0...Inf
-    objective : instance of the Objective class.
-    bead: instance of the Bead class
-    x : array of x locations for evaluation, in meters
-    y : array of y locations for evaluation, in meters
-    z : array of z locations for evaluation, in meters
-    bead_center : tuple: tuple of three floating point numbers
-        determining the x, y and z position of the bead center in 3D space,
-        in meters
+    beam_power : float
+        Power of the laser beam before entering the objective, in Watt.
+    filling_factor : float
+        Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
+        waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
+    objective : Objective
+        Instance of the Objective class. 
+    bead: Bead
+        Instance of the Bead class 
+    x : np.ndarray
+        array of x locations for evaluation, in meters
+    y : np.ndarray
+        array of y locations for evaluation, in meters
+    z : np.ndarray
+        array of z locations for evaluation, in meters 
+    bead_center : tuple
+        A tuple of three floating point numbers determining the x, y and z position of the bead
+        center in 3D space, in meters
     bfp_sampling_n : (Default value = 31) Number of discrete steps with
-        which the back focal plane is sampled, from the center to the edge.
-        The total number of plane waves scales with the square of
-        bfp_sampling_n
+        which the back focal plane is sampled, from the center to the edge. The total number of
+        plane waves scales with the square of bfp_sampling_n
     num_orders : number of order that should be included in the
-        calculation the Mie solution. If it is None (default), the code will
-        use the number_of_orders() method to calculate a sufficient number.
-    return_grid: (Default value = False) return the sampling grid in the
-        matrices X, Y and Z
-    total_field : If True, return the total field of incident and
-        scattered electromagnetic field (default). If False, then only
-        return the scattered field outside the bead. Inside the bead, the
-        full field is always returned.
-    magnetic_field : If True, return the magnetic fields as well. If false
-        (default), do not return the magnetic fields.
-    verbose : If True, print statements on the progress of the calculation.
-        Default is False
-    grid: If True (default), interpret the vectors or scalars x, y and z as
-        the input for the numpy.meshgrid function, and calculate the fields
-        at the locations that are the result of the numpy.meshgrid output.
-        If False, interpret the x, y and z vectors as the exact locations
-        where the field needs to be evaluated. In that case, all vectors
-        need to be of the same length.
+        calculation the Mie solution. If it is `None` (default), the code will use the
+        `number_of_orders()` method to calculate a sufficient number.
+    return_grid: bool, optional
+        return the sampling grid in the matrices X, Y and Z. Default value = False
+    total_field : bool, optional
+        If True, return the total field of incident and scattered electromagnetic field (default).
+        If False, then only return the scattered field outside the bead. Inside the bead, the full
+        field is always returned.
+    magnetic_field : bool, optional
+        If True, return the magnetic fields as well. If false (default), do not return the magnetic
+        fields.
+    verbose : bool, optional
+        If True, print statements on the progress of the calculation. Default is False
+    grid: bool, optional
+        If True (default), interpret the vectors or scalars x, y and z as the input for the
+        numpy.meshgrid function, and calculate the fields at the locations that are the result of
+        the numpy.meshgrid output. If False, interpret the x, y and z vectors as the exact locations
+        where the field needs to be evaluated. In that case, all vectors need to be of the same
+        length.
 
     Returns
     -------
-    Ex : the electric field along x, as a function of (x, y, z)
-    Ey : the electric field along y, as a function of (x, y, z)
-    Ez : the electric field along z, as a function of (x, y, z)
-    Hx : the magnetic field along x, as a function of (x, y, z)
-    Hy : the magnetic field along y, as a function of (x, y, z)
-    Hz : the magnetic field along z, as a function of (x, y, z)
-        These values are only returned when magnetic_field is True
-    X : x coordinates of the sampling grid
-    Y : y coordinates of the sampling grid
-    Z : z coordinates of the sampling grid
-        These values are only returned if return_grid is True
+    Ex : np.ndarray
+        The electric field along x, as a function of (x, y, z)
+    Ey : np.ndarray
+        The electric field along y, as a function of (x, y, z)
+    Ez : np.ndarray
+        The electric field along z, as a function of (x, y, z)
+    Hx : np.ndarray
+        The magnetic field along x, as a function of (x, y, z). Only returned when magnetic_field is
+        True
+    Hy : np.ndarray
+        The magnetic field along y, as a function of (x, y, z). Only returned when magnetic_field is
+        True
+    Hz : np.ndarray
+        The magnetic field along z, as a function of (x, y, z). Only returned when magnetic_field is
+        True
+    X : np.ndarray
+        x coordinates of the sampling grid
+    Y : np.ndarray
+        y coordinates of the sampling grid
+    Z : np.ndarray
+        z coordinates of the sampling grid These values are only returned if return_grid is True
+        
+    ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+            Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
+    ..  [2] Craig F. Bohren & Donald R. Huffman (1983). Absorption and Scattering of
+            Light by Small Particles. WILEY‐VCH Verlag GmbH & Co. KGaA.
+            doi:10.1002/9783527618156
     """
     w0 = (
         filling_factor * objective.focal_length * objective.NA / bead.n_medium

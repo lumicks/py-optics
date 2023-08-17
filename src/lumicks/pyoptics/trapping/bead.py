@@ -1,24 +1,32 @@
 import numpy as np
 import scipy.special as sp
+from typing import Union
 
 
 class Bead:
-    def __init__(self, bead_diameter=1e-6, n_bead=1.57, n_medium=1.33,
-                 lambda_vac=1064e-9):
+    def __init__(
+        self,
+        bead_diameter: float = 1e-6,
+        n_bead: float = 1.57,
+        n_medium: float = 1.33,
+        lambda_vac: float = 1064e-9
+    ):
         """
-        The `Bead` class describes the situation of a spherical bead with a
-        diameter of bead_diameter (in meters) and having a refractive index
-        n_bead, where the bead is embedded in a medium with a refractive index
-        n_medium. The wavelength for any calculation is lambda_vac, which is
-        the wavelength in vacuum (in meters)
+        The `Bead` class describes the situation of a spherical bead with a diameter of
+        `bead_diameter` (in meters) and having a refractive index `n_bead`, where the bead is
+        embedded in a medium with a refractive index `n_medium`. The wavelength for any calculation
+        is `lambda_vac`, which is the wavelength in vacuum (in meters)
 
         Parameters
         ----------
-        bead_diameter : Diameter of the bead in meters
-        n_bead : refractive index of the bead
-        n_medium : refractive index of the medium
-        lambda_vac : wavelength of the light in meters, in vacuum (so not the
-            medium)
+        bead_diameter : float, optional
+            Diameter of the bead in meters, by default 1e-6
+        n_bead : float, optional
+            Refractive index of the bead, by default 1.57
+        n_medium : float, optional
+            Refractive index of the medium, by default 1.33
+        lambda_vac : float, optional
+            Wavelength of the light in meters, in vacuum (so not the medium), by default 1064e-9
         """
 
         self.bead_diameter = bead_diameter
@@ -26,74 +34,101 @@ class Bead:
         self.n_medium = n_medium
         self.lambda_vac = lambda_vac
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return (
+            'Bead\n'
+            '----\n'
             f'Diameter: {self.bead_diameter} [m]\n'
             f'Refractive index: {self.n_bead}\n'
             f'Refractive index medium: {self.n_medium}\n'
             f'Wavelength: {self.lambda_vac} [m]\n'
         )
+    
+    def __repr__(self) -> str:
+        return (
+            f'Bead(bead_diameter={self.bead_diameter}, '
+            f'n_bead={self.n_bead}, '
+            f'n_medium={self.n_medium}, '
+            f'lambda_vac={self.lambda_vac})'
+        )
 
     @property
     def k(self) -> float:
+        """Returns the wave number `k` of the medium surrounding the bead.
+
+        Returns
+        -------
+        float
+            `k`, the wave number of the medium.
+        """        
         return 2 * np.pi * self.n_medium / self.lambda_vac
 
     @property
     def k1(self) -> float:
-        return 2 * np.pi * self.n_bead / self.lambda_vac
-
-    @property
-    def size_param(self):
-        """
-        Return the size parameter of the bead k*a, where k is the wave number
-        in the medium and a is the radius of the bead
+        """Returns the wave number `k1` of the material of the bead.
 
         Returns
         -------
-        size parameter [-]
+        float
+            `k1`, the wave number of the material of the bead
+        """        
+        return 2 * np.pi * self.n_bead / self.lambda_vac
+
+    @property
+    def size_param(self) -> float:
+        """
+        Return the size parameter of the bead :math:`k a`, where :math:`k = 2 \\pi
+        n_{medium}/\\lambda_{vac}`, the wave number in the medium and :math:`a` is the radius of the
+        bead.
+
+        Returns
+        -------
+        float
+            The size parameter of the bead. [-]
         """
         return np.pi * self.n_medium * self.bead_diameter / self.lambda_vac
 
     @property
-    def nrel(self):
+    def nrel(self) -> Union[float, complex]:
         """
         Return the relative refractive index n_bead/n_medium
         """
         return self.n_bead / self.n_medium
 
     @property
-    def number_of_orders(self):
+    def number_of_orders(self) -> int:
         """
-        Return the number of orders required to 'properly' approximate the
-        fields scattered by the bead. The criterion is the closest integer to
-        x + 4x^(1/3) + 2, where x is the size parameter of the bead [1].
-
-        1.  "Absorption and Scattering of Light by Small Particles",
-            Craig F. Bohren & Donald R. Huffman, p. 477
+        Return the number of orders required to 'properly' approximate the fields scattered by the
+        bead. The criterion is the closest integer to :math:`x + 4 x^{1/3} + 2`, where `x` is the
+        size parameter of the bead [1]_.
 
         Returns
         -------
-        n : number of orders
+        int
+            number of orders
+        
+        ..  [1] "Absorption and Scattering of Light by Small Particles",
+                Craig F. Bohren & Donald R. Huffman, p. 477
         """
 
         size_param = self.size_param
         return int(np.round(size_param + 4 * size_param**(1/3) + 2.0))
 
     def ab_coeffs(self, num_orders=None):
-        """
-        Return the scattering coefficients for plane wave excitation of the
-        bead.
+        """Return the scattering coefficients for plane wave excitation of the bead.
 
         Parameters
         ----------
-        num_orders : determines the number of orders returned. If num_orders is
-            None (default), the number of orders returned is determined by the
-            method number_of_orders()
+        num_orders : int, optional
+            Determines the number of orders returned. If `num_orders` is `None` (default), the
+            number of orders returned is determined by the property `number_of_orders`
 
         Returns
         -------
-        an : scattering coefficients
-        bn : scattering coefficients
+        an : np.ndarray
+            Scattering coefficients :math:`a_n`
+        bn : np.ndarray
+            scattering coefficients :math:`b_n`
         """
 
         nrel = self.nrel
@@ -142,14 +177,16 @@ class Bead:
 
         Parameters
         ----------
-        num_orders : determines the number of orders returned. If num_orders is
-            None (default), the number of orders returned is determined by the
-            method number_of_orders()
+        num_orders : int, optional
+            Determines the number of orders returned. If num_orders is `None` (default), the number
+            of orders returned is determined by the property `number_of_orders`
 
         Returns
         -------
-        cn : internal field coefficients
-        dn : internal field coefficients
+        cn : np.ndarray
+            Internal field coefficients :math:`c_n`
+        dn : np.ndarray
+            Internal field coefficients :math:`d_n`
         """
         nrel = self.nrel
         size_param = self.size_param
@@ -193,20 +230,20 @@ class Bead:
         return cn, dn
 
     def extinction_eff(self, num_orders=None):
-        """
-        Return the extinction efficiency Qext (for plane wave excitation),
-        defined as Qext = Cext/(pi r**2), where Cext is the exctinction cross
-        section and r is the bead radius.
+        """Return the extinction efficiency `Qext` (for plane wave excitation), defined as
+        :math:`Q_{ext} = C_{ext}/(\\pi r^2)`, where :math:`C_{ext}` is the exctinction cross section
+        and :math:`r` is the bead radius.
 
         Parameters
         ----------
-        num_orders : determines the number of orders returned. If num_orders is
-            `None` (default), the number of orders returned is determined by
-            the property `number_of_orders`
+        num_orders : int, optional,
+            Determines the number of orders returned. If num_orders is `None` (default), the number
+            of orders returned is determined by the property `number_of_orders`
 
         Returns
         -------
-        Qext : extinction efficiency
+        float
+            Extinction efficiency
         """
 
         an, bn = self.ab_coeffs(num_orders=num_orders)
@@ -217,20 +254,20 @@ class Bead:
         )
 
     def scattering_eff(self, num_orders=None):
-        """
-        Return the scattering efficiency Qsca (for plane wave excitation),
-        defined as Qsca = Csca/(pi r**2), where Csca is the scattering cross
-        section and r is the bead radius.
+        """Return the scattering efficiency `Qsca` (for plane wave excitation),
+        defined as :math:`Q_{sca} = C_{sca}/(\\pi r^2)`, where :math:`C_{sca}` is the scattering
+        cross section and :math:`r` is the bead radius.
 
         Parameters
         ----------
-        num_orders : determines the number of orders returned. If num_orders is
-            `None` (default), the number of orders returned is determined by
-            the property `number_of_orders`
+        num_orders : int, optional
+            Determines the number of orders returned. If num_orders is `None` (default), the number
+            of orders returned is determined by the property `number_of_orders`
 
         Returns
         -------
-        Qsca : scattering efficiency
+        float
+            Scattering efficiency
         """
 
         an, bn = self.ab_coeffs(num_orders=num_orders)
@@ -242,19 +279,21 @@ class Bead:
 
     def pressure_eff(self, num_orders=None):
         """
-        Return the pressure efficiency Qpr (for plane wave excitation),
-        defined as Qpr = Qext - Qsca <cos(theta)>, where <cos(theta)> is the
-        mean scattering angle.
+        Return the pressure efficiency `Qpr` (for plane wave excitation), defined as :math:`Q_{pr} =
+        Q_{ext} - Q_{sca} <\cos(\\theta)>`, where :math:`<\cos(\\theta)>` is the mean scattering
+        angle.
 
         Parameters
         ----------
-        num_orders : determines the number of orders returned. If num_orders is
-            `None` (default), the number of orders returned is determined by
-            the property `number_of_orders`
+        num_orders : int, optional
+            Determines the number of orders returned. If num_orders is
+            `None` (default), the number of orders returned is determined by the property
+            `number_of_orders`
 
         Returns
         -------
-        Qpr : pressure efficiency
+        float
+            Pressure efficiency
 
         """
 

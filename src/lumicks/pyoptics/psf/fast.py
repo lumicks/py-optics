@@ -3,13 +3,6 @@ from ..czt import czt
 
 """
 Functions to calculate point spread functions of focused wavefronts by use of chirped z-transforms.
-
-References
-----------
-.. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
-       Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
-.. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser,
-       "Fast focus field calculations," Opt. Express 14, 11277-11291 (2006)
 """
 
 
@@ -29,8 +22,8 @@ def fast_gauss(
     return_grid=False,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
-    Gaussian beam, using the angular spectrum of plane waves method, see [1], chapter 3. This
-    function uses the chirp-z transform for speedy evaluation of the fields in the focus.
+    Gaussian beam, using the angular spectrum of plane waves method, see [1]_, chapter 3. This
+    function uses the chirp-z transform for speedy evaluation of the fields in the focus [2]_.
 
     This function correctly incorporates the polarized nature of light in a focus. In other words,
     the polarization state at the focus includes electric fields in the x, y, and z directions. This
@@ -40,20 +33,20 @@ def fast_gauss(
     Parameters
     ----------
     lambda_vac : float
-        wavelength of the light, in meters.
+        Wavelength of the light, in meters.
     n_bfp : float
-        refractive index at the back focal plane of the objective.
+        Refractive index at the back focal plane of the objective [-]
     n_medium : float
-        refractive index of the medium into which the light is
+        Refractive index of the medium into which the light is focused [-]
     focused focal_length : float
-        focal length of the objective, in meters.
+        Focal length of the objective, in meters.
     filling_factor : float
-        filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
+        Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
         waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
     NA : float
         Numerical Aperture n_medium * sin(theta_max) of the objective.
     xrange : float
-        size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
+        Size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
         at x locations [-xrange/2..xrange/2]
     numpoints_x : int
         Number of points to calculate along the x dimension. Must be > 0
@@ -61,16 +54,16 @@ def fast_gauss(
         Same as x, but along y.
     numpoints_y: int
         Same as x, but for y.
-    z : np.array
-        numpy array of locations along z, in meters, where to calculate the fields. Can be a single
+    z : Union[np.array, float]
+        Numpy array of locations along z, in meters, where to calculate the fields. Can be a single
         number as well.
-    bfp_sampling_n :  int
+    bfp_sampling_n :  int, optional
         number of discrete steps with which the back focal plane is sampled, from the center to the
         edge. The total number of plane waves scales with the square of bfp_sampling_n. Default
-        value = 125  .
-    return_grid : bool
+        value = 125.
+    return_grid : bool, optional
         return the sampling grid (default value = False).
-        
+
     Returns
     -------
     Ex : ndarray
@@ -84,6 +77,11 @@ def fast_gauss(
 
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
+
+    .. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
+        Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
+    .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser,
+       "Fast focus field calculations," Opt. Express 14, 11277-11291 (2006)
     """
     w0 = filling_factor * focal_length * NA / n_medium  # See [1]
 
@@ -124,8 +122,8 @@ def fast_psf(
     return_grid=False,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
-    arbitrary input field, using the angular spectrum of plane waves method, see [1], chapter 3.
-    This function uses the chirp-z transform for speedy evaluation of the fields in the focus.
+    arbitrary input field, using the angular spectrum of plane waves method, see [1]_, chapter 3.
+    This function uses the chirp-z transform for speedy evaluation of the fields in the focus [2]_.
 
     This function correctly incorporates the polarized nature of light in a focus. In other words,
     the polarization state at the focus includes electric fields in the x, y, and z directions. The
@@ -134,33 +132,34 @@ def fast_psf(
     Parameters
     ----------
     f_input_field : callable
-        function with signature f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n), where x_bfp
-        is a grid of x locations in the back focal plane, determined by the focal length and NA of
-        the objective. The corresponding grid for y is y_bfp, and r_bfp is the radial distance from
-        the center of the back focal plane. The float r_max is the largest distance that falls
-        inside the NA, but r_bfp will contain larger numbers as the back focal plane is sampled with
-        a square grid. The number of samples from the center to the edge of the NA in horizontal or
-        vertical direction is bfp_sampling_n. This number is forwarded to the callable for
-        convenience. The function must return a tuple (E_bfp_x, E_bfp_y), which are the electric
-        fields in the x- and y- direction, respectively, at the sample locations in the back focal
-        plane. In other words, E_bfp_x describes the electric field of the input beam which is
-        polarized along the x-axis. Similarly, E_bfp_y describes the y-polarized part of the input
-        beam. The fields may be complex, so a phase difference between x and y is possible. If only
-        one polarization is used, the other return value must be None, e.g., y polarization would
-        return (None, E_bfp_y). The fields are post-processed such that any part that falls outside
-        of the NA is set to zero.
+        Function with signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`, where
+        `x_bfp` is a grid of x locations in the back focal plane, determined by the focal length and
+        NA of the objective. The corresponding grid for y is `y_bfp`, and `r_bfp` is the radial
+        distance from the center of the back focal plane. The float `r_max` is the largest distance
+        that falls inside the NA, but `r_bfp` will contain larger numbers as the back focal plane is
+        sampled with a square grid. The number of samples from the center to the edge of the NA in
+        horizontal or vertical direction is `bfp_sampling_n`. This number is forwarded to the
+        callable for convenience. The function must return a tuple `(E_bfp_x, E_bfp_y)`, which are
+        the electric fields in the x- and y- direction, respectively, at the sample locations in the
+        back focal plane. In other words, `E_bfp_x` describes the electric field of the input beam
+        which is polarized along the x-axis. Similarly, `E_bfp_y` describes the y-polarized part of
+        the input beam. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be `None`, e.g., y
+        polarization would return `(None, E_bfp_y)`. The fields are post-processed such that any
+        part that falls outside of the NA is set to zero.
     lambda_vac : float
-        wavelength of the light [m]
+        Wavelength of the light [m]
     n_bfp : float
-        refractive index at the back focal plane of the objective [-]
+        Refractive index at the back focal plane of the objective [-]
     n_medium : float
-        refractive index of the medium into which the light is focused [-]
+        Refractive index of the medium into which the light is focused [-]
     focal_length : float
-        focal length of the objective [m]
+        Focal length of the objective [m]
     NA : float
-        Numerical Aperture = n_medium * sin(theta_max) of the objective [-]
+        Numerical Aperture = :math:`n_{medium} \sin(\\theta_{max})`, where :math:`\\theta_{max}` is
+        the maximum acceptance angle of the objective [-]
     xrange : float
-        size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
+        Size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
         at x locations [-xrange/2..xrange/2] [m]
     numpoints_x : int
         Number of points to calculate along the x dimension. Must be > 0
@@ -168,15 +167,15 @@ def fast_psf(
         Same as x, but along y [m]
     numpoints_y : int
         Same as x, but for y
-    z : np.array
-        numpy array of locations along z, where to calculate the fields. Can be a single number as
+    z : Union[np.array, float]
+        Numpy array of locations along z, where to calculate the fields. Can be a single number as
         well [m]
-    bfp_sampling_n : int
-        number of discrete steps with which the back focal plane is sampled, from the center to the
+    bfp_sampling_n : int, optional
+        Number of discrete steps with which the back focal plane is sampled, from the center to the
         edge. The total number of plane waves scales with the square of bfp_sampling_n (default =
         125)
-    return_grid : bool
-        return the sampling grid (default = False)
+    return_grid : bool, optional
+        Return the sampling grid (default = False)
 
     Returns
     -------
@@ -192,6 +191,10 @@ def fast_psf(
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
 
+    .. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.). Cambridge:
+        Cambridge University Press. doi:10.1017/CBO9780511794193
+    .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser, "Fast focus
+        field calculations," Opt. Express 14, 11277-11291 (2006)
     """
     z = np.atleast_1d(z)
     xrange *= 0.5
@@ -225,7 +228,7 @@ def fast_psf(
     if Einx is None and Einy is None:
         raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
     cos_theta = np.ones(sin_theta.shape)
-    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
+    cos_theta[aperture] = ((1 - sin_theta[aperture]) * (1 + sin_theta[aperture])) ** 0.5
 
     cos_phi = np.ones_like(sin_theta)
     sin_phi = np.zeros_like(sin_theta)

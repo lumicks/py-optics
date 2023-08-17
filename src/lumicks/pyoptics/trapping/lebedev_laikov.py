@@ -1,67 +1,53 @@
-"""Lebedev-Laikov.F, translated to C with f2c (version 20160102),
-   because I don't understand FORTRAN, then further translated by
-   hand to Python.
-
+"""Lebedev-Laikov.F, translated to C with f2c (version 20160102), because I don't understand
+   FORTRAN, then further translated by hand to Python. File obtained from
+   http://www.ccl.net/cca/software/SOURCES/FORTRAN/Lebedev-Laikov-Grids/
+   
+   Original comment in the code:
+   
    This subroutine is part of a set of subroutines that generate
-   Lebedev grids [1-6] for integration on a sphere. The original
-   C-code [0] was kindly provided by Dr. Dmitri N. Laikov and
-   translated into fortran by Dr. Christoph van Wuellen.
-   This subroutine was translated using a C to fortran77 conversion
-   tool written by Dr. Christoph van Wuellen.
+   Lebedev grids [1]_, [2]_, [3]_, [4]_, [5]_, [6]_, for integration on a sphere. The original
+   C-code [1]_ was kindly provided by Dr. Dmitri N. Laikov and translated into fortran by Dr.
+   Christoph van Wuellen. This subroutine was translated using a C to fortran77 conversion tool
+   written by Dr. Christoph van Wuellen.
 
-   Users of this code are asked to include reference [0] in their
-   publications, and in the user- and programmers-manuals
-   describing their codes.
+   Users of this code are asked to include reference [1]_ in their publications, and in the user-
+   and programmers-manuals describing their codes.
 
    This code was distributed through CCL (http://www.ccl.net/).
 
-   [0] V.I. Lebedev, and D.N. Laikov
-       "A quadrature formula for the sphere of the 131st
-        algebraic order of accuracy"
-       Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481.
 
-   [1] V.I. Lebedev
-       "A quadrature formula for the sphere of 59th algebraic
-        order of accuracy"
-       Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286.
+   ..  [1] V.I. Lebedev, and D.N. Laikov,
+           "A quadrature formula for the sphere of the 131st algebraic order of accuracy",
+           Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481.
+   ..  [2] V.I. Lebedev,
+           "A quadrature formula for the sphere of 59th algebraic order of accuracy",
+           Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286.
+   ..  [3] V.I. Lebedev, and A.L. Skorokhodov
+           "Quadrature formulas of orders 41, 47, and 53 for the sphere",
+           Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592.
+   ..  [4] V.I. Lebedev, "Spherical quadrature formulas exact to orders 25-29",
+           Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107.
+   ..  [5] V.I. Lebedev, "Quadratures on a sphere",
+           Computational Mathematics and Mathematical Physics, Vol. 16, 1976, pp. 10-24.
+   ..  [6] V.I. Lebedev
+           "Values of the nodes and weights of ninth to seventeenth order Gauss-Markov quadrature
+           formulae invariant under the octahedron group with inversion",
+           Computational Mathematics and Mathematical Physics, Vol. 15, 1975, pp. 44-51.
+           
+   Given a point on a sphere (specified by `a` and `b`), generate all the equivalent points under Oh
+   symmetry, making grid points with weight `v`. The variable num is increased by the number of
+   different points generated.
 
-   [2] V.I. Lebedev, and A.L. Skorokhodov
-       "Quadrature formulas of orders 41, 47, and 53 for the sphere"
-       Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592.
+   Depending on code, there are 6...48 different but equivalent points::
 
-   [3] V.I. Lebedev
-       "Spherical quadrature formulas exact to orders 25-29"
-       Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107.
+        code=1:   (0,0,1) etc                                (  6 points) 
+        code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points)
+        code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points)
+        code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points) 
+        code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points)
+        code=6:   (a,b,c) etc, c=sqrt(1-a^2-b^2), a/b input  ( 48 points)
 
-   [4] V.I. Lebedev
-       "Quadratures on a sphere"
-       Computational Mathematics and Mathematical Physics, Vol. 16,
-       1976, pp. 10-24.
-
-   [5] V.I. Lebedev
-       "Values of the nodes and weights of ninth to seventeenth
-        order Gauss-Markov quadrature formulae invariant under the
-        octahedron group with inversion"
-       Computational Mathematics and Mathematical Physics, Vol. 15,
-       1975, pp. 44-51.
-
-
-    Given a point on a sphere (specified by a and b), generate all
-    the equivalent points under Oh symmetry, making grid points with
-    weight v.
-    The variable num is increased by the number of different points
-    generated.
-
-    Depending on code, there are 6...48 different but equivalent
-    points.
-
-    code=1:   (0,0,1) etc                                (  6 points)
-    code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points)
-    code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points)
-    code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points)
-    code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points)
-    code=6:   (a,b,c) etc, c=sqrt(1-a^2-b^2), a/b input  ( 48 points) """
-
+    """
 
 from math import sqrt
 
@@ -10382,20 +10368,54 @@ _ORDER = (3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 35, 41, 47,
 
 
 def get_nearest_order(order: int):
-    _order = int(order)
-    if _order > 131:
-        # TODO: should we issue a warning?
-        return 131
+    """For a given `order`, return the nearest (higher) order that we have sampling coordinates and
+    weight factors for.
 
-    if order < 0:
-        raise ValueError("The order should not be below 1")
+    Parameters
+    ----------
+    order : int
+        Order to check against. Must be >= 1.
 
-    while _order not in _ORDER:
-        _order += 1
-    return _order
+    Returns
+    -------
+    nearest_order : int
+        The nearest order with known coordinates and coefficients.
+
+    Raises
+    ------
+    ValueError
+        Orders smaller than 1 and larger than 131 are not supported and have an exception as a
+        result.
+    """
+    int_order = int(order)
+    if int_order > 131 or order < 1:
+        raise ValueError(f"A value of {order} is not supported")
+
+    return min(filter(lambda x: x >= int_order, _ORDER))
 
 
 def get_integration_locations(order: int):
+    """Retrieve the integration locations and weight factors for a certain order. Note that the
+    value of `order` must exist in the range of permissible values, otherwise a ValueError exception
+    is thrown. Permissible values are: 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 35,
+    41, 47, 53, 59, 65, 71, 77, 83, 89, 95, 101, 107, 113, 119, 125, and 131.
+
+    Parameters
+    ----------
+    order : int
+        Integration order to get the integration and weight factors for.
+
+    Returns
+    -------
+    x, y, z, w : tuple
+        Tuple of lists with the x, y and z locations of the integration coordinates, and the weight
+        factors `w` to go with it.
+        
+    Raises
+    ------
+    ValueError
+        Raises an exception if `order` is not in the set of permissible values.
+    """    
     if order not in _ORDER:
         raise ValueError(
             "'order' has to be 3, 5, 7, 9, 11, 13, 15, 17, 19, " +

@@ -1,31 +1,42 @@
-import numpy as np
+"""Field distributions of dipoles, implemented from various sources"""
 
+import numpy as np
+from scipy.constants import mu_0 as MU0, epsilon_0 as EPS0, speed_of_light as C
 
 # Some constants useful for calculating the magnetic fields
-_C = 299792458
-_MU0 = 4 * np.pi * 1e-7
-_EPS0 = (_C**2 * _MU0)**-1
 
 def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
-    """Get the electromagnetic field of an x-oriented dipole. The field includes
-    both near- and farfields. The dipole is located at (0,0,0).
-    Reference: Principles of Nano-optics, 2nd Ed., Ch. 2 and "a little algebra"
+    """Get the electromagnetic field of an x-oriented dipole in homogeneous space. The field includes
+    both near- and farfields. The dipole is located at (0,0,0). See [1]_.
     
-    Arguments:
-        px: dipole moment of the dipole (SI units)
-        n_medium: refractive index of the medium in which the dipole is embedded
-        lambda_vac: wavelength in vacuum of the radiation
-        x, y, z: (array of) coordinates at which the electromagnetic field is to
-            be evaluated
+    Parameters
+    ----------
+    px : float
+        Dipole moment of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation
+    x, y, z : Union[float, mp.ndarray]
+        (Array of) coordinates at which the electromagnetic field is to be evaluated
         
-        Returns:
-            Ex: array of electric field polarized in the x-direction 
-                evaluated at (x, y, z)
-            Ey: As Ex, but y-polarized component
-            Ez: As Ex, but z-polarized component
-            Hx: H field polarized in the x-direction evaluated at (x, y, z)
-            Hy: As Hx, but y-polarized component
-            Hz: As Hx, but z-polarized component
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+    Hx : np.ndarray
+        H field polarized in the x-direction evaluated at (x, y, z)
+    Hy : np.ndarray
+        As Hx, but y-polarized component
+    Hz : np.ndarray
+        As Hx, but z-polarized component
+
+ 
+    ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 2
     """
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
@@ -41,7 +52,7 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
     Ey = x * y / (k**2 * R) * (3 / R**3 - 3j * k / R**2 - k**2 / R)
     Ez = x * z / (k**2 * R) * (3 / R**3 - 3j * k / R**2 - k**2 / R)
 
-    prefactor = px * k**2 * np.exp(1j * k * R)/(4 * np.pi * R * _EPS0 * n_medium**2)
+    prefactor = px * k**2 * np.exp(1j * k * R)/(4 * np.pi * R * EPS0 * n_medium**2)
     Ex *= prefactor
     Ey *= prefactor
     Ez *= prefactor
@@ -49,7 +60,7 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
     Hy = 1j * k * z / R - z / R**2
     Hz = y / R**2 - 1j * k * y / R
 
-    prefactor *= (1j * 2 * np.pi * _C / lambda_vac * _MU0)**-1
+    prefactor *= (1j * 2 * np.pi * C / lambda_vac * MU0)**-1
 
     Hy *= prefactor
     Hz *= prefactor
@@ -63,24 +74,35 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
 
 def field_dipole_y(py, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of a y-oriented dipole. The field includes
-    both near- and farfields. The implementation is based on a permutation of
-    the fields as calculated by fields_dipole_z.
+    both near- and farfields. The implementation is based on a permutation of the fields as
+    calculated by :func:`field_dipole_z()`.
     
-    Arguments:
-        py: dipole moment of the dipole (SI units)
-        n_medium: refractive index of the medium in which the dipole is embedded
-        lambda_vac: wavelength in vacuum of the radiation
-        x, y, z: (array of) coordinates at which the electromagnetic field is to
-            be evaluated
-        
-        Returns:
-            Ex: array of electric field polarized in the x-direction 
-                evaluated at (x, y, z)
-            Ey: As Ex, but y-polarized component
-            Ez: As Ex, but z-polarized component
-            Hx: H field polarized in the x-direction evaluated at (x, y, z)
-            Hy: As Hx, but y-polarized component
-            Hz: As Hx, but z-polarized component
+    Parameters
+    ----------
+    
+    py : float
+        Dipole moment of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation
+    x, y, z : Union[float, np.ndarray]
+        (Array of) coordinates at which the electromagnetic field is to be evaluated
+    
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+    Hx : np.ndarray
+        H field polarized in the x-direction evaluated at (x, y, z)
+    Hy : np.ndarray
+        As Hx, but y-polarized component
+    Hz : np.ndarray
+        As Hx, but z-polarized component
     """
 
     Ex, Ez, Ey, Hx, Hz, Hy = field_dipole_z(py, n_medium, lambda_vac, x, -z, y)
@@ -90,24 +112,36 @@ def field_dipole_y(py, n_medium, lambda_vac, x, y, z):
 
 def field_dipole_z(pz, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of a z-oriented dipole. The field includes
-    both near- and farfields. The dipole is located at (0,0,0).
-    Reference: Antenna Theory, Ch. 4, 3rd Edition, C. A. Balanis
+    both near- and farfields. The dipole is located at (0,0,0). See [1]_
     
-    Arguments:
-        pz: dipole moment of the dipole (SI units)
-        n_medium: refractive index of the medium in which the dipole is embedded
-        lambda_vac: wavelength in vacuum of the radiation
-        x, y, z: (array of) coordinates at which the electromagnetic field is to
-            be evaluated
+    Parameters
+    ----------
+    pz : float
+        Dipole moment of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        wavelength in vacuum of the radiation
+    x, y, z : np.ndarray
+        (Array of) coordinates at which the electromagnetic field is to be evaluated
         
-        Returns:
-            Ex: array of electric field polarized in the x-direction 
-                evaluated at (x, y, z)
-            Ey: As Ex, but y-polarized component
-            Ez: As Ex, but z-polarized component
-            Hx: H field polarized in the x-direction evaluated at (x, y, z)
-            Hy: As Hx, but y-polarized component
-            Hz: As Hx, but z-polarized component
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+    Hx : np.ndarray
+        H field polarized in the x-direction evaluated at (x, y, z)
+    Hy : np.ndarray
+        As Hx, but y-polarized component
+    Hz : np.ndarray
+        As Hx, but z-polarized component
+
+       
+    ..  [1] Antenna Theory, Ch. 4, 3rd Edition, C. A. Balanis
     """
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
@@ -130,10 +164,10 @@ def field_dipole_z(pz, n_medium, lambda_vac, x, y, z):
     # as it does not affect Ez (no cosP or sinP terms)
     cosP[rho == 0] = sinP[rho == 0] = 0
 
-    _eps = _EPS0 * n_medium**2
-    eta = (_MU0 / _eps)**0.5
+    _eps = EPS0 * n_medium**2
+    eta = (MU0 / _eps)**0.5
     k = 2 * np.pi * n_medium / lambda_vac
-    w = _C * (k / n_medium)
+    w = C * (k / n_medium)
 
     I0l = 1j * w * pz
 
@@ -166,24 +200,37 @@ def field_dipole_z(pz, n_medium, lambda_vac, x, y, z):
 
 def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
     """Get the electromagnetic field of an arbitrarily-oriented dipole. 
-    The field includes both near- and farfields. The dipole is located at (0,0,0)
-    Reference: Classical Electrodynamics, Ch. 9, 3rd Edition, J.D. Jackson
+    The field includes both near- and farfields. The dipole is located at (0,0,0) See [1]_. This
+    function was not tested with complex dipole moment components.
         
-        Arguments:
-            p: tuple of (px, py, pz): the dipole moment of the dipole (SI units)
-            n_medium: refractive index of the medium in which the dipole is embedded
-            lambda_vac: wavelength in vacuum of the radiation
-            x, y, z: (array of) coordinates at which the electromagnetic field is to
-                be evaluated
-            
-            Returns:
-                Ex: array of electric field polarized in the x-direction 
-                    evaluated at (x, y, z)
-                Ey: As Ex, but y-polarized component
-                Ez: As Ex, but z-polarized component
-                Hx: H field polarized in the x-direction evaluated at (x, y, z)
-                Hy: As Hx, but y-polarized component
-                Hz: As Hx, but z-polarized component
+    Parameters
+    ----------
+    p : tuple(float, float, float)
+        The dipole moment (px, py, pz) of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation
+    x, y, z : np.ndarray
+        (Array of) coordinates at which the electromagnetic field is to be evaluated
+        
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+    Hx : np.ndarray
+        H field polarized in the x-direction evaluated at (x, y, z)
+    Hy : np.ndarray
+        As Hx, but y-polarized component
+    Hz : np.ndarray
+        As Hx, but z-polarized component
+
+
+    ..  [1] Classical Electrodynamics, Ch. 9, 3rd Edition, J.D. Jackson
     """
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
@@ -210,7 +257,7 @@ def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
 
     ndotp = nx*px + ny*py + nz*pz
 
-    eps_inv = (_EPS0 * n_medium**2)**-1
+    eps_inv = (EPS0 * n_medium**2)**-1
     G0 = np.exp(1j * k * r) / (4 * np.pi * r)
 
     if farfield:
@@ -230,7 +277,7 @@ def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
     Ey *= G0 * eps_inv
     Ez *= G0 * eps_inv
     
-    prefactor_H = G0 * _C * k**2 / n_medium
+    prefactor_H = G0 * C * k**2 / n_medium
 
     Hx *= prefactor_H * nxp_x
     Hy *= prefactor_H * nxp_y
@@ -241,22 +288,32 @@ def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
     return Ex, Ey, Ez, Hx, Hy, Hz
 
 def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
-    """Get the electromagnetic farfield of an arbitrarily-oriented dipole. 
+    """Get the electric farfield of an arbitrarily-oriented dipole. 
     The dipole is located at (0,0,0).
-    Reference: Principles of Nano-optics, 2nd Ed., Appendix D
+    See [1]_
         
-        Arguments:
-            p: tuple of (px, py, pz): the dipole moment of the dipole (SI units)
-            n_medium: refractive index of the medium in which the dipole is embedded
-            lambda_vac: wavelength in vacuum of the radiation
-            x, y, z: Array of locations in the far field where to evaluate the electric
-            field (meters). 
-            
-            Returns:
-                Ex: array of electric field polarized in the x-direction 
-                    evaluated at (x, y, z)
-                Ey: As Ex, but y-polarized component
-                Ez: As Ex, but z-polarized component
+    Parameters
+    ----------
+    p : tuple(float, float, float)
+        The dipole moment (px, py, pz) of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation
+    x, y, z : Union[float, np.ndarray]
+        (Array of locations in the far field where to evaluate the electric field (meters). 
+    
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+
+
+    ..  [1] Principles of Nano-optics, 2nd Ed., Appendix D
     """
     x = np.atleast_1d(x)
     y = np.atleast_1d(y)
@@ -269,7 +326,7 @@ def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
     Sz = z / r
     
     k = 2 * np.pi * n_medium / lambda_vac
-    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * _EPS0 * 
+    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * EPS0 * 
         4 * np.pi * r)
     Ex = (p[0] * (1 - Sx**2) - p[1] * Sx * Sy 
         - p[2] * Sx * Sz) * prefactor
@@ -281,45 +338,55 @@ def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
     return  Ex, Ey, Ez
 
 
-def farfield_dipole_angle(p, n_medium, lambda_vac, cosPhi, sinPhi, cosTheta, r):
+def farfield_dipole_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, r):
     """Get the electromagnetic farfield of an arbitrarily-oriented dipole. 
-    The dipole is located at (0,0,0).
-    Reference: Principles of Nano-optics, 2nd Ed., Appendix D
+    The dipole is located at (0,0,0). See [1]_.
         
-        Arguments:
-            p: tuple of (px, py, pz): the dipole moment of the dipole (SI units)
-            n_medium: refractive index of the medium in which the dipole is embedded
-            lambda_vac: wavelength in vacuum of the radiation (meters)
-            cosPhi: cosine of the angle Phi, which is the angle between the
-            location (x, y, 0) and the x-axis.
-            sinPhi: sine of the angle Phi
-            cosTheta: cosine of the angle Theta, which is the angle of the
-                location (x, y, z) with the z-axis.
-            r: distance from (0, 0, 0) to (x, y, z)
-            
-            Returns:
-                Ex: array of electric field polarized in the x-direction 
-                    evaluated at (x, y, z)
-                Ey: As Ex, but y-polarized component
-                Ez: As Ex, but z-polarized component
+    Parameters
+    ----------
+    p : tuple(float, float, float)
+        Tuple of (px, py, pz), the dipole moment of the dipole (SI units)
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation (meters)
+    cos_phi : Union[float, np.ndarray]
+        Cosine of the angle phi, which is the angle between the location (x, y, 0) and the x-axis.
+    sin_phi : Union[float, np.ndarray]
+        Sine of the angle phi
+    cos_theta : Union[float, np.ndarray]
+        Cosine of the angle Theta, which is the angle of the location (x, y, z) with the z-axis.
+    r: distance from (0, 0, 0) to (x, y, z)
+    
+    Returns
+    -------
+    Ex: np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey: np.ndarray
+        As Ex, but y-polarized component
+    Ez: np.ndarray
+        As Ex, but z-polarized component
+
+
+    ..  [1] Principles of Nano-optics, 2nd Ed., Appendix D
     """
-    cosPhi = np.atleast_1d(cosPhi)
-    sinPhi = np.atleast_1d(sinPhi)
-    cosTheta = np.atleast_1d(cosTheta)
+    cos_phi = np.atleast_1d(cos_phi)
+    sin_phi = np.atleast_1d(sin_phi)
+    cos_theta = np.atleast_1d(cos_theta)
 
-    assert cosPhi.shape == sinPhi.shape == cosTheta.shape
+    assert cos_phi.shape == sin_phi.shape == cos_theta.shape
 
-    sinT = np.zeros(cosTheta.shape)
-    sinT[cosTheta <= 1] = (1 - cosTheta[cosTheta <= 1]**2)**0.5
+    sinT = np.zeros(cos_theta.shape)
+    sinT[cos_theta <= 1] = (1 - cos_theta[cos_theta <= 1]**2)**0.5
     
     k = 2 * np.pi * n_medium / lambda_vac
-    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * _EPS0 * 
+    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * EPS0 * 
         4 * np.pi * r)
-    Ex = (p[0] * (1 - cosPhi**2 * sinT**2) - p[1] * sinPhi * cosPhi * sinT**2 
-        - p[2] * cosPhi * sinT * cosTheta) * prefactor
-    Ey = (-p[0] * sinPhi * cosPhi * sinT**2 + p[1] * (1 - sinPhi**2 * sinT**2)
-        - p[2] * sinPhi * sinT * cosTheta) * prefactor
-    Ez = (-p[0] * cosPhi * sinT * cosTheta - p[1] * sinPhi * sinT * cosTheta
+    Ex = (p[0] * (1 - cos_phi**2 * sinT**2) - p[1] * sin_phi * cos_phi * sinT**2 
+        - p[2] * cos_phi * sinT * cos_theta) * prefactor
+    Ey = (-p[0] * sin_phi * cos_phi * sinT**2 + p[1] * (1 - sin_phi**2 * sinT**2)
+        - p[2] * sin_phi * sinT * cos_theta) * prefactor
+    Ez = (-p[0] * cos_phi * sinT * cos_theta - p[1] * sin_phi * sinT * cos_theta
         + p[2] * sinT**2) * prefactor
 
     return  Ex, Ey, Ez
