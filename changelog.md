@@ -1,5 +1,5 @@
 # Changelog
 
-## v0.4.0 | t.b.d.
+## v0.4.0 | 2023-08-19
 
 * Initial release
