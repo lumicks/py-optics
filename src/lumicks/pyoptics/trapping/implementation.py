@@ -13,8 +13,8 @@ from .radial_data import (
     ExternalRadialData,
     InternalRadialData
 )
-from .associated_legendre import associated_legendre_dtheta
-from .objective import FarfieldData
+from ..mathutils.associated_legendre import associated_legendre_dtheta
+from ..objective import FarfieldData
 from .bead import Bead
 
 

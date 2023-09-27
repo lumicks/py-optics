@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from itertools import product
 from lumicks.pyoptics.psf.direct import direct_psf
-from lumicks.pyoptics.trapping.objective import Objective
+from lumicks.pyoptics.objective import Objective
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -11,7 +11,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
     # We don't use the class Objective in pyoptics.psf, but it is handy here to get the angles
     objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
-    def dummy(x_bfp, **kwargs):
+    def dummy(_, x_bfp, *args):
         """A do-nothing function"""
         return (np.zeros_like(x_bfp), None)
 

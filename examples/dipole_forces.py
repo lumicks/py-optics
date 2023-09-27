@@ -124,11 +124,11 @@ def gaussian_beam(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
 # %%
 # Define the cube where we want to calculate the forces. All distances are in [m]
 numpoints = 81
-dim_xy = 4e-6  # [m]
+half_dim_xy = 2e-6  # [m]
 dim_z = 4e-6  # [m]
 z = np.linspace(-dim_z / 2, dim_z / 2, numpoints) 
-x = np.linspace(-dim_xy / 2, dim_xy / 2, numpoints)
-y = np.linspace(-dim_xy / 2, dim_xy / 2, numpoints)
+x = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
+y = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 
 # %% [markdown]
 # ### Visualization of the Point Spread function (PSF)
@@ -137,7 +137,7 @@ y = np.linspace(-dim_xy / 2, dim_xy / 2, numpoints)
 # %%
 Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
         gaussian_beam, lambda_vac, objective.n_bfp, objective.n_medium, objective.focal_length, objective.NA,
-        xrange=dim_xy, numpoints_x=numpoints, yrange=dim_xy, numpoints_y=numpoints, z=z,
+        x_range=(-half_dim_xy, half_dim_xy), numpoints_x=numpoints, y_range=(-half_dim_xy, half_dim_xy), numpoints_y=numpoints, z=z,
         bfp_sampling_n=bfp_sampling_n, return_grid=True
 )
 
@@ -214,15 +214,15 @@ def dipole_force(alpha, z_pos, dim, numpoints):
 
     # Actual PSF
     Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        gaussian_beam, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
-        numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
+        gaussian_beam, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=(-dim / 2, dim / 2),
+        numpoints_x=numpoints, y_range=(-dim / 2, dim / 2), numpoints_y=numpoints, z=z_pos,
         bfp_sampling_n=bfp_sampling_n, return_grid=True
     )
     # Gradients at sampling points. Edx is [Exdx, Eydx, Ezdx]. Edy is [Exdy, Eydy, Ezdy] etc..
     Edx, Edy, Edz = [
         psf.fast_psf(
-            dEd_, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, xrange=dim,
-            numpoints_x=numpoints, yrange=dim, numpoints_y=numpoints, z=z_pos,
+            dEd_, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=(-dim / 2, dim / 2),
+            numpoints_x=numpoints, y_range=(-dim / 2, dim / 2), numpoints_y=numpoints, z=z_pos,
             bfp_sampling_n=bfp_sampling_n, return_grid=False)
         for dEd_ in (dEdx, dEdy, dEdz)
     ]
@@ -277,7 +277,7 @@ ax[0].plot(z * 1e6, Fz_dipole[(numpoints -1) // 2, (numpoints -1) // 2, :] * 1e1
 ax[0].legend()
 ax[0].set_ylabel('Force [pN]')
 ax[1].plot(z * 1e6, (Fz_mie - Fz_dipole[(numpoints -1) // 2, (numpoints -1) // 2,:]) * 1e12, label='error')
-ax[1].set_ylabel('$F_\mathit{Mie} - F_\mathit{dipole}$ [pN]')
+ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
 ax[1].legend()
 ax[1].set_xlabel('z [μm]')
 plt.show()
@@ -330,7 +330,7 @@ ax[0].legend(loc='upper right')
 ax[0].set_ylabel('Force [pN]')
 ax[1].plot(z * 1e6, (Fx_mie - Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2]) * 1e12, label='error - x')
 ax[1].plot(z * 1e6, (Fy_mie - Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2]) * 1e12, label='error - y')
-ax[1].set_ylabel('$F_\mathit{Mie} - F_\mathit{dipole}$ [pN]')
+ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
 ax[1].legend()
 ax[1].set_xlabel('distance in x / y [μm]')
 plt.show()
@@ -441,7 +441,7 @@ ax[0].legend(loc='upper right')
 ax[0].set_ylabel('Force [pN]')
 ax[1].plot(z * 1e6, (Fx_mie - Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2]) * 1e12, label='error - x')
 ax[1].plot(z * 1e6, (Fy_mie - Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2]) * 1e12, label='error - y')
-ax[1].set_ylabel('$F_\mathit{Mie} - F_\mathit{dipole}$ [pN]')
+ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
 ax[1].legend()
 ax[1].set_xlabel('distance in x / y [μm]')
 plt.show()

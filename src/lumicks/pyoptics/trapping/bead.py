@@ -280,7 +280,7 @@ class Bead:
     def pressure_eff(self, num_orders=None):
         """
         Return the pressure efficiency `Qpr` (for plane wave excitation), defined as :math:`Q_{pr} =
-        Q_{ext} - Q_{sca} <\cos(\\theta)>`, where :math:`<\cos(\\theta)>` is the mean scattering
+        Q_{ext} - Q_{sca} <\\cos(\\theta)>`, where :math:`<\\cos(\\theta)>` is the mean scattering
         angle.
 
         Parameters

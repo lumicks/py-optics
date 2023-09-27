@@ -53,6 +53,7 @@ def focused_gauss_ref(
     Ez : np.ndarray
         The electric field along z, as a function of (x, y, z)
 
+
     ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
             Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
 
@@ -162,7 +163,7 @@ def focused_dipole_ref(
     focal_length : float
         Focal length of the objective, in meters
     NA : float
-        Numerical Aperture = $n_{medium} \sin(\\theta_{max})$ of the objective
+        Numerical Aperture = $n_{medium} \\sin(\\theta_{max})$ of the objective
     focal_length_tube : float x : np.array
         Array of x locations for evaluation
     y : np.array
@@ -185,7 +186,8 @@ def focused_dipole_ref(
         The coordinates in Y (only when `return_grid==True`)
     Z : np.ndarray
         The coordinates in Z (only when `return_grid==True`)
-    
+
+
     ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
             Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
 

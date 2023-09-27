@@ -1,7 +1,7 @@
 import numpy as np
 import mpmath as mp
 import pytest
-from lumicks.pyoptics.trapping.associated_legendre import (
+from lumicks.pyoptics.mathutils.associated_legendre import (
     associated_legendre
 )
 

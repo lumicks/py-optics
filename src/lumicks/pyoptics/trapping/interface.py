@@ -7,7 +7,7 @@ from scipy.constants import (
 import logging
 
 from .bead import Bead
-from .lebedev_laikov import (
+from ..mathutils.lebedev_laikov import (
     get_integration_locations,
     get_nearest_order
 )
@@ -21,7 +21,7 @@ from .local_coordinates import (
     ExternalBeadCoordinates,
     InternalBeadCoordinates,
 )
-from .objective import (
+from ..objective import (
     Objective,
     FarfieldData
 )
@@ -127,7 +127,7 @@ def fields_focus_gaussian(
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
     E0 = (I0 * 2/(EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
 
-    def gaussian_beam(x_bfp, y_bfp, **kwargs):
+    def gaussian_beam(_, x_bfp, y_bfp, *args):
         Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
         return (Ex, None)
 
@@ -652,7 +652,7 @@ def forces_focus(
         n[2] = z[k]
         F += T @ n * w[k]
     # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
-    return F * (bead.bead_diameter * 0.51)**2 * 2 * np.pi
+    return np.squeeze(F) * (bead.bead_diameter * 0.51)**2 * 2 * np.pi
 
 
 def absorbed_power_focus(

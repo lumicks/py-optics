@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import numpy.polynomial as npp
-from lumicks.pyoptics.trapping.associated_legendre import (
+from lumicks.pyoptics.mathutils.associated_legendre import (
     associated_legendre,
 )
 

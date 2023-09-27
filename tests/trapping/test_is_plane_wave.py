@@ -116,7 +116,7 @@ def test_plane_wave_bfp(
     objective = trp.Objective(
         NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
-    def dummy(x_bfp, **kwargs):
+    def dummy(_, x_bfp, *args):
         return (np.zeros_like(x_bfp), None)
 
     coords, fields = objective.sample_back_focal_plane(dummy, bfp_sampling_n)
@@ -136,7 +136,7 @@ def test_plane_wave_bfp(
             if not farfield.aperture[p, m]:
                 continue
 
-            def input_field_Etheta(x_bfp, **kwargs):
+            def input_field_Etheta(_, x_bfp, *args):
                 # Create an input field that is theta-polarized with 1 V/m
                 # after refraction by the lens and propagation to the focal
                 # plane
@@ -160,7 +160,7 @@ def test_plane_wave_bfp(
 
                 return (Ex, Ey)
 
-            def input_field_Ephi(x_bfp, **kwargs):
+            def input_field_Ephi(_, x_bfp, *args):
                 # Create an input field that is phi-polarized with 1 V/m after
                 # refraction by the lens and propagation to the focal plane
                 Ex = np.zeros(x_bfp.shape, dtype='complex128')

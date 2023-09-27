@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-import lumicks.pyoptics.trapping as trp
+import lumicks.pyoptics.mathutils.lebedev_laikov as ll
 
 @pytest.mark.parametrize(
     'order', (
@@ -9,7 +9,7 @@ import lumicks.pyoptics.trapping as trp
     )
 )
 def test_lebedev_laikov(order):
-    x, y, z, w = trp.lebedev_laikov.get_integration_locations(order)
+    x, y, z, w = ll.get_integration_locations(order)
     R = np.hypot(np.hypot(x, y), z)
     np.testing.assert_allclose(R, np.ones(R.shape))
     np.testing.assert_allclose(np.sum(w), 1)
@@ -17,4 +17,4 @@ def test_lebedev_laikov(order):
 @pytest.mark.parametrize('order', (-1, 0,132.2))
 def test_lebedev_laikov_args(order):
     with pytest.raises(ValueError, match=f"A value of {order} is not supported"):
-        trp.lebedev_laikov.get_nearest_order(order)
+        ll.get_nearest_order(order)

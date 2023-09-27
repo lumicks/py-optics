@@ -81,6 +81,7 @@ def focused_gauss(
 
     If return_grid is True, then also return the sampling grid X, Y and Z.
 
+
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
     """
@@ -128,24 +129,25 @@ def direct_psf(
     which the point spread function is to be evaluated are not necessarily equally spaced, which is
     more flexible. Furthermore, the direct evaluation  of the transform, that is performed here,
     could be faster for a small number of points, over the overhead of using FFTs. It's mostly used
-    to benchmark  the fast version of this function, which does use FFTs.
+    to benchmark the fast version of this function, which does use FFTs, and for educational
+    purposes.
 
     Parameters
     ----------
     f_input_field:
-        function with signature f(aperture, x_bfp, y_bfp, r_bfp, r_max), where `x_bfp` is a grid of x
-        locations in the back focal plane, determined by the focal length and NA of the objective.
-        `y_bfp` is the corresponding grid of y locations, and `r_bfp` is the radial distance from the
-        center of the back focal plane. `r_max` is the largest distance that falls inside the NA, but
-        `r_bfp` will contain larger numbers as the back focal plane is sampled with a square grid. The
-        function must return a tuple (E_bfp_x, E_bfp_y), which are the electric fields in the x- and
-        y- direction, respectively, at the sample locations in the back focal plane. In other words,
-        E_bfp_x describes the electric field of the input beam which is polarized along the x-axis.
-        Similarly, E_bfp_y describes the y-polarized part of the input beam. The fields may be
-        complex, so a phase difference between x and y is possible. If only one polarization is used,
-        the other return value must be None, e.g., y polarization would return (None, E_bfp_y). The
-        fields are post-processed such that any part that falls outside of the NA is
-        set to zero.
+        function with signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max)`, where `x_bfp` is a grid
+        of x locations in the back focal plane, determined by the focal length and NA of the
+        objective. `y_bfp` is the corresponding grid of y locations, and `r_bfp` is the radial
+        distance from the center of the back focal plane. `r_max` is the largest distance that falls
+        inside the NA, but `r_bfp` will contain larger numbers as the back focal plane is sampled
+        with a square grid. The function must return a tuple `(E_bfp_x, E_bfp_y)`, which are the
+        electric fields in the x- and y- direction, respectively, at the sample locations in the
+        back focal plane. In other words, `E_bfp_x` describes the electric field of the input beam
+        which is polarized along the x-axis. Similarly, `E_bfp_y` describes the y-polarized part of
+        the input beam. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be `None`, e.g., y
+        polarization would return `(None, E_bfp_y)`. The fields are post-processed such that any
+        part that falls outside of the NA is set to zero.
     lambda_vac: float
         wavelength of the light [m]
     n_bfp: float
@@ -161,14 +163,14 @@ def direct_psf(
     y: np.array
         array of y locations for evaluation [m]
     z: np.array:
-        array of z locations for evaluation. The final locations are determined by the
-        output of numpy.meshgrid(x, y, z) [m]
+        array of z locations for evaluation. The final locations are determined by the output of
+        `numpy.meshgrid(x, y, z)` [m]
     bfp_sampling_n: int
-        number of discrete steps with which the back focal plane is sampled, from
-        the center to the edge. The total number of plane waves scales with the square of
-        bfp_sampling_n (default = 50) [-]
+        number of discrete steps with which the back focal plane is sampled, from the center to the
+        edge. The total number of plane waves scales with the square of `bfp_sampling_n` (default =
+        50) [-]
     return_grid: bool
-        return the sampling grid (default = False)
+        return the sampling grid (default = `False`)
 
     Returns
     -------
@@ -181,18 +183,14 @@ def direct_psf(
 
     If return_grid is True, then also return the sampling grid X, Y and Z.
 
+
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
 
     """
 
-    # Generate the grid on which to evaluate the PSF, i.e., the sampling of the
-    # PSF
-
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
-    X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
+    # Generate the grid on which to evaluate the PSF, i.e., the sampling of the PSF
+    X, Y, Z = np.meshgrid(np.atleast_1d(x), np.atleast_1d(y), np.atleast_1d(z), indexing="ij")
 
     k = 2 * np.pi * n_medium / lambda_vac
     ks = k * NA / n_medium
@@ -210,7 +208,7 @@ def direct_psf(
     _sin_theta_range = np.linspace(0, sin_th_max, num=bfp_sampling_n)
     sin_theta_range[0:bfp_sampling_n] = -_sin_theta_range[::-1]
     sin_theta_range[bfp_sampling_n:] = _sin_theta_range[1:]
-    sin_theta_x, sin_theta_y = np.meshgrid(sin_theta_range, sin_theta_range)
+    sin_theta_x, sin_theta_y = np.meshgrid(sin_theta_range, sin_theta_range, indexing="ij")
     sin_theta = np.hypot(sin_theta_x, sin_theta_y)
 
     # The back focal plane is circular, but our sampling grid is square ->
@@ -243,9 +241,7 @@ def direct_psf(
     cos_2phi = cos_phi**2 - sin_phi**2
     kz = k * cos_theta
 
-    # There is something funky with the definition of phi and Ez_inf in [1],
-    # but the results that we get now are sensible, meaning that curved
-    # wavefronts have the correct sign for x and z
+    Einfx_x, Einfy_x, Einfz_x, Einfx_y, Einfy_y, Einfz_y = [0] * 6
     if Einx is not None:
         Einx = np.complex128(Einx)
         Einx[np.logical_not(aperture)] = 0
@@ -261,18 +257,9 @@ def direct_psf(
         Einfy_y = Einy * 0.5 * ((1 + cos_2phi) + cos_theta * (1 - cos_2phi))
         Einfz_y = Einy * sin_phi * sin_theta
 
-    if Einx is None:
-        Einfx = Einfx_y
-        Einfy = Einfy_y
-        Einfz = Einfz_y
-    elif Einy is None:
-        Einfx = Einfx_x
-        Einfy = Einfy_x
-        Einfz = Einfz_x
-    else:
-        Einfx = Einfx_x + Einfx_y
-        Einfy = Einfy_x + Einfy_y
-        Einfz = Einfz_x + Einfz_y
+    Einfx = Einfx_x + Einfx_y
+    Einfy = Einfy_x + Einfy_y
+    Einfz = Einfz_x + Einfz_y
 
     # Calculate properties of the plane waves
     # As they come from the negative z-direction, a point at infinity with a
@@ -291,23 +278,19 @@ def direct_psf(
     # Now the meat: add plane waves from the angles corresponding to the
     # sampling of the back focal plane. This numerically approximates equation
     # 3.33 of [2]
-
-    for m in range(npupilsamples):
-        for p in range(npupilsamples):
-            # if not aperture[p, m]:  # Skip points outside aperture
-                # continue
-
-            Exp = np.exp(1j * kx[p, m] * X + 1j * ky[p, m] * Y + 1j * kz[p, m] * Z)
-            Ex += Einfx[p, m] * Exp
-            Ey += Einfy[p, m] * Exp
-            Ez += Einfz[p, m] * Exp
+    rows, cols = np.nonzero(aperture)
+    for row, col in zip(rows, cols):
+        Exp = np.exp(1j * kx[row, col] * X + 1j * ky[row, col] * Y + 1j * kz[row, col] * Z)
+        Ex += Einfx[row, col] * Exp
+        Ey += Einfy[row, col] * Exp
+        Ez += Einfz[row, col] * Exp
 
     for E in [Ex, Ey, Ez]:
         E *= -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
 
-    retval = [np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez)]
+    retval = (np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez))
 
     if return_grid:
-        retval += [np.squeeze(X), np.squeeze(Y), np.squeeze(Z)]
+        retval += (np.squeeze(X), np.squeeze(Y), np.squeeze(Z))
 
     return retval

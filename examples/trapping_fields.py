@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.6
+#       jupytext_version: 1.14.7
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -22,9 +22,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 from lumicks.pyoptics import trapping as trp
-font = {'weight' : 'normal',
-        'size'   : 16}
-rc('font', **font)
 
 # %% [markdown]
 # ## Definition of coordinate system
@@ -94,8 +91,8 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(1, filling_factor=0.9, objective
 # %%
 plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 plt.title('|E| [V/m]')
 plt.colorbar()
 plt.show()
@@ -108,8 +105,8 @@ plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6, X * 1e6, Ez.imag, cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('imag(Ez) [V/m]')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 plt.show()
 
 # %% [markdown]
@@ -136,8 +133,8 @@ plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6,Y * 1e6, np.abs(Ex), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| [V/m]')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('Y [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('Y [µm]')
 plt.show()
 
 # %% [markdown]
@@ -146,8 +143,8 @@ plt.show()
 # %%
 plt.figure(figsize=(10, 8))
 plt.pcolor(Z * 1e6,Y * 1e6, Ex.imag, cmap='plasma', shading='auto')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('Y [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('Y [µm]')
 plt.title('imag(Ex) [V/m]')
 plt.colorbar()
 plt.show()
@@ -192,15 +189,15 @@ plt.subplot(1, 2, 1)
 plt.pcolormesh(Z, X, np.sqrt(np.abs(Ez_IR)**2 + np.abs(Ex_IR)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|$E_{IR}$|')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 
 plt.subplot(1, 2, 2)
 plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez_UV)**2 + np.abs(Ex_UV)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|$E_{UV}$|')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 
 plt.show()
 
@@ -247,8 +244,8 @@ plt.figure(figsize=(10, 8))
 plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| [V/m]')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 plt.show()
 
 # %% [markdown]
@@ -264,8 +261,8 @@ plt.figure(figsize=(10,8))
 plt.pcolormesh(Z * 1e6, X * 1e6, np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| [V/m]')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 plt.show()
 plt.show()
 
@@ -305,6 +302,6 @@ plt.figure(figsize=(10, 8))
 plt.pcolormesh(Z * 1e6, X * 1e6, np.log10(np.sqrt(np.abs(Ez)**2 + np.abs(Ex)**2)), cmap='plasma', shading='auto')
 plt.colorbar()
 plt.title('|E| (scattered)')
-plt.xlabel('Z [$\mu$m]')
-plt.ylabel('X [$\mu$m]')
+plt.xlabel('Z [µm]')
+plt.ylabel('X [µm]')
 plt.show()

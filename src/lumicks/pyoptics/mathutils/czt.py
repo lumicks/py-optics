@@ -3,6 +3,7 @@
 from scipy.fft import fft, ifft, next_fast_len
 import numpy as np
 
+
 def init_czt(x, M, w, a):
     """Initialize auxilliary vectors that can be precomputed in order to perform a chirp-z
     transform. Storing these vectors prevents having to recalculate them on every function call,
@@ -27,36 +28,21 @@ def init_czt(x, M, w, a):
     precomputed : tuple
         An opaque tuple containing the auxilliary vectors.
     """
-     # Upconvert to make it a matrix to handle vectors and matrices the same way
-    xshape = x.shape
-    x = np.atleast_2d(x)
+    # Upconvert to make it a matrix to handle vectors and matrices the same way
+    N = x.shape[0]
+    L = next_fast_len(M + N - 1)
 
-    newshape = x.shape
-    N = int(newshape[0])
-    expand_shape = (1, *newshape[1:])
-    tile_shape = [1] * (len(newshape)-1)
+    k = np.arange(max(M, N))
+    ww = w ** (k**2 / 2)
+    an = a ** -k[:N]
+    anww = an * ww[:N]
 
-    L =  next_fast_len(M + N - 1)
-
-    k = np.arange(np.max((M, N))).T
-    ww = w**(k**2 / 2)
-    an = a**-(k[:N])
-    anww = an * ww[0:N]
-    anww = anww.reshape((N, *tile_shape))
-    anww = np.tile(anww, expand_shape)
-
-    v = np.zeros(L, dtype='complex128')
-    v[0: M] = 1 / ww[0: M]
-    v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
-
+    v = np.zeros(L, dtype="complex128")
+    v[:M] = 1 / ww[:M]
+    v[(L - N + 1) : L + 1] = 1 / ww[1:N][::-1]
     V = fft(v, L, axis=0)
-    V = np.reshape(V, (L, *tile_shape))
-    V = np.tile(V, expand_shape)
 
-    ww = ww.reshape((ww.shape[0], *tile_shape))
-    ww = np.tile(ww[0:M], expand_shape)
-
-    return xshape, M, L, anww, V, ww
+    return M, L, anww, V, ww
 
 
 def exec_czt(x, precomputed):
@@ -83,24 +69,17 @@ def exec_czt(x, precomputed):
     ..  [1] Lawrence R. Rabiner, Ronald W. Schafer, and Charles M. Rader, "The chirp z-transform
             algorithm and its application," Bell Syst. Tech. J. 48, 1249-1292 (1969).
     """
-     # Upconvert to make it a matrix to handle vectors and matrices the same way
-    x=np.atleast_2d(x)
-    xshape, M, L, anww, V, ww = precomputed
+    M, L, anww, V, ww = precomputed
 
-    y = anww * x
+    y = (anww * x.T).T
     Y = fft(y, L, axis=0)
 
-    G = Y * V
+    G = (Y.T * V).T
 
     g = ifft(G, L, axis=0)
-    g = g[0:M] * ww
+    g = (g[:M].T * ww[:M]).T
 
-    if len(xshape) == 1:
-        output = g.reshape((M,))
-    else:
-        output = g
-
-    return output
+    return g
 
 
 def czt(x, M, w, a):
@@ -126,45 +105,28 @@ def czt(x, M, w, a):
     X : np.ndarray
         The M-point chirp z transform.
 
-   
+
     ..  [1] Lawrence R. Rabiner, Ronald W. Schafer, and Charles M. Rader, "The chirp z-transform
             algorithm and its application," Bell Syst. Tech. J. 48, 1249-1292 (1969).
     """
 
-    # Upconvert to make it a matrix to handle vectors and matrices the same way
-    xshape=x.shape
-    x=np.atleast_2d(x)
-
-    newshape = x.shape
-    N = int(newshape[0])
-    expand_shape = (1, *newshape[1:])
-    tile_shape = [1] * (len(newshape)-1)
-
+    N = x.shape[0]
     L = next_fast_len(M + N - 1)
 
-    k = np.arange(np.max((M, N))).T
-    ww = w**(k**2 / 2)
-    an = a**-(k[:N])
-    anww = an * ww[0:N]
-    anww = anww.reshape((N, *tile_shape))
-    y = np.tile(anww, expand_shape) * x
+    k = np.arange(max(M, N))
+    ww = w ** (k**2 / 2)
+    an = a ** -k[:N]
+    anww = an * ww[:N]
+    y = (anww * x.T).T
     Y = fft(y, L, axis=0)
 
-    v = np.zeros(L, dtype='complex128')
-    v[0: M] = 1 / ww[0: M]
-    v[(L - N + 1):L+1] = 1 / ww[1:N][::-1]
-
+    v = np.zeros(L, dtype="complex128")
+    v[:M] = 1 / ww[:M]
+    v[(L - N + 1) : L + 1] = 1 / ww[1:N][::-1]
     V = fft(v, L, axis=0)
-    V = np.reshape(V, (L, *tile_shape))
-    G = Y * np.tile(V, expand_shape)
+    G = (Y.T * V).T
 
     g = ifft(G, L, axis=0)
-    ww = ww.reshape((ww.shape[0], *tile_shape))
-    g = g[0:M] * np.tile(ww[0:M], expand_shape)
+    g = (g[:M].T * ww[:M]).T
 
-    if len(xshape) == 1:
-        output = g.reshape((M,))
-    else:
-        output = g
-
-    return output
+    return g

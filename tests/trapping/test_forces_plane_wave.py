@@ -17,7 +17,7 @@ def test_plane_wave_forces_bfp(
     objective = trp.Objective(focal_length=focal_length,
                              n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
-    def dummy(x_bfp, **kwargs):
+    def dummy(_, x_bfp, *args):
         return (np.zeros_like(x_bfp), None)
 
     coords, fields = objective.sample_back_focal_plane(dummy, bfp_sampling_n)
@@ -37,7 +37,7 @@ def test_plane_wave_forces_bfp(
     ks = k * NA / n_medium
     dk = ks / (bfp_sampling_n - 1)
 
-    def input_field_Etheta(aperture, x_bfp, **kwargs):
+    def input_field_Etheta(aperture, x_bfp, *args):
         # Create an input field that is theta-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
         Ex = np.zeros_like(x_bfp, dtype='complex128')
@@ -64,7 +64,7 @@ def test_plane_wave_forces_bfp(
 
         return (Ex, Ey)
 
-    def input_field_Ephi(aperture, x_bfp, **kwargs):
+    def input_field_Ephi(aperture, x_bfp, *args):
         # Create an input field that is phi-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
         Ex = np.zeros_like(x_bfp, dtype='complex128')

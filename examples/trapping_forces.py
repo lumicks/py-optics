@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.6
+#       jupytext_version: 1.14.7
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -26,10 +26,7 @@ from matplotlib import rc
 import lumicks.pyoptics.trapping as trp
 from scipy.interpolate import interp1d
 from scipy.constants import epsilon_0, speed_of_light as C
-
-font = {'weight' : 'normal',
-        'size'   : 16}
-rc('font', **font)
+from tqdm.auto import tqdm
 
 # %% [markdown]
 # ## Definition of coordinate system
@@ -102,27 +99,9 @@ P = Pmax * power_percentage / 100.                  # [W]
 I0 = 2 * P / (np.pi * w0**2)                        # [W/m^2]
 E0 = (I0 * 2/(epsilon_0 * C * n_bfp))**0.5       # [V/m]
 
-def gaussian_beam(x_bfp, y_bfp, **kwargs): 
+def gaussian_beam(_, x_bfp, y_bfp, *args): 
     Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
     return (Ex, None)
-
-
-# %% [markdown]
-# Add a little progress bar.
-# Code from <https://www.mikulskibartosz.name/how-to-display-a-progress-bar-in-jupyter-notebook/>
-
-# %%
-def update_progress(progress):
-    bar_length = 20
-    progress = float(progress)
-    if progress < 0:
-        progress = 0
-    if progress >= 1:
-        progress = 1
-    block = int(round(bar_length * progress))
-    clear_output(wait = True)
-    text = "Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
-    print(text)
 
 
 # %% [markdown]
@@ -135,19 +114,17 @@ z = np.linspace(0, 1e-6, 20)
 Fz = np.empty(z.shape)
 
 # %%
-for idx, zz in enumerate(z):
+for idx, zz in enumerate(tqdm(z)):
     F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, bead_center=(0, 0, zz), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz[idx] = F[2]
-    update_progress(idx / z.size)
-update_progress(1.)
 
 # %%
 plt.figure(figsize=(8, 6))
 plt.plot(z * 1e9, Fz * 1e12)
 plt.xlabel('$z$ [nm]')
 plt.ylabel('$F$ [pN]')
-plt.title(f'{bead_diameter * 1e6} $\mu$m bead, $F_z$ at $x_b = y_b = 0$')
+plt.title(f'{bead_diameter * 1e6} µm bead, $F_z$ at $x_b = y_b = 0$')
 plt.show()
 
 # %%
@@ -162,22 +139,18 @@ print(f'Force in z zero near z = {(z_eval*1e9):.1f} nm')
 # %%
 x = np.linspace(-500e-9, -1e-9, 21)
 Fx = np.empty(x.shape)
-for idx, xx in enumerate(x):
+for idx, xx in enumerate(tqdm(x)):
     F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(xx, 0, z_eval), num_orders=None, integration_orders=None)
     Fx[idx] = F[0]
-    update_progress(idx / x.size)
-update_progress(1.)
 
 # %%
 y = np.linspace(-500e-9, -1e-9, 21)
 Fy = np.empty(y.shape)
-for idx, yy in enumerate(y):
+for idx, yy in enumerate(tqdm(y)):
     F = trp.forces_focus(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, yy, z_eval), num_orders=None, integration_orders=None)
     Fy[idx] = F[1]
-    update_progress(idx / y.size)
-update_progress(1.)
 
 # %%
 plt.figure(figsize=(8, 6))
@@ -186,7 +159,7 @@ plt.plot(y * 1e9,Fy * 1e12, label='y')
 plt.xlabel('displacement [nm]')
 plt.ylabel('F [pN]')
 plt.legend()
-plt.title(f'{bead_diameter * 1e6} $\mu$m bead, $F_x$ at $(x, 0, {z_eval * 1e9:.1f})$ nm, $F_y$ at $(0, y, {z_eval * 1e9:.1f})$ nm')
+plt.title(f'{bead_diameter * 1e6} µm bead, $F_x$ at $(x, 0, {z_eval * 1e9:.1f})$ nm, $F_y$ at $(0, y, {z_eval * 1e9:.1f})$ nm')
 plt.show()
 
 # %% [markdown]
@@ -199,7 +172,7 @@ plt.show()
 # %%
 Fz1 = np.empty(z.size)
 Fz2 = np.empty(z.size)
-for idx, k in enumerate(z):
+for idx, k in enumerate(tqdm(z)):
     F = trp.forces_focus(gaussian_beam, objective, bead=bead, bfp_sampling_n=bfp_sampling_n, 
                                   bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
@@ -208,11 +181,9 @@ for idx, k in enumerate(z):
                                   bead_center=(0, 0, k), 
                                   num_orders=None, integration_orders=None, verbose=False)
     Fz2[idx] = F[2]
-    update_progress(idx / z.size)
-update_progress(1.)
 
 # %%
-plt.figure(figsize=(16, 6))
+plt.figure(figsize=(12, 4))
 plt.subplot(1, 2, 1)
 plt.plot(z * 1e9, Fz1 * 1e12, label=f'bfp_sampling = {bfp_sampling_n}')
 plt.plot(z * 1e9, Fz2 * 1e12, label=f'bfp_sampling = {bfp_sampling_n * 2}')
@@ -240,7 +211,7 @@ plt.semilogy(range(1, an.size + 1), np.abs(an), label='$a_n$')
 plt.semilogy(range(1, bn.size + 1), np.abs(bn), label='$b_n$')
 plt.xlabel('Order')
 plt.ylabel('|$a_n$|, $|b_n|$ [-]')
-plt.title(f'Magnitude of scattering coefficients for {bead.bead_diameter * 1e6:.2f} $\mu$m bead')
+plt.title(f'Magnitude of scattering coefficients for {bead.bead_diameter * 1e6:.2f} µm bead')
 plt.legend()
 plt.grid()
 plt.show()

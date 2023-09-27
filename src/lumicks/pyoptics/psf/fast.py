@@ -1,5 +1,6 @@
 import numpy as np
-from ..czt import czt
+from typing import Union
+from ..mathutils import czt
 
 """
 Functions to calculate point spread functions of focused wavefronts by use of chirped z-transforms.
@@ -13,11 +14,11 @@ def fast_gauss(
     focal_length: float,
     filling_factor: float,
     NA: float,
-    xrange: float,
+    x_range: Union[float, tuple[float, float]],
     numpoints_x: int,
-    yrange: float,
+    y_range: Union[float, tuple[float, float]],
     numpoints_y: int,
-    z: np.array,
+    z: Union[float, np.ndarray],
     bfp_sampling_n=125,
     return_grid=False,
 ):
@@ -44,13 +45,14 @@ def fast_gauss(
         Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
         waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
     NA : float
-        Numerical Aperture n_medium * sin(theta_max) of the objective.
-    xrange : float
-        Size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
-        at x locations [-xrange/2..xrange/2]
+        Numerical Aperture: n_medium * sin(theta_max) of the objective.
+    x_range : Union[float, tuple(float, float)]
+        Size of the PSF along x, in meters. If the range is a single float, it is centered around
+        zero. The algorithm will calculate at x locations [-x_range/2..x_range/2]. Otherwise, it will
+        calculate at locations from [x_range[0]..x_range[1]]
     numpoints_x : int
         Number of points to calculate along the x dimension. Must be > 0
-    yrange : float
+    y_range : Union[float, tuple(float, float)]
         Same as x, but along y.
     numpoints_y: int
         Same as x, but for y.
@@ -78,10 +80,11 @@ def fast_gauss(
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
 
-    .. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
-        Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
-    .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser,
-       "Fast focus field calculations," Opt. Express 14, 11277-11291 (2006)
+
+    .. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.). Cambridge:
+        Cambridge University Press. doi:10.1017/CBO9780511794193
+    .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser, "Fast focus
+       field calculations," Opt. Express 14, 11277-11291 (2006)
     """
     w0 = filling_factor * focal_length * NA / n_medium  # See [1]
 
@@ -96,9 +99,9 @@ def fast_gauss(
         n_medium,
         focal_length,
         NA,
-        xrange,
+        x_range,
         numpoints_x,
-        yrange,
+        y_range,
         numpoints_y,
         z,
         bfp_sampling_n,
@@ -113,9 +116,9 @@ def fast_psf(
     n_medium: float,
     focal_length: float,
     NA: float,
-    xrange: float,
+    x_range: Union[float, tuple[float, float]],
     numpoints_x: int,
-    yrange: float,
+    y_range: Union[float, tuple[float, float]],
     numpoints_y: int,
     z: np.array,
     bfp_sampling_n=125,
@@ -156,14 +159,15 @@ def fast_psf(
     focal_length : float
         Focal length of the objective [m]
     NA : float
-        Numerical Aperture = :math:`n_{medium} \sin(\\theta_{max})`, where :math:`\\theta_{max}` is
+        Numerical Aperture = :math:`n_{medium} \\sin(\\theta_{max})`, where :math:`\\theta_{max}` is
         the maximum acceptance angle of the objective [-]
-    xrange : float
-        Size of the PSF along x, in meters, and centered around zero. The algorithm will calculate
-        at x locations [-xrange/2..xrange/2] [m]
+    x_range : Union[float, tuple(float, float)]
+        Size of the calculation range along x, in meters. If the range is a single float, it is centered around
+        zero. The algorithm will calculate at x locations [-x_range/2..x_range/2]. Otherwise, it will
+        calculate at locations from [x_range[0]..x_range[1]]
     numpoints_x : int
-        Number of points to calculate along the x dimension. Must be > 0
-    yrange : float
+        Number of points to calculate along the x dimension. Must be >= 1
+    y_range : Union[float, tuple(float, float)]
         Same as x, but along y [m]
     numpoints_y : int
         Same as x, but for y
@@ -191,14 +195,42 @@ def fast_psf(
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
 
+
     .. [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.). Cambridge:
         Cambridge University Press. doi:10.1017/CBO9780511794193
     .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser, "Fast focus
         field calculations," Opt. Express 14, 11277-11291 (2006)
     """
+    if numpoints_x < 1:
+        raise ValueError("numpoints_x needs to be >= 1")
+    if numpoints_y < 1:
+        raise ValueError("numpoints_y needs to be >= 1")
     z = np.atleast_1d(z)
-    xrange *= 0.5
-    yrange *= 0.5
+    x_range = np.asarray(x_range, dtype="float")
+    y_range = np.asarray(y_range, dtype="float")
+    if x_range.size == 1:
+        if numpoints_x > 1:
+            raise ValueError("x_range needs to be a tuple (xmin, xmax) for numpoints_x > 1")
+        x_center = x_range
+        x_range = 0.0
+    elif x_range.size == 2:
+        x_center = np.mean(x_range)
+        x_range = np.abs(np.diff(x_range))
+    else:
+        raise ValueError(f"Unexpected size of {x_range.size} elements for x_range")
+    if y_range.size == 1:
+        if numpoints_y > 1:
+            raise ValueError("y_range needs to be a tuple (ymin, ymax) for numpoints_x > 1")
+        y_center = y_range
+        y_range = 0.0
+    elif y_range.size == 2:
+        y_center = np.mean(y_range)
+        y_range = np.abs(np.diff(y_range))
+    else:
+        raise ValueError(f"Unexpected size of {y_range.size} elements for y_range")
+
+    x_range *= 0.5
+    y_range *= 0.5
 
     k = 2 * np.pi * n_medium / lambda_vac
     ks = k * NA / n_medium
@@ -218,12 +250,12 @@ def fast_psf(
     sin_theta_x, sin_theta_y = np.meshgrid(sin_theta_range, sin_theta_range, indexing="ij")
 
     sin_theta = np.hypot(sin_theta_x, sin_theta_y)
-    r_max = focal_length * sin_th_max
     aperture = sin_theta <= sin_th_max
 
-    x_bfp = sin_theta_x * focal_length
-    y_bfp = sin_theta_y * focal_length
-    r_bfp = sin_theta * focal_length
+    r_max, x_bfp, y_bfp, r_bfp = [
+        sine * focal_length for sine in (sin_th_max, sin_theta_x, sin_theta_y, sin_theta)
+    ]
+
     Einx, Einy = f_input_field(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)
     if Einx is None and Einy is None:
         raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
@@ -246,16 +278,13 @@ def fast_psf(
     cos_2phi = cos_phi**2 - sin_phi**2
     kz = k * cos_theta
 
+    Einfx_x, Einfy_x, Einfz_x, Einfx_y, Einfy_y, Einfz_y = [0] * 6
     if Einx is not None:
         Einx = np.complex128(Einx)
         Einx[np.logical_not(aperture)] = 0
         Einx *= np.sqrt(n_bfp / n_medium) * np.sqrt(cos_theta) / kz
         Einfx_x = Einx * 0.5 * ((1 - cos_2phi) + (1 + cos_2phi) * cos_theta)
         Einfy_x = Einx * 0.5 * sin_2phi * (cos_theta - 1)
-        #  TODO: Auxilliary -1 that needs explanation
-        # Current suspicion: definition of theta, phi in [1]
-        # Funky things going on with phi for far field
-        # Might depend on interpretation of theta - angle with +z or -z axis?
         Einfz_x = cos_phi * sin_theta * Einx
     if Einy is not None:
         Einy = np.complex128(Einy)
@@ -265,18 +294,9 @@ def fast_psf(
         Einfy_y = Einy * 0.5 * ((1 + cos_2phi) + cos_theta * (1 - cos_2phi))
         Einfz_y = Einy * sin_phi * sin_theta
 
-    if Einx is None:
-        Einfx = Einfx_y
-        Einfy = Einfy_y
-        Einfz = Einfz_y
-    elif Einy is None:
-        Einfx = Einfx_x
-        Einfy = Einfy_x
-        Einfz = Einfz_x
-    else:
-        Einfx = Einfx_x + Einfx_y
-        Einfy = Einfy_x + Einfy_y
-        Einfz = Einfz_x + Einfz_y
+    Einfx = Einfx_x + Einfx_y
+    Einfy = Einfy_x + Einfy_y
+    Einfz = Einfz_x + Einfz_y
 
     # Make kz 3D - np.atleast_3d() prepends a dimension, and that is not what we need
     kz = np.reshape(kz, (npupilsamples, npupilsamples, 1))
@@ -284,28 +304,16 @@ def fast_psf(
     Z = np.tile(z, ((2 * bfp_sampling_n - 1), (2 * bfp_sampling_n - 1), 1))
     Exp = np.exp(1j * kz * Z)
 
-    Einfx = Einfx.reshape((npupilsamples, npupilsamples, 1))
-    Einfx = np.tile(Einfx, (1, 1, z.shape[0])) * Exp
-
-    Einfy = Einfy.reshape((npupilsamples, npupilsamples, 1))
-    Einfy = np.tile(Einfy, (1, 1, z.shape[0])) * Exp
-
-    Einfz = Einfz.reshape((npupilsamples, npupilsamples, 1))
-    Einfz = np.tile(Einfz, (1, 1, z.shape[0])) * Exp
+    Einfx, Einfy, Einfz = [
+        np.tile(np.reshape(E, (npupilsamples, npupilsamples, 1)), (1, 1, z.shape[0])) * Exp
+        for E in (Einfx, Einfy, Einfz)
+    ]
 
     # Set up the factors for the chirp z transform
-    # TODO: allow arbitrary slices along the XZ and YZ plane, instead of at zero
-    if numpoints_x > 1:
-        ax = np.exp(-1j * dk * xrange)
-        wx = np.exp(-2j * dk * xrange / (numpoints_x - 1))
-    else:
-        ax = wx = 1.0
-
-    if numpoints_y > 1:
-        ay = np.exp(-1j * dk * yrange)
-        wy = np.exp(-2j * dk * yrange / (numpoints_y - 1))
-    else:
-        ay = wy = 1.0
+    ax = np.exp(-1j * dk * (x_range - x_center))
+    wx = np.exp(-2j * dk * x_range / (numpoints_x - 1)) if numpoints_x > 1 else 1.0
+    ay = np.exp(-1j * dk * (y_range - y_center))
+    wy = np.exp(-2j * dk * y_range / (numpoints_y - 1)) if numpoints_y > 1 else 1.0
 
     # The chirp z transform assumes data starting at x[0], but our aperture is
     # symmetric around point (0,0). Therefore, fix the phases after the
@@ -335,16 +343,17 @@ def fast_psf(
     Ez = np.transpose(czt.exec_czt(Einfz, precalc_step1) * phase_fix_step1, (1, 0, 2))
     Ez = np.transpose(czt.exec_czt(Ez, precalc_step2) * phase_fix_step2, (1, 0, 2))
 
-    Ex *= -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
-    Ey *= -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
-    Ez *= -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
+    Ex, Ey, Ez = [
+        E * -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
+        for E in (Ex, Ey, Ez)
+    ]
 
-    retval = [np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez)]
+    retval = (np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez))
 
     if return_grid:
-        xrange_v = np.linspace(-xrange, xrange, numpoints_x)
-        yrange_v = np.linspace(-yrange, yrange, numpoints_y)
+        xrange_v = np.linspace(-x_range + x_center, x_range + x_center, numpoints_x)
+        yrange_v = np.linspace(-y_range + y_center, y_range + y_center, numpoints_y)
         X, Y, Z = np.meshgrid(xrange_v, yrange_v, np.squeeze(z), indexing="ij")
-        retval += [np.squeeze(X), np.squeeze(Y), np.squeeze(Z)]
+        retval += (np.squeeze(X), np.squeeze(Y), np.squeeze(Z))
 
     return retval

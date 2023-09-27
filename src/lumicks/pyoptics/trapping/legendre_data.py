@@ -1,9 +1,9 @@
 import numpy as np
 from numba import njit, prange
 from dataclasses import fields
-from .associated_legendre import associated_legendre_over_sin_theta
+from ..mathutils.associated_legendre import associated_legendre_over_sin_theta
 from .local_coordinates import Coordinates
-from .farfield_data import FarfieldData
+from ..farfield_data import FarfieldData
 from .data_lookup import DataLookup
 
 

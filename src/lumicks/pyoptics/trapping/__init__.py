@@ -7,4 +7,4 @@ from .interface import (
    scattered_power_focus,
    absorbed_power_focus,
 )
-from .objective import Objective
+from ..objective import Objective
