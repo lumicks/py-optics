@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from lumicks.pyoptics.psf.reference import focused_gauss_ref
 from lumicks.pyoptics.psf import fast_gauss
+from lumicks.pyoptics.objective import Objective
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
@@ -49,6 +50,26 @@ def test_gaussian(focal_length, n_medium, NA, x_shift, y_shift, z_shift):
         z=z_points,
         bfp_sampling_n=bfp_sampling_n,
         return_grid=False,
+    )
+
+    w0 = filling_factor * focal_length * NA / n_medium
+
+    def field_func(_, x_bfp, y_bfp, *args):
+        Ein = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2)
+        return (Ein, None)
+
+    objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
+    Ex, Ey, Ez = objective.focus(
+        field_func,
+        lambda_vac=lambda_vac,
+        x_range=x_dim,
+        numpoints_x=num_pts,
+        y_range=y_dim,
+        numpoints_y=num_pts,
+        z=z_points,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=False,
+        bias_correction=True,
     )
     # Allow 1 V/m absolute error and 5% relative error
     np.testing.assert_allclose([Ex_ref, Ey_ref, Ez_ref], [Ex, Ey, Ez], rtol=0.05, atol=1)

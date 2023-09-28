@@ -201,33 +201,33 @@ def fast_psf(
     .. [2] Marcel Leutenegger, Ramachandra Rao, Rainer A. Leitgeb, and Theo Lasser, "Fast focus
         field calculations," Opt. Express 14, 11277-11291 (2006)
     """
-    if numpoints_x < 1:
-        raise ValueError("numpoints_x needs to be >= 1")
-    if numpoints_y < 1:
-        raise ValueError("numpoints_y needs to be >= 1")
-    z = np.atleast_1d(z)
+
+    def _check_axis(numpts, axrange, axis):
+        names = {"x": ("numpoints_x", "x_range"), "y": ("numpoints_y", "y_range")}
+        if numpts < 1:
+            raise ValueError(f"{names[axis][0]} needs to be >= 1")
+        if axrange.size > 2:
+            raise RuntimeError(f"{names[axis][1]} needs to be a float or a (min, max) tuple")
+        if axrange.size == 1 and numpts > 1:
+            raise ValueError(
+                f"{names[axis][1]} needs to be a tuple (xmin, xmax) for {names[axis][0]} > 1"
+            )
+        if axrange.size == 2 and numpts == 1:
+            raise ValueError(
+                f"{names[axis][1]} needs to be a location (float) for {names[axis][0]} == 1"
+            )
+
     x_range = np.asarray(x_range, dtype="float")
     y_range = np.asarray(y_range, dtype="float")
-    if x_range.size == 1:
-        if numpoints_x > 1:
-            raise ValueError("x_range needs to be a tuple (xmin, xmax) for numpoints_x > 1")
-        x_center = x_range
-        x_range = 0.0
-    elif x_range.size == 2:
-        x_center = np.mean(x_range)
-        x_range = np.abs(np.diff(x_range))
-    else:
-        raise ValueError(f"Unexpected size of {x_range.size} elements for x_range")
-    if y_range.size == 1:
-        if numpoints_y > 1:
-            raise ValueError("y_range needs to be a tuple (ymin, ymax) for numpoints_x > 1")
-        y_center = y_range
-        y_range = 0.0
-    elif y_range.size == 2:
-        y_center = np.mean(y_range)
-        y_range = np.abs(np.diff(y_range))
-    else:
-        raise ValueError(f"Unexpected size of {y_range.size} elements for y_range")
+
+    _check_axis(numpoints_x, x_range, "x")
+    _check_axis(numpoints_y, y_range, "y")
+
+    x_center = np.mean(x_range)
+    x_range = 0.0 if x_range.size == 1 else np.abs(np.diff(x_range))
+    y_center = np.mean(y_range)
+    y_range = 0.0 if y_range.size == 1 else np.abs(np.diff(y_range))
+    z = np.atleast_1d(z)
 
     x_range *= 0.5
     y_range *= 0.5

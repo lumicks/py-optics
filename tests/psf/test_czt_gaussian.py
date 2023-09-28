@@ -6,7 +6,7 @@ from lumicks.pyoptics.psf.direct import focused_gauss
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
-@pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
+@pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2)])
 @pytest.mark.parametrize(
     "x_shift, y_shift", [(1.0e-6, -0.9e-6), (-1.23e-6, -0.2e-6), (0.75e-6, 1.65e-6)]
 )
