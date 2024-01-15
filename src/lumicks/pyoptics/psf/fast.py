@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Union, Tuple
 from ..mathutils import czt
 
 """
@@ -116,9 +116,9 @@ def fast_psf(
     n_medium: float,
     focal_length: float,
     NA: float,
-    x_range: Union[float, tuple[float, float]],
+    x_range: Union[float, Tuple[float, float]],
     numpoints_x: int,
-    y_range: Union[float, tuple[float, float]],
+    y_range: Union[float, Tuple[float, float]],
     numpoints_y: int,
     z: np.array,
     bfp_sampling_n=125,
