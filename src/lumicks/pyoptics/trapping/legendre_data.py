@@ -32,7 +32,6 @@ def _loop_over_rotations(
 
     index = radii == 0
     for r, c in zip(rows, cols):
-
         # Rotate the coordinate system such that the x-polarization on the
         # bead coincides with theta polarization in global space
         # however, cos(theta) is the same for phi polarization!
@@ -76,7 +75,9 @@ def _alp_sin_theta_with_parity(
     # Parity for order L: parity[0] == 1, for L == 1
     parity = (-1) ** np.arange(n_orders)
     for L in prange(1, n_orders + 1):
-        alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, unique_abs_cos_theta)[sign_inv]
+        alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, unique_abs_cos_theta)[
+            sign_inv
+        ]
 
         if parity[L - 1] == -1 and max_negative_index is not None:
             alp_sin_theta[L - 1, : max_negative_index + 1] *= -1
@@ -101,11 +102,7 @@ def calculate_legendre(
         for field in fields(farfield_data)
         if field.name in ("aperture", "cos_theta", "sin_theta", "cos_phi", "sin_phi")
     }
-    local_cos_theta = _loop_over_rotations(
-        coordinates.xyz_stacked,
-        coordinates.r,
-        **farfield_args
-    )
+    local_cos_theta = _loop_over_rotations(coordinates.xyz_stacked, coordinates.r, **farfield_args)
 
     shape = local_cos_theta.shape
     local_cos_theta = np.reshape(local_cos_theta, local_cos_theta.size)

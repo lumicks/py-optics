@@ -77,17 +77,17 @@ def associated_legendre_over_sin_theta(n, cos_theta):
         Degree to calculate
     cos_theta : np.ndarray
         Cosine of the angles to calculate at.
-        
+
     Returns
     -------
     np.ndarray
         Calculated values
-    
+
     Notes
     -----
     The function calculates the following:
-    
-    .. math:: 
+
+    .. math::
         P_n^1(\\cos(\\theta))/\\sin(\\theta)
 
     Uses a Clenshaw recursive algorithm for the evaluation, specific for the 1st order associated
@@ -95,7 +95,7 @@ def associated_legendre_over_sin_theta(n, cos_theta):
     polynomial, for high degrees of n
 
 
-    ..  [1] Clenshaw, C. W. (July 1955). "A note on the summation of Chebyshev series". Mathematical 
+    ..  [1] Clenshaw, C. W. (July 1955). "A note on the summation of Chebyshev series". Mathematical
             Tables and Other Aids to Computation. 9 (51): 118
     """
     if n == 1:

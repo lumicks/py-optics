@@ -448,7 +448,6 @@ def reflected_focused_gaussian(
 
     f0 = filling_factor
     f = objective_focal_length
-    f_ = tube_lens_focal_length
 
     for z_idx, zz in enumerate(z):
         for idx, rr in enumerate(r):

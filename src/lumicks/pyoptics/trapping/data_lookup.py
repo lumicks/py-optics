@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit
 
+
 @njit(cache=True)
 def _exec_lookup(source, lookup, r, c):
     """
@@ -12,6 +13,7 @@ def _exec_lookup(source, lookup, r, c):
 
 class DataLookup:
     """A small class that keeps data and its inverse lookup table together"""
+
     __slots__ = (
         "_data",
         "_inverse",

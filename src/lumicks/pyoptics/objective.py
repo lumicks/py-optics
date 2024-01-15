@@ -1,7 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, astuple
 from collections import namedtuple
-from typing import Union
 from .farfield_data import FarfieldData
 
 
@@ -74,7 +73,7 @@ class Objective:
         Sine of the maximum acceptance angle of the objective
         """
         return self.NA / self.n_medium
-    
+
     def sine_theta_range(self, bfp_sampling_n):
         sin_theta = np.zeros(bfp_sampling_n * 2 - 1)
         _sin_theta = np.linspace(0, self.sin_theta_max, num=bfp_sampling_n)
@@ -133,9 +132,7 @@ class Objective:
         k = 2 * np.pi * self.n_medium / lambda_vac
 
         cos_theta = np.ones(sin_theta.shape)
-        cos_theta[aperture] = (
-            (1 + sin_theta[aperture]) * (1 - sin_theta[aperture])
-        ) ** 0.5
+        cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
 
         cos_phi = np.ones_like(sin_theta)
         sin_phi = np.zeros_like(sin_theta)
@@ -186,4 +183,3 @@ class Objective:
             Einf_phi=Einf_phi,
             aperture=bfp_coords.aperture,
         )
-

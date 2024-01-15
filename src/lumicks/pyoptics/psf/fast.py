@@ -320,12 +320,14 @@ def fast_psf(
     # transform such that the real and imaginary parts of the fields are what
     # they need to be
     phase_fix_x = np.reshape(
-        (ax * wx ** -(np.arange(numpoints_x))) ** (bfp_sampling_n - 1), (numpoints_x, 1, 1)
+        (ax * wx ** -(np.arange(numpoints_x))) ** (bfp_sampling_n - 1),
+        (numpoints_x, 1, 1),
     )
     phase_fix_step1 = np.tile(phase_fix_x, (1, npupilsamples, Z.shape[2]))
 
     phase_fix_y = np.reshape(
-        (ay * wy ** -(np.arange(numpoints_y))) ** (bfp_sampling_n - 1), (numpoints_y, 1, 1)
+        (ay * wy ** -(np.arange(numpoints_y))) ** (bfp_sampling_n - 1),
+        (numpoints_y, 1, 1),
     )
 
     phase_fix_step2 = np.tile(phase_fix_y, (1, numpoints_x, Z.shape[2]))

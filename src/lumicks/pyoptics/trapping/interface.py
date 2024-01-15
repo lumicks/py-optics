@@ -1,43 +1,36 @@
 import numpy as np
-from scipy.constants import (
-    speed_of_light as _C,
-    epsilon_0 as EPS0,
-    mu_0 as MU0
-)
+from scipy.constants import speed_of_light as _C, epsilon_0 as EPS0, mu_0 as MU0
 import logging
 
 from .bead import Bead
-from ..mathutils.lebedev_laikov import (
-    get_integration_locations,
-    get_nearest_order
-)
+from ..mathutils.lebedev_laikov import get_integration_locations, get_nearest_order
 from .legendre_data import calculate_legendre
-from .radial_data import (
-    calculate_external,
-    calculate_internal
-)
+from .radial_data import calculate_external, calculate_internal
 from .local_coordinates import (
     LocalBeadCoordinates,
     ExternalBeadCoordinates,
     InternalBeadCoordinates,
 )
-from ..objective import (
-    Objective,
-    FarfieldData
-)
+from ..objective import Objective, FarfieldData
 from .implementation import calculate_fields
 
 
 def fields_focus_gaussian(
-    beam_power: float, filling_factor,
+    beam_power: float,
+    filling_factor,
     objective: Objective,
-    bead: Bead, bead_center=(0, 0, 0),
-    x=0, y=0, z=0,
-    bfp_sampling_n=31, num_orders=None,
+    bead: Bead,
+    bead_center=(0, 0, 0),
+    x=0,
+    y=0,
+    z=0,
+    bfp_sampling_n=31,
+    num_orders=None,
     return_grid=False,
-    total_field=True, magnetic_field=False,
+    total_field=True,
+    magnetic_field=False,
     verbose=False,
-    grid=True
+    grid=True,
 ):
     """
     Calculate the three-dimensional electromagnetic field of a bead the focus of a of a Gaussian
@@ -55,15 +48,15 @@ def fields_focus_gaussian(
         Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
         waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
     objective : Objective
-        Instance of the Objective class. 
+        Instance of the Objective class.
     bead: Bead
-        Instance of the Bead class 
+        Instance of the Bead class
     x : np.ndarray
         array of x locations for evaluation, in meters
     y : np.ndarray
         array of y locations for evaluation, in meters
     z : np.ndarray
-        array of z locations for evaluation, in meters 
+        array of z locations for evaluation, in meters
     bead_center : tuple
         A tuple of three floating point numbers determining the x, y and z position of the bead
         center in 3D space, in meters
@@ -114,42 +107,54 @@ def fields_focus_gaussian(
         y coordinates of the sampling grid
     Z : np.ndarray
         z coordinates of the sampling grid These values are only returned if return_grid is True
-        
+
     ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
             Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
     ..  [2] Craig F. Bohren & Donald R. Huffman (1983). Absorption and Scattering of
             Light by Small Particles. WILEY‐VCH Verlag GmbH & Co. KGaA.
             doi:10.1002/9783527618156
     """
-    w0 = (
-        filling_factor * objective.focal_length * objective.NA / bead.n_medium
-    )  # [m]
+    w0 = filling_factor * objective.focal_length * objective.NA / bead.n_medium  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
-    E0 = (I0 * 2/(EPS0 * _C * objective.n_bfp))**0.5  # [V/m]
+    E0 = (I0 * 2 / (EPS0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
     def gaussian_beam(_, x_bfp, y_bfp, *args):
         Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
         return (Ex, None)
 
     return fields_focus(
-        gaussian_beam, objective, bead,
-        x=x, y=y, z=z,
-        bead_center=bead_center, bfp_sampling_n=bfp_sampling_n,
-        num_orders=num_orders, return_grid=return_grid,
-        total_field=total_field, magnetic_field=magnetic_field,
-        verbose=verbose, grid=grid
+        gaussian_beam,
+        objective,
+        bead,
+        x=x,
+        y=y,
+        z=z,
+        bead_center=bead_center,
+        bfp_sampling_n=bfp_sampling_n,
+        num_orders=num_orders,
+        return_grid=return_grid,
+        total_field=total_field,
+        magnetic_field=magnetic_field,
+        verbose=verbose,
+        grid=grid,
     )
 
 
 def fields_focus(
-    f_input_field, objective: Objective,
-    bead: Bead, bead_center=(0, 0, 0),
-    x=0, y=0, z=0,
-    bfp_sampling_n=31, num_orders=None,
+    f_input_field,
+    objective: Objective,
+    bead: Bead,
+    bead_center=(0, 0, 0),
+    x=0,
+    y=0,
+    z=0,
+    bfp_sampling_n=31,
+    num_orders=None,
     return_grid=False,
-    total_field=True, magnetic_field=False,
+    total_field=True,
+    magnetic_field=False,
     verbose=False,
-    grid=True
+    grid=True,
 ):
     """
     Calculate the three-dimensional electromagnetic field of a bead in the
@@ -229,10 +234,7 @@ def fields_focus(
         These values are only returned if return_grid is True
     """
     if bead.n_medium != objective.n_medium:
-        raise ValueError(
-            'The immersion medium of the bead '
-            'and the objective have to be the same'
-        )
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     loglevel = logging.getLogger().getEffectiveLevel()
     if verbose:
@@ -247,9 +249,7 @@ def fields_focus(
     # if M > bfp_sampling_n:
     #    print('bfp_sampling_n lower than recommendation for convergence')
 
-    local_coordinates = LocalBeadCoordinates(
-        x, y, z, bead.bead_diameter, bead_center, grid=grid
-    )
+    local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, bead_center, grid=grid)
     internal_coordinates = InternalBeadCoordinates(local_coordinates)
     external_coordinates = ExternalBeadCoordinates(local_coordinates)
 
@@ -260,23 +260,17 @@ def fields_focus(
         f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n
     )
 
-    farfield_data = objective.back_focal_plane_to_farfield(
-        bfp_coords, bfp_fields, bead.lambda_vac
-    )
+    farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)
 
-    logging.info('Calculating Hankel functions and derivatives')
-    external_radial_data = calculate_external(
-        bead.k, external_coordinates.r, n_orders)
+    logging.info("Calculating Hankel functions and derivatives")
+    external_radial_data = calculate_external(bead.k, external_coordinates.r, n_orders)
 
-    logging.info(
-        'Calculating Associated Legendre polynomials for external fields')
+    logging.info("Calculating Associated Legendre polynomials for external fields")
     legendre_data_ext = calculate_legendre(
-        external_coordinates,
-        farfield_data=farfield_data,
-        n_orders=n_orders
+        external_coordinates, farfield_data=farfield_data, n_orders=n_orders
     )
 
-    Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    Ex = np.zeros(local_coordinates.coordinate_shape, dtype="complex128")
     Ey = np.zeros_like(Ex)
     Ez = np.zeros_like(Ex)
 
@@ -289,49 +283,60 @@ def fields_focus(
         Hy = 0
         Hz = 0
 
-    logging.info('Calculating external fields')
+    logging.info("Calculating external fields")
 
     calculate_fields(
-        Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=bead_center,
+        Ex,
+        Ey,
+        Ez,
+        Hx,
+        Hy,
+        Hz,
+        bead=bead,
+        bead_center=bead_center,
         local_coordinates=external_coordinates,
-        farfield_data=farfield_data, legendre_data=legendre_data_ext,
+        farfield_data=farfield_data,
+        legendre_data=legendre_data_ext,
         external_radial_data=external_radial_data,
         internal=False,
-        total_field=total_field, magnetic_field=magnetic_field,
+        total_field=total_field,
+        magnetic_field=magnetic_field,
     )
 
-    logging.info('Calculating Bessel functions and derivatives')
-    internal_radial_data = calculate_internal(
-        bead.k1, internal_coordinates.r, n_orders
-    )
+    logging.info("Calculating Bessel functions and derivatives")
+    internal_radial_data = calculate_internal(bead.k1, internal_coordinates.r, n_orders)
 
-    logging.info(
-        'Calculating Associated Legendre polynomials for internal fields')
+    logging.info("Calculating Associated Legendre polynomials for internal fields")
     legendre_data_int = calculate_legendre(
-        internal_coordinates,
-        farfield_data=farfield_data,
-        n_orders=n_orders
+        internal_coordinates, farfield_data=farfield_data, n_orders=n_orders
     )
 
-    logging.info('Calculating internal fields')
+    logging.info("Calculating internal fields")
     calculate_fields(
-        Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=bead_center,
+        Ex,
+        Ey,
+        Ez,
+        Hx,
+        Hy,
+        Hz,
+        bead=bead,
+        bead_center=bead_center,
         local_coordinates=internal_coordinates,
-        farfield_data=farfield_data, legendre_data=legendre_data_int,
+        farfield_data=farfield_data,
+        legendre_data=legendre_data_int,
         internal_radial_data=internal_radial_data,
         internal=True,
-        total_field=total_field, magnetic_field=magnetic_field,
+        total_field=total_field,
+        magnetic_field=magnetic_field,
     )
 
     logging.getLogger().setLevel(loglevel)
     ks = bead.k * objective.NA / bead.n_medium
     dk = ks / (bfp_sampling_n - 1)
-    phase = -1j * objective.focal_length * (
+    phase = (-1j * objective.focal_length) * (
         np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi)
     )
-    
+
     for component in (Ex, Ey, Ez):
         component *= phase
 
@@ -351,7 +356,7 @@ def fields_focus(
         ret += (Hx, Hy, Hz)
 
     if return_grid:
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
         X = np.squeeze(X)
         Y = np.squeeze(Y)
         Z = np.squeeze(Z)
@@ -360,11 +365,21 @@ def fields_focus(
     return ret
 
 
-def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
-                      num_orders=None, return_grid=False,
-                      total_field=True, magnetic_field=False,
-                      verbose=False, grid=True
-                      ):
+def fields_plane_wave(
+    bead: Bead,
+    x,
+    y,
+    z,
+    theta=0,
+    phi=0,
+    polarization=(1, 0),
+    num_orders=None,
+    return_grid=False,
+    total_field=True,
+    magnetic_field=False,
+    verbose=False,
+    grid=True,
+):
     """
     Calculate the electromagnetic field of a bead, subject to excitation
     by a plane wave. The plane wave can be at an angle theta and phi, and
@@ -423,8 +438,7 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
     y = np.atleast_1d(y)
     z = np.atleast_1d(z)
 
-    local_coordinates = LocalBeadCoordinates(
-        x, y, z, bead.bead_diameter, grid=grid)
+    local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, grid=grid)
     internal_coordinates = InternalBeadCoordinates(local_coordinates)
     external_coordinates = ExternalBeadCoordinates(local_coordinates)
 
@@ -447,27 +461,26 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
         Einf_theta=np.atleast_2d(polarization[0]) * kz,
         Einf_phi=np.atleast_2d(polarization[1]) * kz,
         aperture=np.atleast_2d(True),
-        cos_theta=cos_theta, sin_theta=sin_theta,
-        cos_phi=cos_phi, sin_phi=sin_phi,
-        kz=kz, ky=ky, kx=kx, kp=kp
+        cos_theta=cos_theta,
+        sin_theta=sin_theta,
+        cos_phi=cos_phi,
+        sin_phi=sin_phi,
+        kz=kz,
+        ky=ky,
+        kx=kx,
+        kp=kp,
     )
 
-    logging.info('Calculating Hankel functions and derivatives')
-    external_radial_data = calculate_external(
-        bead.k, external_coordinates.r, n_orders)
+    logging.info("Calculating Hankel functions and derivatives")
+    external_radial_data = calculate_external(bead.k, external_coordinates.r, n_orders)
 
-    logging.info(
-        'Calculating Associated Legendre polynomials for external fields')
-    legendre_data_ext = calculate_legendre(
-        external_coordinates,
-        farfield_data,
-        n_orders
-    )
+    logging.info("Calculating Associated Legendre polynomials for external fields")
+    legendre_data_ext = calculate_legendre(external_coordinates, farfield_data, n_orders)
 
-    Ex = np.zeros(local_coordinates.coordinate_shape, dtype='complex128')
+    Ex = np.zeros(local_coordinates.coordinate_shape, dtype="complex128")
     Ey = np.zeros_like(Ex)
     Ez = np.zeros_like(Ex)
-    
+
     if magnetic_field:
         Hx = np.zeros_like(Ex)
         Hy = np.zeros_like(Ex)
@@ -477,38 +490,49 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
         Hy = 0
         Hz = 0
 
-    logging.info('Calculating external fields')
+    logging.info("Calculating external fields")
 
     calculate_fields(
-        Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=(0, 0, 0), local_coordinates=external_coordinates,
-        farfield_data=farfield_data, legendre_data=legendre_data_ext,
+        Ex,
+        Ey,
+        Ez,
+        Hx,
+        Hy,
+        Hz,
+        bead=bead,
+        bead_center=(0, 0, 0),
+        local_coordinates=external_coordinates,
+        farfield_data=farfield_data,
+        legendre_data=legendre_data_ext,
         external_radial_data=external_radial_data,
         internal=False,
-        total_field=total_field, magnetic_field=magnetic_field,
+        total_field=total_field,
+        magnetic_field=magnetic_field,
     )
 
-    logging.info('Calculating Bessel functions and derivatives')
-    internal_radial_data = calculate_internal(
-        bead.k1, internal_coordinates.r, n_orders
-    )
+    logging.info("Calculating Bessel functions and derivatives")
+    internal_radial_data = calculate_internal(bead.k1, internal_coordinates.r, n_orders)
 
-    logging.info(
-        'Calculating Associated Legendre polynomials for internal fields')
-    legendre_data_int = calculate_legendre(
-        internal_coordinates,
-        farfield_data,
-        n_orders
-    )
+    logging.info("Calculating Associated Legendre polynomials for internal fields")
+    legendre_data_int = calculate_legendre(internal_coordinates, farfield_data, n_orders)
 
-    logging.info('Calculating internal fields')
+    logging.info("Calculating internal fields")
     calculate_fields(
-        Ex, Ey, Ez, Hx, Hy, Hz,
-        bead=bead, bead_center=(0, 0, 0), local_coordinates=internal_coordinates,
-        farfield_data=farfield_data, legendre_data=legendre_data_int,
+        Ex,
+        Ey,
+        Ez,
+        Hx,
+        Hy,
+        Hz,
+        bead=bead,
+        bead_center=(0, 0, 0),
+        local_coordinates=internal_coordinates,
+        farfield_data=farfield_data,
+        legendre_data=legendre_data_int,
         internal_radial_data=internal_radial_data,
         internal=True,
-        total_field=total_field, magnetic_field=magnetic_field,
+        total_field=total_field,
+        magnetic_field=magnetic_field,
     )
     logging.getLogger().setLevel(loglevel)
 
@@ -525,7 +549,7 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
         ret += (Hx, Hy, Hz)
 
     if return_grid:
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
         X = np.squeeze(X)
         Y = np.squeeze(Y)
         Z = np.squeeze(Z)
@@ -535,10 +559,14 @@ def fields_plane_wave(bead: Bead, x, y, z, theta=0, phi=0, polarization=(1, 0),
 
 
 def forces_focus(
-    f_input_field, objective,
-    bead, bead_center=(0, 0, 0),
-    bfp_sampling_n=31, num_orders=None, integration_orders=None,
-    verbose=False
+    f_input_field,
+    objective,
+    bead,
+    bead_center=(0, 0, 0),
+    bfp_sampling_n=31,
+    num_orders=None,
+    integration_orders=None,
+    verbose=False,
 ):
     """
     Calculate the forces on a bead in the focus of an arbitrary input
@@ -611,40 +639,55 @@ def forces_focus(
     zb = z * bead.bead_diameter * 0.51 + bead_center[2]
 
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
-        f_input_field, objective, bead, bead_center, xb, yb, zb,
-        bfp_sampling_n, num_orders, return_grid=False,
-        total_field=True, magnetic_field=True, verbose=verbose,
-        grid=False
+        f_input_field,
+        objective,
+        bead,
+        bead_center,
+        xb,
+        yb,
+        zb,
+        bfp_sampling_n,
+        num_orders,
+        return_grid=False,
+        total_field=True,
+        magnetic_field=True,
+        verbose=verbose,
+        grid=False,
     )
     _eps = EPS0 * bead.n_medium**2
     _mu = MU0
 
-    Te11 = _eps * 0.5 * (np.abs(Ex)**2 - np.abs(Ey)**2 - np.abs(Ez)**2)
+    Te11 = _eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2)
     Te12 = _eps * np.real(Ex * np.conj(Ey))
     Te13 = _eps * np.real(Ex * np.conj(Ez))
-    Te22 = _eps * 0.5 * (np.abs(Ey)**2 - np.abs(Ex)**2 - np.abs(Ez)**2)
+    Te22 = _eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2)
     Te23 = _eps * np.real(Ey * np.conj(Ez))
-    Te33 = _eps * 0.5 * (np.abs(Ez)**2 - np.abs(Ey)**2 - np.abs(Ex)**2)
-    Th11 = _mu * 0.5 * (np.abs(Hx)**2 - np.abs(Hy)**2 - np.abs(Hz)**2)
+    Te33 = _eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2)
+    Th11 = _mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2)
     Th12 = _mu * np.real(Hx * np.conj(Hy))
     Th13 = _mu * np.real(Hx * np.conj(Hz))
-    Th22 = _mu * 0.5 * (np.abs(Hy)**2 - np.abs(Hx)**2 - np.abs(Hz)**2)
+    Th22 = _mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2)
     Th23 = _mu * np.real(Hy * np.conj(Hz))
-    Th33 = _mu * 0.5 * (np.abs(Hz)**2 - np.abs(Hy)**2 - np.abs(Hx)**2)
+    Th33 = _mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2)
     F = np.zeros((3, 1))
     n = np.empty((3, 1))
 
     for k in np.arange(x.size):
+        TE = np.asarray(
+            [
+                [Te11[k], Te12[k], Te13[k]],
+                [Te12[k], Te22[k], Te23[k]],
+                [Te13[k], Te23[k], Te33[k]],
+            ]
+        )
 
-        TE = np.asarray([
-            [Te11[k], Te12[k], Te13[k]],
-            [Te12[k], Te22[k], Te23[k]],
-            [Te13[k], Te23[k], Te33[k]]])
-
-        TH = np.asarray([
-            [Th11[k], Th12[k], Th13[k]],
-            [Th12[k], Th22[k], Th23[k]],
-            [Th13[k], Th23[k], Th33[k]]])
+        TH = np.asarray(
+            [
+                [Th11[k], Th12[k], Th13[k]],
+                [Th12[k], Th22[k], Th23[k]],
+                [Th13[k], Th23[k], Th33[k]],
+            ]
+        )
 
         T = TE + TH
         n[0] = x[k]
@@ -652,14 +695,18 @@ def forces_focus(
         n[2] = z[k]
         F += T @ n * w[k]
     # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
-    return np.squeeze(F) * (bead.bead_diameter * 0.51)**2 * 2 * np.pi
+    return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
 
 
 def absorbed_power_focus(
-    f_input_field, objective,
-    bead: Bead, bead_center=(0, 0, 0),
-    bfp_sampling_n=31, num_orders=None, integration_orders=None,
-    verbose=False
+    f_input_field,
+    objective,
+    bead: Bead,
+    bead_center=(0, 0, 0),
+    bfp_sampling_n=31,
+    num_orders=None,
+    integration_orders=None,
+    verbose=False,
 ):
     """
     Calculate the dissipated power in a bead in the focus of an arbitrary
@@ -721,9 +768,9 @@ def absorbed_power_focus(
         order = get_nearest_order(get_nearest_order(n_orders) + 1)
         x, y, z, w = get_integration_locations(order)
     else:
-        x, y, z, w = get_integration_locations(get_nearest_order(
-            np.amax((1, int(integration_orders)))
-        ))
+        x, y, z, w = get_integration_locations(
+            get_nearest_order(np.amax((1, int(integration_orders))))
+        )
 
     x = np.asarray(x)
     y = np.asarray(y)
@@ -735,10 +782,20 @@ def absorbed_power_focus(
     zb = z * bead.bead_diameter * 0.51 + bead_center[2]
 
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
-        f_input_field, objective, bead, bead_center,
-        xb, yb, zb, bfp_sampling_n, num_orders, return_grid=False,
-        total_field=True, magnetic_field=True, verbose=verbose,
-        grid=False
+        f_input_field,
+        objective,
+        bead,
+        bead_center,
+        xb,
+        yb,
+        zb,
+        bfp_sampling_n,
+        num_orders,
+        return_grid=False,
+        total_field=True,
+        magnetic_field=True,
+        verbose=verbose,
+        grid=False,
     )
 
     # Note: factor 1/2 incorporated later as 2 pi instead of 4 pi
@@ -747,16 +804,20 @@ def absorbed_power_focus(
     Pz = (np.conj(Hy) * Ex - np.conj(Hx) * Ey).real
 
     # Integral of - dot(P, n) over spherical surface
-    Pabs = - np.sum((Px * x + Py * y + Pz * z) * w)
+    Pabs = -np.sum((Px * x + Py * y + Pz * z) * w)
 
-    return Pabs * (bead.bead_diameter * 0.51)**2 * 2 * np.pi
+    return Pabs * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
 
 
 def scattered_power_focus(
-    f_input_field, objective: Objective,
-    bead: Bead, bead_center=(0, 0, 0),
-    bfp_sampling_n=31, num_orders=None, integration_orders=None,
-    verbose=False
+    f_input_field,
+    objective: Objective,
+    bead: Bead,
+    bead_center=(0, 0, 0),
+    bfp_sampling_n=31,
+    num_orders=None,
+    integration_orders=None,
+    verbose=False,
 ):
     """
     Calculate the scattered power by a bead in the focus of an arbitrary
@@ -815,9 +876,9 @@ def scattered_power_focus(
         order = get_nearest_order(get_nearest_order(n_orders) + 1)
         x, y, z, w = get_integration_locations(order)
     else:
-        x, y, z, w = get_integration_locations(get_nearest_order(
-            np.amax((1, int(integration_orders)))
-        ))
+        x, y, z, w = get_integration_locations(
+            get_nearest_order(np.amax((1, int(integration_orders))))
+        )
 
     x = np.asarray(x)
     y = np.asarray(y)
@@ -829,11 +890,20 @@ def scattered_power_focus(
     zb = z * bead.bead_diameter * 0.51 + bead_center[2]
 
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
-        f_input_field, objective,
-        bead, bead_center,
-        xb, yb, zb, bfp_sampling_n, num_orders, return_grid=False,
-        total_field=False, magnetic_field=True, verbose=verbose,
-        grid=False
+        f_input_field,
+        objective,
+        bead,
+        bead_center,
+        xb,
+        yb,
+        zb,
+        bfp_sampling_n,
+        num_orders,
+        return_grid=False,
+        total_field=False,
+        magnetic_field=True,
+        verbose=verbose,
+        grid=False,
     )
 
     # Note: factor 1/2 incorporated later as 2 pi instead of 4 pi
@@ -844,4 +914,4 @@ def scattered_power_focus(
     # integral of dot(P, n) over spherical surface:
     Psca = np.sum((Px * x + Py * y + Pz * z) * w)
 
-    return Psca * (bead.bead_diameter * 0.51)**2 * 2 * np.pi
+    return Psca * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi

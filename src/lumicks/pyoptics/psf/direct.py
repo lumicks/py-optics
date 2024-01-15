@@ -2,7 +2,7 @@ import numpy as np
 
 """
 Functions to calculate a point spread function of a focused wavefront by direct summation of plane
-waves. 
+waves.
 
 References
 ----------
