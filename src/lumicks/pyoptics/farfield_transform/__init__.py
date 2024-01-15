@@ -6,7 +6,7 @@ References:
 This implementation is original code and not based on any other software
 """
 
-from ..czt import czt
+from ..mathutils.czt import czt
 import numpy as np
 
 
