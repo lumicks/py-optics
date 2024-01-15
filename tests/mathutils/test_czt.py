@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 import lumicks.pyoptics.mathutils.czt as czt
 
+
 @pytest.mark.parametrize(
     "x_shape", ((3, 4), (4, 3), (10, 12), (356, 5), (56, 678), (1, 8), (11, 1))
 )
@@ -21,11 +22,7 @@ def test_czt_3d_rect(x_shape, multiplier):
     np.testing.assert_allclose(czt_direct, fft_x, atol=0)
 
 
-
-@pytest.mark.parametrize(
-    "x_size",
-    (1, 5, 10, 16, 128,)
-)
+@pytest.mark.parametrize("x_size", (1, 5, 10, 16, 128))
 @pytest.mark.parametrize("multiplier", (1, 2))
 def test_czt_3d_eye(x_size, multiplier):
     """Test equivalence of czt and fft for A = 1.0 and w = exp(-2j pi / N)"""
@@ -42,10 +39,7 @@ def test_czt_3d_eye(x_size, multiplier):
     np.testing.assert_allclose(czt_direct, fft_x, atol=0)
 
 
-@pytest.mark.parametrize(
-    "x_size",
-    (1, 5, 10, 16, 128)
-)
+@pytest.mark.parametrize("x_size", (1, 5, 10, 16, 128))
 @pytest.mark.parametrize("multiplier", (1, 2))
 def test_czt_2d_eye(x_size, multiplier):
     """Test equivalence of czt and fft for A = 1.0 and w = exp(-2j pi / N)"""
@@ -59,6 +53,7 @@ def test_czt_2d_eye(x_size, multiplier):
     fft_x = np.fft.fft(x, n=M, axis=0)
     np.testing.assert_allclose(czt_init_exec, fft_x, atol=0)
     np.testing.assert_allclose(czt_direct, fft_x, atol=0)
+
 
 @pytest.mark.parametrize(
     "x_shape", ((3, 4), (4, 3), (10, 12), (356, 5), (56, 678), (1, 8), (11, 1))
@@ -78,10 +73,7 @@ def test_czt_2d_rect(x_shape, multiplier):
     np.testing.assert_allclose(czt_direct, fft_x, atol=0)
 
 
-@pytest.mark.parametrize(
-    "x_len",
-    (2, 3, 5, 13, 20, 32, 200, 256)
-)
+@pytest.mark.parametrize("x_len", (2, 3, 5, 13, 20, 32, 200, 256))
 @pytest.mark.parametrize("multiplier", (1, 2))
 def test_czt_array(x_len, multiplier):
     x = np.zeros(x_len)

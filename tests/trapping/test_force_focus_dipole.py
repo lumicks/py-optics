@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
-from scipy.constants import (
-    epsilon_0 as _EPS0
-)
+from scipy.constants import epsilon_0 as _EPS0
 
 import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
@@ -11,7 +9,7 @@ import lumicks.pyoptics.trapping as trp
 n_medium = 1.33
 n_bead = 5
 bead_size = 20e-9  # [m]
-k = 2*np.pi*n_medium / 1064e-9
+k = 2 * np.pi * n_medium / 1064e-9
 
 numpoints = 5
 dim = (-1e-6, 1e-6)
@@ -22,22 +20,22 @@ focal_length = 4.43e-3
 n_bfp = 1.0
 bfp_sampling_n = 11
 w0 = filling_factor * focal_length * NA / n_medium
-objective = trp.Objective(NA=NA, focal_length=focal_length,
-                         n_medium=n_medium, n_bfp=n_bfp)
+objective = trp.Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n_bfp=n_bfp)
 bead = trp.Bead(bead_size, n_bead, n_medium, 1064e-9)
 
 # quasi-static polarizability
-a_s = 4 * np.pi * _EPS0 * n_medium**2 * \
-    (bead_size/2)**3 * (n_bead**2 - n_medium**2)/(n_bead**2 + 2 * n_medium**2)
+a_s = (4 * np.pi * _EPS0 * n_medium**2 * (bead_size / 2) ** 3 * (n_bead**2 - n_medium**2)) / (
+    n_bead**2 + 2 * n_medium**2
+)
 
 # correct for radiation reaction
-a = a_s + 1j * k**3 / (6*np.pi*_EPS0*n_medium**2) * a_s**2
+a = a_s + 1j * k**3 / (6 * np.pi * _EPS0 * n_medium**2) * a_s**2
 
 
 def get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n):
     sin_theta = r_bfp / focal_length
     cos_theta = np.ones_like(sin_theta)
-    cos_theta[aperture] = (1 - sin_theta[aperture]**2)**0.5
+    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
     region = sin_theta > 0
     cos_phi = np.empty_like(sin_theta)
     sin_phi = np.empty_like(sin_theta)
@@ -51,64 +49,103 @@ def get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n):
 
 
 def field_func(_, x_bfp, y_bfp, *args):
-
-    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)
+    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2)
     return (Ein, None)
 
 
 def field_func_kx(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to X
     _, sin_theta, cos_phi, __ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2*np.pi*n_medium / 1064e-9
+    k = 2 * np.pi * n_medium / 1064e-9
     Kp = k * sin_theta
     Kx = -Kp * cos_phi
 
-    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Kx
+    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Kx
     return (Ein, None)
 
 
 def field_func_ky(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to Y
     _, sin_theta, __, sin_phi = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2*np.pi*n_medium / 1064e-9
+    k = 2 * np.pi * n_medium / 1064e-9
     Kp = k * sin_theta
     Ky = -Kp * sin_phi
 
-    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Ky
+    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Ky
     return (Ein, None)
 
 
 def field_func_kz(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
     # Takes the derivative of the fields to Z
     cos_theta, _, __, ___ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2*np.pi*n_medium / 1064e-9
+    k = 2 * np.pi * n_medium / 1064e-9
     Kz = k * cos_theta
 
-    Ein = np.exp(-((x_bfp)**2 + y_bfp**2)/w0**2)*1j*Kz
+    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Kz
     return (Ein, None)
 
 
-@pytest.mark.parametrize('z_pos', zrange)
+@pytest.mark.parametrize("z_pos", zrange)
 def test_force_focus(z_pos):
     Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        field_func, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=dim,
-        numpoints_x=numpoints, y_range=dim, numpoints_y=numpoints, z=z_pos,
-        bfp_sampling_n=bfp_sampling_n, return_grid=True
+        field_func,
+        1064e-9,
+        1.0,
+        n_medium,
+        4.43e-3,
+        1.2,
+        x_range=dim,
+        numpoints_x=numpoints,
+        y_range=dim,
+        numpoints_y=numpoints,
+        z=z_pos,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=True,
     )
     Exdx, Eydx, Ezdx = psf.fast_psf(
-        field_func_kx, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=dim,
-        numpoints_x=numpoints, y_range=dim, numpoints_y=numpoints, z=z_pos,
-        bfp_sampling_n=bfp_sampling_n, return_grid=False
+        field_func_kx,
+        1064e-9,
+        1.0,
+        n_medium,
+        4.43e-3,
+        1.2,
+        x_range=dim,
+        numpoints_x=numpoints,
+        y_range=dim,
+        numpoints_y=numpoints,
+        z=z_pos,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=False,
     )
     Exdy, Eydy, Ezdy = psf.fast_psf(
-        field_func_ky, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=dim,
-        numpoints_x=numpoints, y_range=dim, numpoints_y=numpoints, z=z_pos,
-        bfp_sampling_n=bfp_sampling_n, return_grid=False
+        field_func_ky,
+        1064e-9,
+        1.0,
+        n_medium,
+        4.43e-3,
+        1.2,
+        x_range=dim,
+        numpoints_x=numpoints,
+        y_range=dim,
+        numpoints_y=numpoints,
+        z=z_pos,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=False,
     )
     Exdz, Eydz, Ezdz = psf.fast_psf(
-        field_func_kz, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=dim,
-        numpoints_x=numpoints, y_range=dim, numpoints_y=numpoints, z=z_pos,
-        bfp_sampling_n=bfp_sampling_n, return_grid=False
+        field_func_kz,
+        1064e-9,
+        1.0,
+        n_medium,
+        4.43e-3,
+        1.2,
+        x_range=dim,
+        numpoints_x=numpoints,
+        y_range=dim,
+        numpoints_y=numpoints,
+        z=z_pos,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=False,
     )
 
     E_grad_E_x = np.conj(Ex) * Exdx + np.conj(Ey) * Eydx + np.conj(Ez) * Ezdx
@@ -125,10 +162,13 @@ def test_force_focus(z_pos):
     for p in range(numpoints):
         for m in range(numpoints):
             F = trp.forces_focus(
-                field_func, objective, bead=bead,
+                field_func,
+                objective,
+                bead=bead,
                 bead_center=(X[p, m], Y[p, m], z_pos),
-                bfp_sampling_n=bfp_sampling_n, num_orders=None,
-                integration_orders=None
+                bfp_sampling_n=bfp_sampling_n,
+                num_orders=None,
+                integration_orders=None,
             )
             Fx_mie[p, m] = F[0]
             Fy_mie[p, m] = F[1]

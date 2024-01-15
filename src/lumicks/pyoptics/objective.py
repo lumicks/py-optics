@@ -3,7 +3,6 @@ from dataclasses import dataclass, astuple
 from collections import namedtuple
 from typing import Union
 from .farfield_data import FarfieldData
-from .mathutils import czt
 
 
 @dataclass
