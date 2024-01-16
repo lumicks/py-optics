@@ -74,6 +74,8 @@ def test_paraxial_gaussian(wavelength, focal_length, n_bfp, n_medium, NA):
         y=y_points,
     )
 
+    # For low NA, the vectorial PSF valid for high NA should in the limit of NA == 0 be the paraxial
+    # PSF. Slap a boundary of 5% on it for the above NAs
     np.testing.assert_allclose(Ex_ref, E, rtol=5e-2, atol=0)
 
 
