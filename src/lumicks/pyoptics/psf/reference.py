@@ -279,19 +279,19 @@ def focused_dipole_ref(
             I1[idx] = quad(__I01, 0, th_max, complex_func=True)[0]
             I2[idx] = quad(__I02, 0, th_max, complex_func=True)[0]
 
-    # Transform the results back to the grid
-    sx = X.shape
-    I0_ = np.reshape(I0[idx_r], sx)
-    I1_ = np.reshape(I1[idx_r], sx)
-    I2_ = np.reshape(I2[idx_r], sx)
+        # Transform the results back to the grid
+        sx = X.shape
+        I0_ = np.reshape(I0[idx_r], sx)
+        I1_ = np.reshape(I1[idx_r], sx)
+        I2_ = np.reshape(I2[idx_r], sx)
 
-    Ex[:, :, z_idx] += (I0_ + I2_ * np.cos(2 * phi)) * dipole_moment[0]
-    Ex[:, :, z_idx] += (I2_ * np.sin(2 * phi)) * dipole_moment[1]
-    Ex[:, :, z_idx] += (2j * I1_ * np.cos(phi)) * dipole_moment[2]
+        Ex[:, :, z_idx] += (I0_ + I2_ * np.cos(2 * phi)) * dipole_moment[0]
+        Ex[:, :, z_idx] += (I2_ * np.sin(2 * phi)) * dipole_moment[1]
+        Ex[:, :, z_idx] += (2j * I1_ * np.cos(phi)) * dipole_moment[2]
 
-    Ey[:, :, z_idx] += (I2_ * np.sin(2 * phi)) * dipole_moment[0]
-    Ey[:, :, z_idx] += (I0_ - I2_ * np.cos(2 * phi)) * dipole_moment[1]
-    Ey[:, :, z_idx] += (2j * I1_ * np.sin(phi)) * dipole_moment[2]
+        Ey[:, :, z_idx] += (I2_ * np.sin(2 * phi)) * dipole_moment[0]
+        Ey[:, :, z_idx] += (I0_ - I2_ * np.cos(2 * phi)) * dipole_moment[1]
+        Ey[:, :, z_idx] += (2j * I1_ * np.sin(phi)) * dipole_moment[2]
 
     factor = (
         (n_medium / n_image) ** 0.5
