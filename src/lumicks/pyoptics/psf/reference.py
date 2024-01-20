@@ -302,7 +302,8 @@ def focused_dipole_ref(
 
     retval = (np.squeeze(factor * Ex), np.squeeze(factor * Ey))
     if return_grid:
-        retval += (X, Y)
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
+        retval += (X, Y, Z)
     return retval
 
 
