@@ -8,11 +8,11 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.9", "3.11"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         lfs: true
     - name: Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -24,22 +24,16 @@ jobs:
     - name: Link OpenMP on MacOS
       run: |
         if [ "$RUNNER_OS" == "macOS" ]; then
-            # Fix libiomp5.dylib, as found in STUMPY: https://github.com/TDAmeritrade/stumpy
-            echo "Install OpenMP via Conda"
-            conda install -c intel -y openmp
-            echo "Checking $CONDA/lib for OpenMP"
-            ls $CONDA/lib/libiomp5.dylib
-            echo "Changing  @rpath for the omppool.cpython-x-darwin.so shared object to look in $CONDA/lib"
-            ls "$(python -c 'import site; print(site.getsitepackages()[0])')"/numba/np/ufunc/omppool.*.so | xargs install_name_tool -change @rpath/libiomp5.dylib $CONDA/lib/libiomp5.dylib
-            # Fix libomp.dylib
-            echo "Linking OpenMP into /usr/local/lib"
+            # Fix libiomp.dylib, as found in STUMPY: https://github.com/TDAmeritrade/stumpy
+            echo "Installing OpenMP"
+            brew install libomp
+            echo "Linking OpenMP"
             brew link --force libomp
-            echo "Checking /usr/local/lib for OpenMP"
-            ls /usr/local/lib/libomp.dylib
-            echo "Changing  @rpath for the omppool.cpython-x-darwin.so shared object to look in /usr/local/lib"
-            ls "$(python -c 'import site; print(site.getsitepackages()[0])')"/numba/np/ufunc/omppool.*.so | xargs install_name_tool -change @rpath/libomp.dylib /usr/local/lib/libomp.dylib
-            echo "Checking Numba OpenMP Access"
-            python -c "from numba.np.ufunc import omppool" 
+            echo "Find OpenMP Linking Location"
+            libfile=`brew list libomp --verbose | grep libomp.dylib`
+            echo $libfile
+            echo "Changing  @rpath for the omppool.cpython-x-darwin.so shared object to look in $libfile"
+            ls "$(python -c 'import site; print(site.getsitepackages()[0])')"/numba/np/ufunc/omppool.*.so | xargs install_name_tool -change @rpath/libomp.dylib $libfile
         fi
       shell: bash
     - name: Numba environment report
