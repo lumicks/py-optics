@@ -4,6 +4,7 @@
 
 ### Changes
 * Bumped minimum version of support Python to 3.9, to easily accomodate typing
+* Bumped maximum tested version of Python to 3.12
 
 ### Improvements
 
