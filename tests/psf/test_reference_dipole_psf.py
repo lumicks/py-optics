@@ -1,5 +1,6 @@
-"""Test approximate (paraxial) point spread function expressions against full 3D vector expressions,
-for low NA objectives."""
+"""Test full 3D vector point spread function of focused dipoles against approximate (paraxial)
+expressions, for low NA objectives."""
+
 import numpy as np
 import pytest
 
