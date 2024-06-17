@@ -9,6 +9,7 @@ class ExternalRadialData:
     Data class that holds spherical Hankel functions evaluated at radii outside
     the bead, and related functions (derivatives)
     """
+
     k0r: np.ndarray
     krH: np.ndarray
     dkrH_dkr: np.ndarray
@@ -20,6 +21,7 @@ class InternalRadialData:
     Data class that holds spherical Bessel functions evaluated at radii inside
     the bead, and related functions (derivatives)
     """
+
     k1r: np.ndarray
     sphBessel: np.ndarray
     jn_over_k1r: np.ndarray
@@ -44,8 +46,7 @@ def calculate_external(k: float, radii: np.ndarray, n_orders: int):
 
     for L in range(1, n_orders + 1):
         sphHankel[L - 1, :] = (
-            sqrt_x * (sp.jv(L + 0.5, k0r_unique) +
-                      1j * sp.yv(L + 0.5, k0r_unique))
+            sqrt_x * (sp.jv(L + 0.5, k0r_unique) + 1j * sp.yv(L + 0.5, k0r_unique))
         )[inverse]
         krH[L - 1, :] = k0r * sphHankel[L - 1, :]
         dkrH_dkr[L - 1, :] = krh_1 - L * sphHankel[L - 1, :]
@@ -62,25 +63,21 @@ def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
 
     k1r = k1 * radii
     k1r_unique, inverse = np.unique(k1r, return_inverse=True)
-    sphBessel = np.zeros((n_orders, k1r.shape[0]), dtype='complex128')
-    jn_over_k1r = np.zeros(sphBessel.shape, dtype='complex128')
-    jn_1 = np.zeros(sphBessel.shape, dtype='complex128')
-    jprev = np.empty(k1r.shape[0], dtype='complex128')
-    jprev[k1r > 0] = (
-        np.sin(k1r[k1r > 0]) / k1r[k1r > 0]
-    )
+    sphBessel = np.zeros((n_orders, k1r.shape[0]), dtype="complex128")
+    jn_over_k1r = np.zeros(sphBessel.shape, dtype="complex128")
+    jn_1 = np.zeros(sphBessel.shape, dtype="complex128")
+    jprev = np.empty(k1r.shape[0], dtype="complex128")
+    jprev[k1r > 0] = np.sin(k1r[k1r > 0]) / k1r[k1r > 0]
     jprev[k1r == 0] = 1
 
     for L in range(1, n_orders + 1):
         sphBessel[L - 1, :] = sp.spherical_jn(L, k1r_unique)[inverse]
-        jn_over_k1r[L - 1, k1r > 0] = (
-            sphBessel[L - 1, k1r > 0] / k1r[k1r > 0]
-        )
+        jn_over_k1r[L - 1, k1r > 0] = sphBessel[L - 1, k1r > 0] / k1r[k1r > 0]
         jn_1[L - 1, :] = jprev
         jprev = sphBessel[L - 1, :]
     # The limit of the Spherical Bessel functions for jn(x)/x == 0, except
     # for n == 1. Then it is 1/3. See https://dlmf.nist.gov/10.52
     # For n > 1 taken care of by np.zeros(...)
-    jn_over_k1r[0, k1r == 0] = 1/3
+    jn_over_k1r[0, k1r == 0] = 1 / 3
 
     return InternalRadialData(k1r, sphBessel, jn_over_k1r, jn_1)

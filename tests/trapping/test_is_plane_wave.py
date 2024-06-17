@@ -5,9 +5,7 @@ import lumicks.pyoptics.trapping as trp
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("n_angles", [7, 11])
-def test_plane_wave_direct(
-    n_medium, NA, n_angles, lambda_vac=1064e-9
-):
+def test_plane_wave_direct(n_medium, NA, n_angles, lambda_vac=1064e-9):
     """Test to make sure trapping.fields_plane_wave() returns a plane wave.
 
     Parameters
@@ -21,7 +19,7 @@ def test_plane_wave_direct(
     lambda_vac : float, optional
         wavelength in vacuum, by default 1064e-9 [m]
     """
-    k = 2*np.pi*n_medium / lambda_vac
+    k = 2 * np.pi * n_medium / lambda_vac
 
     z_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, 21)
     xy_eval = np.linspace(-lambda_vac, lambda_vac, 21)
@@ -44,13 +42,19 @@ def test_plane_wave_direct(
                 continue
             bead = trp.Bead(1e-9, n_medium, n_medium, lambda_vac)
             Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
-                bead, x=xy_eval, y=xy_eval, z=z_eval,
-                theta=theta[p, m], phi=phi[p, m],
-                polarization=(1, 0), return_grid=True, verbose=False
+                bead,
+                x=xy_eval,
+                y=xy_eval,
+                z=z_eval,
+                theta=theta[p, m],
+                phi=phi[p, m],
+                polarization=(1, 0),
+                return_grid=True,
+                verbose=False,
             )
             kz = k * np.cos(theta[p, m])
-            kx = - k * np.sin(theta[p, m]) * np.cos(phi[p, m])
-            ky = - k * np.sin(theta[p, m]) * np.sin(phi[p, m])
+            kx = -k * np.sin(theta[p, m]) * np.cos(phi[p, m])
+            ky = -k * np.sin(theta[p, m]) * np.sin(phi[p, m])
 
             # Check convention, +1j for k vector as we use -1j for time phasor
             Exp = np.exp(1j * (kx * X + ky * Y + kz * z_eval))
@@ -63,14 +67,19 @@ def test_plane_wave_direct(
             np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(
-                np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2,
-                np.ones(Ex.shape)
+                np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2, np.ones(Ex.shape)
             )
 
             Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
-                bead, x=xy_eval, y=xy_eval, z=z_eval,
-                theta=theta[p, m], phi=phi[p, m],
-                polarization=(0, 1), return_grid=True, verbose=False
+                bead,
+                x=xy_eval,
+                y=xy_eval,
+                z=z_eval,
+                theta=theta[p, m],
+                phi=phi[p, m],
+                polarization=(0, 1),
+                return_grid=True,
+                verbose=False,
             )
             Expw = -np.sin(phi[p, m]) * Exp
             Eypw = np.cos(phi[p, m]) * Exp
@@ -82,8 +91,7 @@ def test_plane_wave_direct(
             np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(
-                np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2,
-                np.ones(Ex.shape)
+                np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2, np.ones(Ex.shape)
             )
 
 
@@ -111,17 +119,14 @@ def test_plane_wave_bfp(
 
     """
     num_pts = 21
-    bead = trp.Bead(bead_diameter=1e-9, n_bead=n_medium,
-                   n_medium=n_medium, lambda_vac=lambda_vac)
-    objective = trp.Objective(
-        NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
+    bead = trp.Bead(bead_diameter=1e-9, n_bead=n_medium, n_medium=n_medium, lambda_vac=lambda_vac)
+    objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     def dummy(_, x_bfp, *args):
         return (np.zeros_like(x_bfp), None)
 
     coords, fields = objective.sample_back_focal_plane(dummy, bfp_sampling_n)
-    farfield = objective.back_focal_plane_to_farfield(
-        coords, fields, lambda_vac)
+    farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
 
     k = bead.k
     ks = k * NA / n_medium
@@ -141,20 +146,20 @@ def test_plane_wave_bfp(
                 # after refraction by the lens and propagation to the focal
                 # plane
 
-                Ex = np.zeros_like(x_bfp, dtype='complex128')
-                Ey = np.zeros_like(x_bfp, dtype='complex128')
+                Ex = np.zeros_like(x_bfp, dtype="complex128")
+                Ey = np.zeros_like(x_bfp, dtype="complex128")
 
-                correction = farfield.kz[p, m] * (
-                    np.sqrt(n_bfp / n_medium) *
-                    np.sqrt(farfield.cos_theta[p, m])
-                )**-1
+                correction = (
+                    farfield.kz[p, m]
+                    * (np.sqrt(n_bfp / n_medium) * np.sqrt(farfield.cos_theta[p, m])) ** -1
+                )
                 Expoint = farfield.cos_phi[p, m]
                 Eypoint = farfield.sin_phi[p, m]
 
-                phase = (-1j * objective.focal_length * (
-                    np.exp(-1j * bead.k * objective.focal_length) *
-                    dk**2 / (2 * np.pi)
-                ))**-1
+                phase = (
+                    (-1j * objective.focal_length)
+                    * (np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi))
+                ) ** -1
                 Ex[p, m] = Expoint * correction * phase
                 Ey[p, m] = Eypoint * correction * phase
 
@@ -163,24 +168,33 @@ def test_plane_wave_bfp(
             def input_field_Ephi(_, x_bfp, *args):
                 # Create an input field that is phi-polarized with 1 V/m after
                 # refraction by the lens and propagation to the focal plane
-                Ex = np.zeros(x_bfp.shape, dtype='complex128')
-                Ey = np.zeros(x_bfp.shape, dtype='complex128')
+                Ex = np.zeros(x_bfp.shape, dtype="complex128")
+                Ey = np.zeros(x_bfp.shape, dtype="complex128")
 
-                correction = farfield.kz[p, m] * \
-                    farfield.cos_theta[p, m]**-0.5 * (n_medium/n_bfp)**0.5
+                correction = (
+                    farfield.kz[p, m] * farfield.cos_theta[p, m] ** -0.5 * (n_medium / n_bfp) ** 0.5
+                )
                 Expoint = -farfield.sin_phi[p, m]
                 Eypoint = farfield.cos_phi[p, m]
-                Ex[p, m] = Expoint * correction * 2 * np.pi / \
-                    (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
-                Ey[p, m] = Eypoint * correction * 2 * np.pi / \
-                    (-1j*focal_length*np.exp(-1j*k*focal_length)*dk**2)
+                Ex[p, m] = (Expoint * correction * 2 * np.pi) / (
+                    -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
+                )
+                Ey[p, m] = (Eypoint * correction * 2 * np.pi) / (
+                    -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
+                )
 
                 return (Ex, Ey)
 
             Ex, Ey, Ez, X, Y, Z = trp.fields_focus(
-                input_field_Etheta, bead=bead, objective=objective,
-                x=xy_eval, y=0, z=z_eval,
-                bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False
+                input_field_Etheta,
+                bead=bead,
+                objective=objective,
+                x=xy_eval,
+                y=0,
+                z=z_eval,
+                bfp_sampling_n=bfp_sampling_n,
+                return_grid=True,
+                verbose=False,
             )
             kz = farfield.kz[p, m]
             kx = farfield.kx[p, m]
@@ -190,20 +204,25 @@ def test_plane_wave_bfp(
             Exp = np.exp(1j * (kx * X + ky * Y + kz * Z))
             Expw = farfield.cos_theta[p, m] * farfield.cos_phi[p, m] * Exp
             Eypw = farfield.cos_theta[p, m] * farfield.sin_phi[p, m] * Exp
-            Ezpw = (1-farfield.cos_theta[p, m]**2)**0.5 * Exp
+            Ezpw = (1 - farfield.cos_theta[p, m] ** 2) ** 0.5 * Exp
 
             np.testing.assert_allclose(Ex, Expw, atol=1e-14)
             np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(
-                np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2,
-                np.ones(Ex.shape)
+                np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2, np.ones(Ex.shape)
             )
 
             Ex, Ey, Ez, X, Y, Z = trp.fields_focus(
-                input_field_Ephi, bead=bead, objective=objective,
-                x=xy_eval, y=0, z=z_eval,
-                bfp_sampling_n=bfp_sampling_n, return_grid=True, verbose=False
+                input_field_Ephi,
+                bead=bead,
+                objective=objective,
+                x=xy_eval,
+                y=0,
+                z=z_eval,
+                bfp_sampling_n=bfp_sampling_n,
+                return_grid=True,
+                verbose=False,
             )
             Expw = -farfield.sin_phi[p, m] * Exp
             Eypw = farfield.cos_phi[p, m] * Exp
@@ -214,6 +233,5 @@ def test_plane_wave_bfp(
             np.testing.assert_allclose(Ey, Eypw, atol=1e-14)
             np.testing.assert_allclose(Ez, Ezpw, atol=1e-14)
             np.testing.assert_allclose(
-                np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2,
-                np.ones(Ex.shape)
+                np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2, np.ones(Ex.shape)
             )

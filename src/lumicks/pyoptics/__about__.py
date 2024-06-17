@@ -1,7 +1,7 @@
-__title__ = 'lumicks.pyoptics'
-__version__ = '0.4.0'
-__summary__ = 'Computational code for nanophotonics'
-__url__ = 'https://github.com/lumicks/py-optics'
+__title__ = "lumicks.pyoptics"
+__version__ = "0.4.0"
+__summary__ = "Computational code for nanophotonics"
+__url__ = "https://github.com/lumicks/py-optics"
 
 __author__ = "Lumicks B.V."
 __copyright__ = "2023, " + __author__

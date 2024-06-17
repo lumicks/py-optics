@@ -22,7 +22,7 @@ def test_paraxial_psf_xy(
     f = f_ / magnification * n_medium
     x = np.linspace(-range * 0.5, range * 0.5, num_points) * magnification
 
-    I = ref.focused_dipole_paraxial_xy(
+    Esq = ref.focused_dipole_paraxial_xy(
         p,
         wavelength,
         n_image=n_image,
@@ -64,11 +64,11 @@ def test_paraxial_psf_xy(
     Idip_y_rows = (np.abs(Ex_y) ** 2 + np.abs(Ey_y) ** 2)[:, (num_points - 1) // 2]
 
     # Paraxial PSF should match that of an exact PSF for x-oriented dipole
-    np.testing.assert_allclose(I, Idip_x_cols, rtol=1e-2, atol=0)
-    np.testing.assert_allclose(I, Idip_x_rows, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_x_cols, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_x_rows, rtol=1e-2, atol=0)
     # Paraxial PSF should match that of an exact PSF for y-oriented dipole
-    np.testing.assert_allclose(I, Idip_y_cols, rtol=1e-2, atol=0)
-    np.testing.assert_allclose(I, Idip_y_rows, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_y_cols, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_y_rows, rtol=1e-2, atol=0)
 
 
 @pytest.mark.parametrize("dipole_moment", [1e-30, 3e-29])
@@ -87,7 +87,7 @@ def test_paraxial_psf_z(
     f = f_ / magnification * n_medium
     x = np.linspace(-range * 0.5, range * 0.5, num_points) * magnification
 
-    I = ref.focused_dipole_paraxial_z(
+    Esq = ref.focused_dipole_paraxial_z(
         p,
         wavelength,
         n_bfp=n_bfp,
@@ -113,5 +113,5 @@ def test_paraxial_psf_z(
     Idip_z_cols = (np.abs(Ex_z) ** 2 + np.abs(Ey_z) ** 2)[(num_points - 1) // 2, :]
     Idip_z_rows = (np.abs(Ex_z) ** 2 + np.abs(Ey_z) ** 2)[:, (num_points - 1) // 2]
 
-    np.testing.assert_allclose(I, Idip_z_cols, rtol=1e-2, atol=0)
-    np.testing.assert_allclose(I, Idip_z_rows, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_z_cols, rtol=1e-2, atol=0)
+    np.testing.assert_allclose(Esq, Idip_z_rows, rtol=1e-2, atol=0)

@@ -8,8 +8,15 @@ and dipoles in a homogeneous environment in high-NA and paraxial versions."""
 
 
 def focused_gauss_ref(
-    lambda_vac: float, n_bfp: float, n_medium: float, focal_length: float, filling_factor: float,
-    NA: float, x: np.array, y: np.array, z: np.array
+    lambda_vac: float,
+    n_bfp: float,
+    n_medium: float,
+    focal_length: float,
+    filling_factor: float,
+    NA: float,
+    x: np.array,
+    y: np.array,
+    z: np.array,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
     Gaussian beam, using the angular spectrum of plane waves method, see [1]_, chapter 3.
@@ -35,9 +42,9 @@ def focused_gauss_ref(
         Filling factor of the Gaussian beam over the aperture, defined as w0/R. Here, w0 is the
         waist of the Gaussian beam and R is the radius of the aperture. Range 0...Inf
     NA : float
-        Numerical Aperture n_medium * sin(theta_max) of the objective 
+        Numerical Aperture n_medium * sin(theta_max) of the objective
     x : np.array
-        Array of x locations for evaluation 
+        Array of x locations for evaluation
     y : np.array
         Array of y locations for evaluation
     z : np.array
@@ -60,7 +67,7 @@ def focused_gauss_ref(
     """
 
     x, y, z = np.atleast_1d(x, y, z)
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    X, Y = np.meshgrid(x, y, indexing="ij")
 
     # Calculate all (polar) distances r in the grid, as measured from (0,0)
     r_orig = np.hypot(X, Y)
@@ -78,14 +85,14 @@ def focused_gauss_ref(
     th_max = np.arcsin(NA / n_medium)
 
     # Storage for the results of the integrals
-    I0 = np.zeros(r.shape[0], dtype='complex128')
-    I1 = np.zeros(r.shape[0], dtype='complex128')
-    I2 = np.zeros(r.shape[0], dtype='complex128')
+    I0 = np.zeros(r.shape[0], dtype="complex128")
+    I1 = np.zeros(r.shape[0], dtype="complex128")
+    I2 = np.zeros(r.shape[0], dtype="complex128")
 
     # Storage for the actual fields
-    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-    Ez = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
+    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ez = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
 
     f0 = filling_factor
     f = focal_length
@@ -94,29 +101,38 @@ def focused_gauss_ref(
         for idx, rr in enumerate(r):
             # These are the integrands as defined in [1]
             def __I00(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) *
-                              sp.jv(0, k * rr * np.sin(th)) * \
-                                    np.exp(1j * k * zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) * (1 + np.cos(th)))
+                    * sp.jv(0, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
             def __I01(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 *
-                              np.sin(th)**2 * sp.jv(1, k * rr * np.sin(th)) *
-                              np.exp(1j * k * zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) ** 2)
+                    * sp.jv(1, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
             def __I02(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
-                              sp.jv(2, k * rr * np.sin(th)) * np.exp(1j * k *
-                              zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) * (1 - np.cos(th)))
+                    * sp.jv(2, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
-            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I00, 0, th_max, complex_func=True)[0]
-            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I01, 0, th_max, complex_func=True)[0]
-            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I02, 0, th_max, complex_func=True)[0]
+            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I00, 0, th_max, complex_func=True
+            )[0]
+            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I01, 0, th_max, complex_func=True
+            )[0]
+            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I02, 0, th_max, complex_func=True
+            )[0]
 
         # Transform the results back to the grid
         sx = X.shape
@@ -126,15 +142,24 @@ def focused_gauss_ref(
 
         # Calculate the fields
         Ex[:, :, z_idx] = I0_ + I2_ * np.cos(2 * phi)
-        Ey[:, :, z_idx] = I2_ * np. sin(2 * phi)
+        Ey[:, :, z_idx] = I2_ * np.sin(2 * phi)
         Ez[:, :, z_idx] = -2j * I1_ * np.cos(phi)
 
     return np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez)
 
 
 def focused_dipole_ref(
-    dipole_moment, lambda_vac: float, n_image: float, n_medium: float, focal_length: float,
-    NA: float, focal_length_tube: float, x: np.array, y: np.array, z: np.array, return_grid=False
+    dipole_moment,
+    lambda_vac: float,
+    n_image: float,
+    n_medium: float,
+    focal_length: float,
+    NA: float,
+    focal_length_tube: float,
+    x: np.array,
+    y: np.array,
+    z: np.array,
+    return_grid=False,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
     dipole in a homogeneous medium, using the angular spectrum of plane waves method. See [1]_,
@@ -148,7 +173,7 @@ def focused_dipole_ref(
     This function does not rely on the discretization of the back focal plane of the objective. In
     contrast, it is a semi-analytical expression that involves numerical integration over only the
     single coordinate theta.
-    
+
     Parameters
     ----------
     dipole_moment : tuple(px, py, pz)
@@ -165,7 +190,7 @@ def focused_dipole_ref(
     NA : float
         Numerical Aperture = $n_{medium} \\sin(\\theta_{max})$ of the objective
     focal_length_tube : float
-        Focal length of the tube lens, in meters. 
+        Focal length of the tube lens, in meters.
     x : np.array
         Array of x locations for evaluation, at the image plane of the tube lens
     y : np.array
@@ -193,10 +218,10 @@ def focused_dipole_ref(
     ..  [1] Novotny, L., & Hecht, B. (2012). Principles of Nano-Optics (2nd ed.).
             Cambridge: Cambridge University Press. doi:10.1017/CBO9780511794193
 
-  """
+    """
 
     x, y, z = np.atleast_1d(x, y, z)
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    X, Y = np.meshgrid(x, y, indexing="ij")
 
     # Calculate all (polar) distances r in the grid, as measured from (0,0)
     r_orig = np.hypot(X, Y)
@@ -215,36 +240,39 @@ def focused_dipole_ref(
     th_max = np.arcsin(NA / n_medium)
 
     # Storage for the results of the integrals
-    I0 = np.zeros(r.shape[0], dtype='complex128')
-    I1 = np.zeros(r.shape[0], dtype='complex128')
-    I2 = np.zeros(r.shape[0], dtype='complex128')
+    I0 = np.zeros(r.shape[0], dtype="complex128")
+    I1 = np.zeros(r.shape[0], dtype="complex128")
+    I2 = np.zeros(r.shape[0], dtype="complex128")
 
     f = focal_length
     f_ = focal_length_tube
 
     # Storage for the actual fields
-    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
+    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
 
     for z_idx, zz in enumerate(z):
         for idx, rr in enumerate(r):
             # These are the integrands as defined in [1]
             def __I00(th):
-                return (np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) * 
-                sp.jv(0, k_ * rr * np.sin(th) * f/f_) * 
-                np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2)))
+                return (
+                    (np.cos(th) ** 0.5 * np.sin(th) * (1 + np.cos(th)))
+                    * sp.jv(0, k_ * rr * np.sin(th) * f / f_)
+                    * np.exp(1j * k_ * zz * (1 - 0.5 * (f / f_) ** 2 * np.sin(th) ** 2))
+                )
 
             def __I01(th):
                 return (
-                    np.cos(th)**0.5 * np.sin(th)**2 * 
-                    sp.jv(1, k_ * rr * np.sin(th) * f/f_) * 
-                    np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
+                    (np.cos(th) ** 0.5 * np.sin(th) ** 2)
+                    * sp.jv(1, k_ * rr * np.sin(th) * f / f_)
+                    * np.exp(1j * k_ * zz * (1 - 0.5 * (f / f_) ** 2 * np.sin(th) ** 2))
                 )
 
             def __I02(th):
-                return (np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
-                sp.jv(2, k_ * rr * np.sin(th) * f/f_) * 
-                np.exp(1j * k_ * zz * (1 - 0.5 * (f/f_)**2 * np.sin(th)**2))
+                return (
+                    (np.cos(th) ** 0.5 * np.sin(th) * (1 - np.cos(th)))
+                    * sp.jv(2, k_ * rr * np.sin(th) * f / f_)
+                    * np.exp(1j * k_ * zz * (1 - 0.5 * (f / f_) ** 2 * np.sin(th) ** 2))
                 )
 
             I0[idx] = quad(__I00, 0, th_max, complex_func=True)[0]
@@ -262,23 +290,31 @@ def focused_dipole_ref(
     Ex[:, :, z_idx] += (2j * I1_ * np.cos(phi)) * dipole_moment[2]
 
     Ey[:, :, z_idx] += (I2_ * np.sin(2 * phi)) * dipole_moment[0]
-    Ey[:, :, z_idx] += (I0_ - I2_ * np. cos(2 * phi)) * dipole_moment[1]
+    Ey[:, :, z_idx] += (I0_ - I2_ * np.cos(2 * phi)) * dipole_moment[1]
     Ey[:, :, z_idx] += (2j * I1_ * np.sin(phi)) * dipole_moment[2]
 
     factor = (
-        (n_medium / n_image)**0.5 * 1j * k_ * f * np.exp(1j * (k * f - k_ * f_)) / 
-        (8 * np.pi * f_) * (2 * np.pi)**2 / (lambda_vac**2 * EPS0)
+        (n_medium / n_image) ** 0.5
+        * (1j * k_ * f * np.pi)
+        * np.exp(1j * (k * f - k_ * f_))
+        / (2 * f_ * lambda_vac**2 * EPS0)
     )
 
     retval = (np.squeeze(factor * Ex), np.squeeze(factor * Ey))
     if return_grid:
-        retval += (X, Y,) 
+        retval += (X, Y)
     return retval
 
 
 def focused_dipole_paraxial_xy(
-    dipole_moment_xy: float, lambda_vac: float, n_image: float, n_medium: float, focal_length: float,
-    NA: float, focal_length_tube: float, r: np.array
+    dipole_moment_xy: float,
+    lambda_vac: float,
+    n_image: float,
+    n_medium: float,
+    focal_length: float,
+    NA: float,
+    focal_length_tube: float,
+    r: np.array,
 ):
     """Calculate the point spread function of a focused dipole in the xy-plane,
     in the paraxial approximation. In that case, the point spread function for x- and y-oriented
@@ -306,46 +342,84 @@ def focused_dipole_paraxial_xy(
     Returns
     -------
     squared_electric_field : np.ndarray
-        The squared magnitude of the electric field [V^2/m^2]
-    """    
+        The squared magnitude of the electric field in [V^2/m^2], for dipoles oriented in the plane.
+    """
     M = focal_length_tube / focal_length * n_medium / n_image
     r_ = NA * r / (M * lambda_vac) * 2 * np.pi
 
-    with np.errstate(divide='ignore', invalid='ignore'):
-      squared_electric_field = (2 * sp.jv(1, r_) / r_)**2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        squared_electric_field = (2 * sp.jv(1, r_) / r_) ** 2
     squared_electric_field[r_ == 0] = 1.0
-    squared_electric_field *= (
-        dipole_moment_xy**2 * (NA * np.pi)**4
-        / (EPS0**2 * n_medium * n_image * lambda_vac**6 * M**2)
+    squared_electric_field *= (dipole_moment_xy**2 * (NA * np.pi) ** 4) / (
+        EPS0**2 * n_medium * n_image * lambda_vac**6 * M**2
     )
 
     return squared_electric_field
 
 
 def focused_dipole_paraxial_z(
-    dipole_moment_z: float, lambda_vac: float, n_bfp: float, n_medium: float, focal_length: float,
-    NA: float, focal_length_tube: float, r: np.array
+    dipole_moment_z: float,
+    lambda_vac: float,
+    n_bfp: float,
+    n_medium: float,
+    focal_length: float,
+    NA: float,
+    focal_length_tube: float,
+    r: np.array,
 ):
-    
+    """Calculate the point spread function of a focused dipole oriented along the z-axis,
+    in the paraxial approximation.
+
+    Parameters
+    ----------
+    dipole_moment_z : float
+        dipole moment in [Cm]
+    lambda_vac : float
+        wavelength [m]
+    n_image : float
+        Refractive index of the medium at the focal plane of the tube lens [-].
+    n_medium : float
+        Refractive index of the medium that the dipole resides in [-].
+    focal_length : float
+        focal length of the objective [m].
+    NA : float
+        Numerical aperture of the objective
+    focal_length_tube : float
+        focal length of the tube lens [m].
+    r : np.array
+        radial distance [m].
+
+    Returns
+    -------
+    squared_electric_field : np.ndarray
+        The squared magnitude of the electric field [V^2/m^2]
+    """
     M = focal_length_tube / focal_length * n_medium / n_bfp
     r_ = NA * r / (M * lambda_vac) * 2 * np.pi
 
-    with np.errstate(divide='ignore', invalid='ignore'):
-      I = (2 * sp.jv(2, r_) / r_)**2
-    I[r_ == 0] = 0.0
-    I *= dipole_moment_z**2 * (NA / lambda_vac)**6 * np.pi**4 / (EPS0**2 * n_medium**3 * 
-      n_bfp * M**2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        squared_electric_field = (2 * sp.jv(2, r_) / r_) ** 2
+    squared_electric_field[r_ == 0] = 0.0
+    squared_electric_field *= (dipole_moment_z**2 * (NA / lambda_vac) ** 6 * np.pi**4) / (
+        EPS0**2 * n_medium**3 * n_bfp * M**2
+    )
+    return squared_electric_field
 
-    return I
 
 def reflected_focused_gaussian(
-    lambda_vac: float, n_image_plane: float, n_medium: float, 
-    objective_focal_length: float, tube_lens_focal_length: float,
+    lambda_vac: float,
+    n_bfp: float,
+    n_medium: float,
+    objective_focal_length: float,
+    tube_lens_focal_length: float,
     filling_factor: float,
-    NA: float, x: np.array, y: np.array, z: np.array):
-    
+    NA: float,
+    x: np.array,
+    y: np.array,
+    z: np.array,
+):
     x, y, z = np.atleast_1d(x, y, z)
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    X, Y = np.meshgrid(x, y, indexing="ij")
 
     # Calculate all (polar) distances r in the grid, as measured from (0,0)
     r_orig = np.hypot(X, Y)
@@ -363,46 +437,54 @@ def reflected_focused_gaussian(
     th_max = np.arcsin(NA / n_medium)
 
     # Storage for the results of the integrals
-    I0 = np.zeros(r.shape[0], dtype='complex128')
-    I1 = np.zeros(r.shape[0], dtype='complex128')
-    I2 = np.zeros(r.shape[0], dtype='complex128')
+    I0 = np.zeros(r.shape[0], dtype="complex128")
+    I1 = np.zeros(r.shape[0], dtype="complex128")
+    I2 = np.zeros(r.shape[0], dtype="complex128")
 
     # Storage for the actual fields
-    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
-    Ez = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype='complex128')
+    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ez = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
 
     f0 = filling_factor
     f = objective_focal_length
-    f_ = tube_lens_focal_length
 
     for z_idx, zz in enumerate(z):
         for idx, rr in enumerate(r):
             # These are the integrands as defined in [1]
             def __I00(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 * np.sin(th) * (1 + np.cos(th)) *
-                              sp.jv(0, k * rr * np.sin(th)) * \
-                                    np.exp(1j * k * zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) * (1 + np.cos(th)))
+                    * sp.jv(0, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
             def __I01(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 *
-                              np.sin(th)**2 * sp.jv(1, k * rr * np.sin(th)) *
-                              np.exp(1j * k * zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) ** 2)
+                    * sp.jv(1, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
             def __I02(th):
-                return (np.exp(-f0**-2 * np.sin(th)**2 / np.sin(th_max)**2) *
-                              np.cos(th)**0.5 * np.sin(th) * (1 - np.cos(th)) *
-                              sp.jv(2, k * rr * np.sin(th)) * np.exp(1j * k *
-                              zz * np.cos(th)))
+                return (
+                    np.exp(-(f0**-2) * np.sin(th) ** 2 / np.sin(th_max) ** 2)
+                    * (np.cos(th) ** 0.5 * np.sin(th) * (1 - np.cos(th)))
+                    * sp.jv(2, k * rr * np.sin(th))
+                    * np.exp(1j * k * zz * np.cos(th))
+                )
 
-            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I00, 0, th_max, complex_func=True)[0]
-            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I01, 0, th_max, complex_func=True)[0]
-            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium)**0.5 *
-                       np.exp(-1j * k * f)) * quad(__I02, 0, th_max, complex_func=True)[0]
+            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I00, 0, th_max, complex_func=True
+            )[0]
+            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I01, 0, th_max, complex_func=True
+            )[0]
+            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
+                __I02, 0, th_max, complex_func=True
+            )[0]
 
         # Transform the results back to the grid
         sx = X.shape
@@ -412,7 +494,7 @@ def reflected_focused_gaussian(
 
         # Calculate the fields
         Ex[:, :, z_idx] = I0_ + I2_ * np.cos(2 * phi)
-        Ey[:, :, z_idx] = I2_ * np. sin(2 * phi)
+        Ey[:, :, z_idx] = I2_ * np.sin(2 * phi)
         Ez[:, :, z_idx] = -2j * I1_ * np.cos(phi)
 
     return np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez)

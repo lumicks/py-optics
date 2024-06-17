@@ -9,7 +9,7 @@ class Bead:
         bead_diameter: float = 1e-6,
         n_bead: float = 1.57,
         n_medium: float = 1.33,
-        lambda_vac: float = 1064e-9
+        lambda_vac: float = 1064e-9,
     ):
         """
         The `Bead` class describes the situation of a spherical bead with a diameter of
@@ -36,20 +36,20 @@ class Bead:
 
     def __str__(self) -> str:
         return (
-            'Bead\n'
-            '----\n'
-            f'Diameter: {self.bead_diameter} [m]\n'
-            f'Refractive index: {self.n_bead}\n'
-            f'Refractive index medium: {self.n_medium}\n'
-            f'Wavelength: {self.lambda_vac} [m]\n'
+            "Bead\n"
+            "----\n"
+            f"Diameter: {self.bead_diameter} [m]\n"
+            f"Refractive index: {self.n_bead}\n"
+            f"Refractive index medium: {self.n_medium}\n"
+            f"Wavelength: {self.lambda_vac} [m]\n"
         )
-    
+
     def __repr__(self) -> str:
         return (
-            f'Bead(bead_diameter={self.bead_diameter}, '
-            f'n_bead={self.n_bead}, '
-            f'n_medium={self.n_medium}, '
-            f'lambda_vac={self.lambda_vac})'
+            f"Bead(bead_diameter={self.bead_diameter}, "
+            f"n_bead={self.n_bead}, "
+            f"n_medium={self.n_medium}, "
+            f"lambda_vac={self.lambda_vac})"
         )
 
     @property
@@ -60,7 +60,7 @@ class Bead:
         -------
         float
             `k`, the wave number of the medium.
-        """        
+        """
         return 2 * np.pi * self.n_medium / self.lambda_vac
 
     @property
@@ -71,7 +71,7 @@ class Bead:
         -------
         float
             `k1`, the wave number of the material of the bead
-        """        
+        """
         return 2 * np.pi * self.n_bead / self.lambda_vac
 
     @property
@@ -106,13 +106,13 @@ class Bead:
         -------
         int
             number of orders
-        
+
         ..  [1] "Absorption and Scattering of Light by Small Particles",
                 Craig F. Bohren & Donald R. Huffman, p. 477
         """
 
         size_param = self.size_param
-        return int(np.round(size_param + 4 * size_param**(1/3) + 2.0))
+        return int(np.round(size_param + 4 * size_param ** (1 / 3) + 2.0))
 
     def ab_coeffs(self, num_orders=None):
         """Return the scattering coefficients for plane wave excitation of the bead.
@@ -143,7 +143,7 @@ class Bead:
         # Downward recurrence for psi_n(x)'/psi_n(x) (logarithmic derivative)
         # See Bohren & Huffman, p. 127
         nmx = int(np.ceil(max(abs(y), n_coeffs)) + 15)
-        D = np.zeros(nmx, dtype='complex128')
+        D = np.zeros(nmx, dtype="complex128")
         for n in range(nmx - 2, -1, -1):
             rn = n + 2
             D[n] = rn / y - 1 / (D[n + 1] + rn / y)
@@ -158,14 +158,10 @@ class Bead:
 
         Dn = D[0:n_coeffs]
         n = np.arange(1, n_coeffs + 1)
-        an = (
-            (Dn / nrel + n / size_param) * psi_n - psi_n_1
-        ) / (
+        an = ((Dn / nrel + n / size_param) * psi_n - psi_n_1) / (
             (Dn / nrel + n / size_param) * ksi_n - ksi_n_1
         )
-        bn = (
-            (nrel * Dn + n / size_param) * psi_n - psi_n_1
-        ) / (
+        bn = ((nrel * Dn + n / size_param) * psi_n - psi_n_1) / (
             (nrel * Dn + n / size_param) * ksi_n - ksi_n_1
         )
 
@@ -200,32 +196,24 @@ class Bead:
         n = np.arange(1, n_coeffs + 1)
 
         jnx = sp.spherical_jn(n, size_param)
-        jn_1x = np.append(np.sin(size_param) / size_param, jnx[0:n_coeffs - 1])
+        jn_1x = np.append(np.sin(size_param) / size_param, jnx[0 : n_coeffs - 1])
 
         jny = sp.spherical_jn(n, y)
-        jn_1y = np.append(np.sin(y) / y, jny[0:n_coeffs - 1])
+        jn_1y = np.append(np.sin(y) / y, jny[0 : n_coeffs - 1])
 
         ynx = sp.spherical_yn(n, size_param)
-        yn_1x = np.append(
-            -np.cos(size_param) / size_param, ynx[0:n_coeffs - 1]
-        )
+        yn_1x = np.append(-np.cos(size_param) / size_param, ynx[0 : n_coeffs - 1])
         hnx = jnx + 1j * ynx
         hn_1x = jn_1x + 1j * yn_1x
 
-        cn = (
-            jnx * (size_param * hn_1x - n * hnx) -
-            hnx * (jn_1x * size_param - n * jnx)
-        ) / (
+        cn = (jnx * (size_param * hn_1x - n * hnx) - hnx * (jn_1x * size_param - n * jnx)) / (
             jny * (hn_1x * size_param - n * hnx) - hnx * (jn_1y * y - n * jny)
         )
 
         dn = (
-            nrel * jnx * (size_param * hn_1x - n * hnx) - nrel * hnx *
-            (size_param * jn_1x - n * jnx)
-        ) / (
-            nrel**2 * jny * (size_param * hn_1x - n * hnx) -
-            hnx * (y * jn_1y - n * jny)
-        )
+            nrel * jnx * (size_param * hn_1x - n * hnx)
+            - nrel * hnx * (size_param * jn_1x - n * jnx)
+        ) / (nrel**2 * jny * (size_param * hn_1x - n * hnx) - hnx * (y * jn_1y - n * jny))
 
         return cn, dn
 
@@ -248,10 +236,7 @@ class Bead:
 
         an, bn = self.ab_coeffs(num_orders=num_orders)
         C = 2 * (1 + np.arange(an.size)) + 1
-        return (
-            2 * self.size_param**-2 *
-            np.sum(C * (an + bn).real)
-        )
+        return 2 * self.size_param**-2 * np.sum(C * (an + bn).real)
 
     def scattering_eff(self, num_orders=None):
         """Return the scattering efficiency `Qsca` (for plane wave excitation),
@@ -272,10 +257,7 @@ class Bead:
 
         an, bn = self.ab_coeffs(num_orders=num_orders)
         C = 2 * (1 + np.arange(an.size)) + 1
-        return (
-            2 * self.size_param**-2 *
-            np.sum(C * (np.abs(an)**2 + np.abs(bn)**2))
-        )
+        return 2 * self.size_param**-2 * np.sum(C * (np.abs(an) ** 2 + np.abs(bn) ** 2))
 
     def pressure_eff(self, num_orders=None):
         """
@@ -300,19 +282,17 @@ class Bead:
         an, bn = self.ab_coeffs(num_orders=num_orders)
         n = 1 + np.arange(an.size)
         C = 2 * n + 1
-        C1 = n * (n + 2)/(n + 1)
-        C2 = C/(n * (n + 1))
-        an_1 = np.zeros(an.shape, dtype='complex128')
-        bn_1 = np.zeros(an.shape, dtype='complex128')
+        C1 = n * (n + 2) / (n + 1)
+        C2 = C / (n * (n + 1))
+        an_1 = np.zeros(an.shape, dtype="complex128")
+        bn_1 = np.zeros(an.shape, dtype="complex128")
         an_1[0:-2] = an[1:-1]
         bn_1[0:-2] = bn[1:-1]
 
-        return (
-            self.extinction_eff(num_orders) -
-            (
-                4 * self.size_param**-2 * np.sum(
-                    C1 * (an * np.conj(an_1) + bn * np.conj(bn_1)).real +
-                    C2 * (an * np.conj(bn)).real
-                )
+        return self.extinction_eff(num_orders) - (
+            4
+            * self.size_param**-2
+            * np.sum(
+                C1 * (an * np.conj(an_1) + bn * np.conj(bn_1)).real + C2 * (an * np.conj(bn)).real
             )
         )

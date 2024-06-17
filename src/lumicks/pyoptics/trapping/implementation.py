@@ -1,26 +1,23 @@
 import numpy as np
 from numba import njit
-from scipy.constants import (
-    mu_0 as MU0,
-    speed_of_light as C
-)
+from scipy.constants import mu_0 as MU0, speed_of_light as C
 
-from .local_coordinates import  (
+from .local_coordinates import (
     Coordinates,
-    CoordLocation,
 )
-from .radial_data import (
-    ExternalRadialData,
-    InternalRadialData
-)
+from .radial_data import ExternalRadialData, InternalRadialData
 from ..mathutils.associated_legendre import associated_legendre_dtheta
 from ..objective import FarfieldData
 from .bead import Bead
 
 
 def calculate_fields(
-    Ex: np.ndarray, Ey: np.ndarray, Ez: np.ndarray,
-    Hx: np.ndarray, Hy: np.ndarray, Hz: np.ndarray,
+    Ex: np.ndarray,
+    Ey: np.ndarray,
+    Ez: np.ndarray,
+    Hx: np.ndarray,
+    Hy: np.ndarray,
+    Hz: np.ndarray,
     bead: Bead = None,
     bead_center: tuple = (0, 0, 0),
     local_coordinates: Coordinates = None,
@@ -47,7 +44,7 @@ def calculate_fields(
     if r.size == 0:
         return
 
-    E = np.empty((3, r.size), dtype='complex128')
+    E = np.empty((3, r.size), dtype="complex128")
     if magnetic_field:
         H = np.empty_like(E)
 
@@ -60,23 +57,15 @@ def calculate_fields(
     # Skip points outside aperture
     rows, cols = np.nonzero(farfield_data.aperture)
     for row, col in zip(rows, cols):
-
         matrices = [
-            R_th(farfield_data.cos_theta[row, col],
-                 farfield_data.sin_theta[row, col]) @
-            R_phi(farfield_data.cos_phi[row, col],
-                  -farfield_data.sin_phi[row, col]),
-            R_phi(0, -1) @
-            R_th(farfield_data.cos_theta[row, col],
-                 farfield_data.sin_theta[row, col]) @
-            R_phi(farfield_data.cos_phi[row, col],
-                  -farfield_data.sin_phi[row, col])
+            R_th(farfield_data.cos_theta[row, col], farfield_data.sin_theta[row, col])
+            @ R_phi(farfield_data.cos_phi[row, col], -farfield_data.sin_phi[row, col]),
+            R_phi(0, -1)
+            @ R_th(farfield_data.cos_theta[row, col], farfield_data.sin_theta[row, col])
+            @ R_phi(farfield_data.cos_phi[row, col], -farfield_data.sin_phi[row, col]),
         ]
 
-        E0 = [
-            farfield_data.Einf_theta[row, col],
-            farfield_data.Einf_phi[row, col]
-        ]
+        E0 = [farfield_data.Einf_theta[row, col], farfield_data.Einf_phi[row, col]]
 
         for polarization in range(2):
             A = matrices[polarization]
@@ -96,10 +85,10 @@ def calculate_fields(
 
                 # Expand the legendre derivatives from the unique version
                 # of cos(theta)
-                sin_theta = ((1 + cos_theta) * (1 - cos_theta))**0.5
+                sin_theta = ((1 + cos_theta) * (1 - cos_theta)) ** 0.5
                 alp_sin_expanded = legendre_data(row, col)
                 alp_expanded = alp_sin_expanded * sin_theta
-                
+
                 for L in range(1, n_orders + 1):
                     alp_prev = alp_sin_expanded[L - 2, :] if L > 1 else None
                     alp_deriv_expanded[L - 1, :] = associated_legendre_dtheta(
@@ -117,31 +106,47 @@ def calculate_fields(
 
             if internal:
                 E = internal_field_fixed_r(
-                    cn, dn,
+                    cn,
+                    dn,
                     internal_radial_data.sphBessel,
                     internal_radial_data.jn_over_k1r,
                     internal_radial_data.jn_1,
                     alp_expanded,
-                    alp_sin_expanded, alp_deriv_expanded,
-                    cos_theta, cosP, sinP
+                    alp_sin_expanded,
+                    alp_deriv_expanded,
+                    cos_theta,
+                    cosP,
+                    sinP,
                 )
             else:
                 E = scattered_field_fixed_r(
-                    an, bn,
+                    an,
+                    bn,
                     external_radial_data.krH,
                     external_radial_data.dkrH_dkr,
                     external_radial_data.k0r,
-                    alp_expanded, alp_sin_expanded,
-                    alp_deriv_expanded, cos_theta, cosP, sinP,
-                    total_field
+                    alp_expanded,
+                    alp_sin_expanded,
+                    alp_deriv_expanded,
+                    cos_theta,
+                    cosP,
+                    sinP,
+                    total_field,
                 )
 
             E = np.matmul(A.T, E)
-            E *= E0[polarization] * np.exp(1j * (
-                farfield_data.kx[row, col] * bead_center[0] +
-                farfield_data.ky[row, col] * bead_center[1] +
-                farfield_data.kz[row, col] * bead_center[2])
-            ) / farfield_data.kz[row, col]
+            E *= (
+                E0[polarization]
+                * np.exp(
+                    1j
+                    * (
+                        farfield_data.kx[row, col] * bead_center[0]
+                        + farfield_data.ky[row, col] * bead_center[1]
+                        + farfield_data.kz[row, col] * bead_center[2]
+                    )
+                )
+                / farfield_data.kz[row, col]
+            )
 
             for idx, component in enumerate((Ex, Ey, Ez)):
                 component[region] += E[idx, :]
@@ -149,31 +154,49 @@ def calculate_fields(
             if magnetic_field:
                 if internal:
                     H = internal_H_field_fixed_r(
-                        cn, dn,
+                        cn,
+                        dn,
                         internal_radial_data.sphBessel,
                         internal_radial_data.jn_over_k1r,
                         internal_radial_data.jn_1,
                         alp_expanded,
-                        alp_sin_expanded, alp_deriv_expanded,
-                        cos_theta, cosP, sinP, bead.n_bead
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        cos_theta,
+                        cosP,
+                        sinP,
+                        bead.n_bead,
                     )
                 else:
                     H = scattered_H_field_fixed_r(
-                        an, bn,
+                        an,
+                        bn,
                         external_radial_data.krH,
                         external_radial_data.dkrH_dkr,
                         external_radial_data.k0r,
-                        alp_expanded, alp_sin_expanded,
-                        alp_deriv_expanded, cos_theta, cosP, sinP,
-                        bead.n_medium, total_field
+                        alp_expanded,
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        cos_theta,
+                        cosP,
+                        sinP,
+                        bead.n_medium,
+                        total_field,
                     )
 
                 H = np.matmul(A.T, H)
-                H *= E0[polarization] * np.exp(1j * (
-                    farfield_data.kx[row, col] * bead_center[0] +
-                    farfield_data.ky[row, col] * bead_center[1] +
-                    farfield_data.kz[row, col] * bead_center[2])
-                ) / farfield_data.kz[row, col]
+                H *= (
+                    E0[polarization]
+                    * np.exp(
+                        1j
+                        * (
+                            farfield_data.kx[row, col] * bead_center[0]
+                            + farfield_data.ky[row, col] * bead_center[1]
+                            + farfield_data.kz[row, col] * bead_center[2]
+                        )
+                    )
+                    / farfield_data.kz[row, col]
+                )
 
                 for idx, component in enumerate((Hx, Hy, Hz)):
                     component[region] += H[idx, :]
@@ -181,13 +204,18 @@ def calculate_fields(
 
 @njit(cache=True)
 def scattered_field_fixed_r(
-    an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
-    dkrh_dkr: np.ndarray, k0r: np.ndarray,
-    alp: np.ndarray, alp_sin: np.ndarray,
+    an: np.ndarray,
+    bn: np.ndarray,
+    krh: np.ndarray,
+    dkrh_dkr: np.ndarray,
+    k0r: np.ndarray,
+    alp: np.ndarray,
+    alp_sin: np.ndarray,
     alp_deriv: np.ndarray,
-    cos_theta: np.ndarray, cosP: np.ndarray,
+    cos_theta: np.ndarray,
+    cosP: np.ndarray,
     sinP: np.ndarray,
-    total_field=True
+    total_field=True,
 ):
     """
     Calculate the scattered electric field for plane wave excitation, at the
@@ -196,29 +224,29 @@ def scattered_field_fixed_r(
     functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
-    Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Ep = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
+    Er = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Et = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Ep = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
 
     sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
     L = np.arange(start=1, stop=an.size + 1)
-    C1 = 1j**(L + 1) * (2 * L + 1)
+    C1 = 1j ** (L + 1) * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
     for L in range(an.size, 0, -1):
-        Er += C1[L-1] * an[L - 1] * krh[L - 1, :] * alp[L-1, :]
+        Er += C1[L - 1] * an[L - 1] * krh[L - 1, :] * alp[L - 1, :]
 
-        Et += C2[L-1] * (
-            an[L - 1] * dkrh_dkr[L - 1, :] * alp_deriv[L - 1, :] +
-            1j * bn[L - 1] * krh[L - 1, :] * alp_sin[L - 1, :]
+        Et += C2[L - 1] * (
+            an[L - 1] * dkrh_dkr[L - 1, :] * alp_deriv[L - 1, :]
+            + 1j * bn[L - 1] * krh[L - 1, :] * alp_sin[L - 1, :]
         )
 
-        Ep += C2[L-1] * (
-            an[L - 1] * dkrh_dkr[L - 1, :] * alp_sin[L - 1, :] +
-            1j * bn[L - 1] * krh[L - 1, :] * alp_deriv[L - 1, :]
+        Ep += C2[L - 1] * (
+            an[L - 1] * dkrh_dkr[L - 1, :] * alp_sin[L - 1, :]
+            + 1j * bn[L - 1] * krh[L - 1, :] * alp_deriv[L - 1, :]
         )
 
-    Er *= -cosP / (k0r)**2
+    Er *= -cosP / (k0r) ** 2
     Et *= -cosP / (k0r)
     Ep *= sinP / (k0r)
     # Cartesian components
@@ -235,10 +263,17 @@ def scattered_field_fixed_r(
 
 @njit(cache=True)
 def internal_field_fixed_r(
-    cn: np.ndarray, dn: np.ndarray,
-    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray,
-    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
-    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray
+    cn: np.ndarray,
+    dn: np.ndarray,
+    sphBessel: np.ndarray,
+    jn_over_k1r: np.ndarray,
+    jn_1: np.ndarray,
+    alp: np.ndarray,
+    alp_sin: np.ndarray,
+    alp_deriv: np.ndarray,
+    cos_theta: np.ndarray,
+    cosP: np.ndarray,
+    sinP: np.ndarray,
 ):
     """
     Calculate the internal electric field for plane wave excitation, at the
@@ -247,28 +282,23 @@ def internal_field_fixed_r(
     functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
-    Er = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Et = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Ep = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
+    Er = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Et = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Ep = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
 
     sinT = np.sqrt(1 - cos_theta**2)
 
     for n in range(cn.size, 0, -1):
-        Er += - (1j**(n + 1) * (2*n + 1) * alp[n - 1, :] * dn[n - 1] *
-                 jn_over_k1r[n - 1, :])
+        Er += -(1j ** (n + 1) * (2 * n + 1) * alp[n - 1, :] * dn[n - 1] * jn_over_k1r[n - 1, :])
 
-        Et += 1j**n * (2 * n + 1) / (n * (n + 1)) * (
-            cn[n - 1] *
-            alp_sin[n - 1, :] * sphBessel[n - 1, :] - 1j * dn[n - 1] *
-            alp_deriv[n - 1, :] * (
-                jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :]
-            )
+        Et += (1j**n * (2 * n + 1) / (n * (n + 1))) * (
+            cn[n - 1] * alp_sin[n - 1, :] * sphBessel[n - 1, :]
+            - 1j * dn[n - 1] * alp_deriv[n - 1, :] * (jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
         )
 
-        Ep += -1j**n * (2 * n + 1) / (n * (n + 1)) * (
-            cn[n - 1] * alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-            1j*dn[n - 1] * alp_sin[n - 1, :] * (
-                jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
+        Ep += (-(1j**n) * (2 * n + 1) / (n * (n + 1))) * (
+            cn[n - 1] * alp_deriv[n - 1, :] * sphBessel[n - 1, :]
+            - 1j * dn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
         )
 
     Er *= -cosP
@@ -283,13 +313,19 @@ def internal_field_fixed_r(
 
 @njit(cache=True)
 def scattered_H_field_fixed_r(
-    an: np.ndarray, bn: np.ndarray, krh: np.ndarray,
-    dkrh_dkr: np.ndarray, k0r: np.ndarray,
-    alp: np.ndarray, alp_sin: np.ndarray,
+    an: np.ndarray,
+    bn: np.ndarray,
+    krh: np.ndarray,
+    dkrh_dkr: np.ndarray,
+    k0r: np.ndarray,
+    alp: np.ndarray,
+    alp_sin: np.ndarray,
     alp_deriv: np.ndarray,
-    cos_theta: np.ndarray, cosP: np.ndarray,
-    sinP: np.ndarray, n_medium: float,
-    total_field=True
+    cos_theta: np.ndarray,
+    cosP: np.ndarray,
+    sinP: np.ndarray,
+    n_medium: float,
+    total_field=True,
 ):
     """
     Calculate the scattered magnetic field for plane wave excitation, at the
@@ -298,9 +334,9 @@ def scattered_H_field_fixed_r(
     functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
-    Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Hp = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
+    Hr = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Ht = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Hp = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
 
     sinT = np.sqrt(1 - cos_theta**2)
 
@@ -311,18 +347,18 @@ def scattered_H_field_fixed_r(
         Hr += C1[L - 1] * 1j * bn[L - 1] * krh[L - 1, :] * alp[L - 1, :]
 
         Ht += C2[L - 1] * (
-            1j * bn[L - 1] * dkrh_dkr[L - 1, :] * alp_deriv[L - 1, :] -
-            an[L - 1] * krh[L - 1, :] * alp_sin[L - 1, :]
+            1j * bn[L - 1] * dkrh_dkr[L - 1, :] * alp_deriv[L - 1, :]
+            - an[L - 1] * krh[L - 1, :] * alp_sin[L - 1, :]
         )
 
         Hp += C2[L - 1] * (
-            1j * bn[L - 1] * dkrh_dkr[L - 1, :] * alp_sin[L - 1, :] -
-            an[L - 1] * krh[L - 1, :] * alp_deriv[L - 1, :]
+            1j * bn[L - 1] * dkrh_dkr[L - 1, :] * alp_sin[L - 1, :]
+            - an[L - 1] * krh[L - 1, :] * alp_deriv[L - 1, :]
         )
 
     # Extra factor of -1 as B&H does not include the Condon–Shortley phase,
     # but our associated Legendre polynomials do include it
-    Hr *= -sinP / (k0r)**2 * n_medium / (C * MU0)
+    Hr *= -sinP / (k0r) ** 2 * n_medium / (C * MU0)
     Ht *= -sinP / (k0r) * n_medium / (C * MU0)
     Hp *= -cosP / (k0r) * n_medium / (C * MU0)
 
@@ -340,11 +376,18 @@ def scattered_H_field_fixed_r(
 
 @njit(cache=True)
 def internal_H_field_fixed_r(
-    cn: np.ndarray, dn: np.ndarray,
-    sphBessel: np.ndarray, jn_over_k1r: np.ndarray, jn_1: np.ndarray,
-    alp: np.ndarray, alp_sin: np.ndarray, alp_deriv: np.ndarray,
-    cos_theta: np.ndarray, cosP: np.ndarray, sinP: np.ndarray,
-    n_bead: np.complex128
+    cn: np.ndarray,
+    dn: np.ndarray,
+    sphBessel: np.ndarray,
+    jn_over_k1r: np.ndarray,
+    jn_1: np.ndarray,
+    alp: np.ndarray,
+    alp_sin: np.ndarray,
+    alp_deriv: np.ndarray,
+    cos_theta: np.ndarray,
+    cosP: np.ndarray,
+    sinP: np.ndarray,
+    n_bead: np.complex128,
 ):
     """
     Calculate the internal magnetic field for plane wave excitation, at the
@@ -353,28 +396,23 @@ def internal_H_field_fixed_r(
     functions, Associated Legendre polynomials and derivatives.
     """
     # Radial, theta and phi-oriented fields
-    Hr = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Ht = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
-    Hp = np.zeros((1, cos_theta.shape[0]), dtype='complex128')
+    Hr = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Ht = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
+    Hp = np.zeros((1, cos_theta.shape[0]), dtype="complex128")
 
     sinT = np.sqrt(1 - cos_theta**2)
 
     for n in range(cn.size, 0, -1):
-        Hr += (1j**(n + 1) * (2*n + 1) * alp[n - 1, :] * cn[n - 1] *
-               jn_over_k1r[n - 1, :])
+        Hr += 1j ** (n + 1) * (2 * n + 1) * alp[n - 1, :] * cn[n - 1] * jn_over_k1r[n - 1, :]
 
-        Ht += 1j**n * (2 * n + 1) / (n * (n + 1)) * (
-            dn[n - 1] * alp_sin[n - 1, :] * sphBessel[n - 1, :] -
-            1j * cn[n - 1] * alp_deriv[n - 1, :] * (
-                jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :]
-            )
+        Ht += (1j**n * (2 * n + 1) / (n * (n + 1))) * (
+            dn[n - 1] * alp_sin[n - 1, :] * sphBessel[n - 1, :]
+            - 1j * cn[n - 1] * alp_deriv[n - 1, :] * (jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
         )
 
-        Hp += - 1j**n * (2 * n + 1) / (n * (n + 1)) * (
-            dn[n - 1] * alp_deriv[n - 1, :] * sphBessel[n - 1, :] -
-            1j*cn[n - 1] * alp_sin[n - 1, :] * (
-                jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :]
-            )
+        Hp += (-(1j**n) * (2 * n + 1) / (n * (n + 1))) * (
+            dn[n - 1] * alp_deriv[n - 1, :] * sphBessel[n - 1, :]
+            - 1j * cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
         )
 
     Hr *= sinP * n_bead / (C * MU0)
@@ -388,12 +426,8 @@ def internal_H_field_fixed_r(
 
 
 def R_phi(cos_phi, sin_phi):
-    return np.asarray([[cos_phi, -sin_phi, 0],
-                       [sin_phi, cos_phi, 0],
-                       [0, 0, 1]])
+    return np.asarray([[cos_phi, -sin_phi, 0], [sin_phi, cos_phi, 0], [0, 0, 1]])
 
 
 def R_th(cos_th, sin_th):
-    return np.asarray([[cos_th, 0, sin_th],
-                       [0,  1,  0],
-                       [-sin_th, 0, cos_th]])
+    return np.asarray([[cos_th, 0, sin_th], [0, 1, 0], [-sin_th, 0, cos_th]])
