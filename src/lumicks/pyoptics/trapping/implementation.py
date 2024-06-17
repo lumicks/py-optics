@@ -230,7 +230,7 @@ def scattered_field_fixed_r(
 
     sinT = np.sqrt(1 - cos_theta**2)  # for theta = 0...pi
 
-    L = np.arange(start=1, stop=an.size + 1)
+    L = np.arange(1, stop=an.size + 1)
     C1 = 1j ** (L + 1) * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
     for L in range(an.size, 0, -1):
@@ -340,7 +340,7 @@ def scattered_H_field_fixed_r(
 
     sinT = np.sqrt(1 - cos_theta**2)
 
-    L = np.arange(start=1, stop=an.size + 1)
+    L = np.arange(1, stop=an.size + 1)
     C1 = 1j**L * (2 * L + 1)
     C2 = C1 / (L * (L + 1))
     for L in range(an.size, 0, -1):
