@@ -1,10 +1,14 @@
+from dataclasses import fields
+
 import numpy as np
 from numba import njit, prange
-from dataclasses import fields
-from ..mathutils.associated_legendre import associated_legendre_over_sin_theta
-from .local_coordinates import Coordinates
+
 from ..farfield_data import FarfieldData
-from .data_lookup import DataLookup
+from ..mathutils.associated_legendre import (
+    associated_legendre_dtheta,
+    associated_legendre_over_sin_theta,
+)
+from .local_coordinates import Coordinates
 
 
 @njit(cache=True, parallel=True)
@@ -127,4 +131,6 @@ def calculate_legendre(
     alp_sin_theta = _alp_sin_theta_with_parity(
         unique_abs_cos_theta, sign_inv, max_negative_index, n_orders
     )
-    return DataLookup(alp_sin_theta, inverse)
+    alp_dtheta = np.empty_like(alp_sin_theta)
+    associated_legendre_dtheta(unique_cos_theta, alp_sin_theta, alp_dtheta)
+    return (alp_sin_theta, inverse), (alp_dtheta, inverse)
