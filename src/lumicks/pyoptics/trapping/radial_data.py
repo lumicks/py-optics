@@ -49,6 +49,11 @@ def calculate_external(k: float, radii: np.ndarray, n_orders: int):
             sqrt_x * (sp.jv(L + 0.5, k0r_unique) + 1j * sp.yv(L + 0.5, k0r_unique))
         )[inverse]
         krH[L - 1, :] = k0r * sphHankel[L - 1, :]
+        # d/dp [p h_n(p)] = p h_n'(p) + h_n(p)
+        # h_n'(p) = h_{n−1}⁡(p) − ((n + 1) / p) h_n⁡(p) (See https://dlmf.nist.gov/10.51 10.51.2)
+        # Then, d/dp [p h_n(p)] = p h_{n−1}⁡(p) − (n + 1) h_n⁡(p) + h_n(p)
+        #                       = p h_{n−1}⁡(p) − n h_n⁡(p)
+        # With p = kr and n = L, we get:
         dkrH_dkr[L - 1, :] = krh_1 - L * sphHankel[L - 1, :]
         krh_1 = krH[L - 1, :]
 
