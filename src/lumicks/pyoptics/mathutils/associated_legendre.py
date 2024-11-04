@@ -30,7 +30,7 @@ def associated_legendre(n: int, x: np.ndarray):
 
 
 @njit(cache=True, parallel=False)
-def associated_legendre_dtheta(n: int, cos_theta: np.ndarray, alp_sin_pre=(None, None)):
+def associated_legendre_dtheta(cos_theta: np.ndarray, alp_sin_pre, out: np.ndarray):
     """Evaluate the derivative of the associated legendre polynomial
     :math:`dP_n^1(\\cos(\\theta))/d\\theta`.
 
@@ -40,30 +40,31 @@ def associated_legendre_dtheta(n: int, cos_theta: np.ndarray, alp_sin_pre=(None,
         degree
     cos_theta : np.ndarray
         The values of :math:`\\cos(\\theta)` to evaluate :math:`dP_n^1(\\cos(\\theta))/d\\theta`.
-    alp_sin_pre : tuple, optional
-        If :math:`P_n^1(\\cos(\\theta))/\\sin(\\theta)` are precalculated for order `n` and order `n -
-        1`, then these can be provided to the function, which saves processing time. If these are
-        not available, they will be calculated on the fly. By default the value is (None, None)
+    alp_sin_pre : np.ndarray
+        An (n, len(cos_theta)) Numpy array of :math:`P_n^1(\\cos(\\theta))/\\sin(\\theta)` values
+        that are precalculated for up to order `n`.
 
     Returns
     -------
     np.ndarray
-        The derivative at :math:`\\cos(\\theta)`.
+        The derivative to :math:`\\theta` evaluated at :math:`\\cos(\\theta)`.
     """
-    if (alp_sin_pre[0] is None or alp_sin_pre[1] is None) and n > 1:
-        alp = associated_legendre_over_sin_theta(n, cos_theta)
-        alp_1 = associated_legendre_over_sin_theta(n - 1, cos_theta)
-    else:
-        alp = alp_sin_pre[0]
-        alp_1 = alp_sin_pre[1]
+    # See https://dlmf.nist.gov/14.10 eq. 14.10.5:
+    # (1−x^2) ⁢d𝖯_n^μ⁡(x) / dx = (n + μ) ⁢𝖯_{n − 1}^μ⁡(x) − n ⁢x ⁢𝖯_n^μ⁡(x).
+    # For µ = 1 and x = cos(theta):
+    # d𝖯_n⁡(cos θ) / d(cos θ) = [(n + 1) ⁢𝖯_{n − 1}⁡(cos θ) − n cos θ ⁢𝖯_n⁡(cos θ)]/sin^2(θ)
 
-    if n == 1:
-        result = -cos_theta
-    else:
-        # See https://dlmf.nist.gov/14.10 eq. 14.10.5
-        result = n * cos_theta * alp - (n + 1) * alp_1
+    # Required is d𝖯_n⁡(cos θ) / dθ, which is d𝖯_n⁡(cos θ) / d(cos θ) * d(cos θ)/dθ
+    # = - d𝖯_n⁡(cos θ) / d(cos θ) sin(θ)
+    # = [n cos θ ⁢𝖯_n⁡(cos θ) - (n + 1) ⁢𝖯_{n − 1}⁡(cos θ)]/sin(θ)
 
-    return result
+    cos_theta = cos_theta.reshape(1, cos_theta.size)
+    out[0, :] = -cos_theta
+    if alp_sin_pre.shape[0] == 1:
+        return
+    n = np.arange(2, stop=alp_sin_pre.shape[0] + 1).reshape(alp_sin_pre.shape[0] - 1, -1)
+
+    out[1:, :] = n * alp_sin_pre[1:, :] * cos_theta - (n + 1) * alp_sin_pre[:-1, :]
 
 
 @njit(cache=True, parallel=False, fastmath=False)
