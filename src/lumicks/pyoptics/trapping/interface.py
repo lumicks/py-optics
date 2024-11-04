@@ -1,18 +1,98 @@
+from typing import Tuple
 import numpy as np
 from scipy.constants import speed_of_light as _C, epsilon_0 as EPS0, mu_0 as MU0
 import logging
 
 from .bead import Bead
 from ..mathutils.lebedev_laikov import get_integration_locations, get_nearest_order
-from .legendre_data import calculate_legendre
-from .radial_data import calculate_external, calculate_internal
-from .local_coordinates import (
-    LocalBeadCoordinates,
-    ExternalBeadCoordinates,
-    InternalBeadCoordinates,
-)
-from ..objective import Objective, FarfieldData
-from .implementation import calculate_fields
+from .local_coordinates import LocalBeadCoordinates
+from ..objective import Objective
+from .focused_field_calculation import focus_field_factory
+from .plane_wave_field_calculation import plane_wave_field_factory
+
+
+def force_factory(
+    f_input_field,
+    objective: Objective,
+    bead: Bead,
+    bfp_sampling_n: int = 31,
+    num_orders: int = None,
+    integration_orders: int = None,
+    verbose: bool = False,
+):
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
+
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+
+    if integration_orders is None:
+        # Go to the next higher available order of integration than should
+        # be strictly necessary
+        order = get_nearest_order(get_nearest_order(n_orders) + 1)
+        x, y, z, w = get_integration_locations(order)
+    else:
+        x, y, z, w = get_integration_locations(
+            get_nearest_order(np.amax((1, int(integration_orders))))
+        )
+
+    x, y, z, w = [np.asarray(c) for c in (x, y, z, w)]
+
+    xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
+
+    local_coordinates = LocalBeadCoordinates(xb, yb, zb, bead.bead_diameter, (0, 0, 0), grid=False)
+
+    external_fields_func = focus_field_factory(
+        objective, bead, n_orders, bfp_sampling_n, f_input_field, local_coordinates, False
+    )
+    _eps = EPS0 * bead.n_medium**2
+    _mu = MU0
+
+    def force_on_bead(
+        bead_center: Tuple[float, float, float],
+    ):
+        Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, True)
+
+        Te11 = _eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2)
+        Te12 = _eps * np.real(Ex * np.conj(Ey))
+        Te13 = _eps * np.real(Ex * np.conj(Ez))
+        Te22 = _eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2)
+        Te23 = _eps * np.real(Ey * np.conj(Ez))
+        Te33 = _eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2)
+        Th11 = _mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2)
+        Th12 = _mu * np.real(Hx * np.conj(Hy))
+        Th13 = _mu * np.real(Hx * np.conj(Hz))
+        Th22 = _mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2)
+        Th23 = _mu * np.real(Hy * np.conj(Hz))
+        Th33 = _mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2)
+        F = np.zeros((3, 1))
+        n = np.empty((3, 1))
+
+        for k in np.arange(x.size):
+            TE = np.asarray(
+                [
+                    [Te11[k], Te12[k], Te13[k]],
+                    [Te12[k], Te22[k], Te23[k]],
+                    [Te13[k], Te23[k], Te33[k]],
+                ]
+            )
+
+            TH = np.asarray(
+                [
+                    [Th11[k], Th12[k], Th13[k]],
+                    [Th12[k], Th22[k], Th23[k]],
+                    [Th13[k], Th23[k], Th33[k]],
+                ]
+            )
+
+            T = TE + TH
+            n[0] = x[k]
+            n[1] = y[k]
+            n[2] = z[k]
+            F += T @ n * w[k]
+        # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
+        return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
+
+    return force_on_bead
 
 
 def fields_focus_gaussian(
@@ -240,126 +320,48 @@ def fields_focus(
     if verbose:
         logging.getLogger().setLevel(logging.INFO)
 
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
+    # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
+    x, y, z = [np.atleast_1d(coord).astype(np.float64) for coord in (x, y, z)]
     # TODO: warning criteria for undersampling/aliasing
     # M = int(np.max((31, 2 * NA**2 * np.max(np.abs(z)) /
     #        (np.sqrt(self.n_medium**2 - NA**2) * self.lambda_vac))))
     # if M > bfp_sampling_n:
     #    print('bfp_sampling_n lower than recommendation for convergence')
 
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, bead_center, grid=grid)
-    internal_coordinates = InternalBeadCoordinates(local_coordinates)
-    external_coordinates = ExternalBeadCoordinates(local_coordinates)
-
-    an, _ = bead.ab_coeffs(num_orders)
-    n_orders = an.size
-
-    bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n
-    )
-
-    farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)
-
-    logging.info("Calculating Hankel functions and derivatives")
-    external_radial_data = calculate_external(bead.k, external_coordinates.r, n_orders)
-
-    logging.info("Calculating Associated Legendre polynomials for external fields")
-    legendre_data_ext = calculate_legendre(
-        external_coordinates, farfield_data=farfield_data, n_orders=n_orders
-    )
-
-    Ex = np.zeros(local_coordinates.coordinate_shape, dtype="complex128")
-    Ey = np.zeros_like(Ex)
-    Ez = np.zeros_like(Ex)
-
-    if magnetic_field:
-        Hx = np.zeros_like(Ex)
-        Hy = np.zeros_like(Ex)
-        Hz = np.zeros_like(Ex)
-    else:
-        Hx = 0
-        Hy = 0
-        Hz = 0
 
     logging.info("Calculating external fields")
-
-    calculate_fields(
-        Ex,
-        Ey,
-        Ez,
-        Hx,
-        Hy,
-        Hz,
+    external_fields = focus_field_factory(
+        objective=objective,
         bead=bead,
-        bead_center=bead_center,
-        local_coordinates=external_coordinates,
-        farfield_data=farfield_data,
-        legendre_data=legendre_data_ext,
-        external_radial_data=external_radial_data,
+        n_orders=n_orders,
+        bfp_sampling_n=bfp_sampling_n,
+        f_input_field=f_input_field,
+        local_coordinates=local_coordinates,
         internal=False,
-        total_field=total_field,
-        magnetic_field=magnetic_field,
-    )
-
-    logging.info("Calculating Bessel functions and derivatives")
-    internal_radial_data = calculate_internal(bead.k1, internal_coordinates.r, n_orders)
-
-    logging.info("Calculating Associated Legendre polynomials for internal fields")
-    legendre_data_int = calculate_legendre(
-        internal_coordinates, farfield_data=farfield_data, n_orders=n_orders
-    )
+    )(bead_center, True, magnetic_field, total_field)
 
     logging.info("Calculating internal fields")
-    calculate_fields(
-        Ex,
-        Ey,
-        Ez,
-        Hx,
-        Hy,
-        Hz,
+    internal_fields = focus_field_factory(
+        objective=objective,
         bead=bead,
-        bead_center=bead_center,
-        local_coordinates=internal_coordinates,
-        farfield_data=farfield_data,
-        legendre_data=legendre_data_int,
-        internal_radial_data=internal_radial_data,
+        n_orders=n_orders,
+        bfp_sampling_n=bfp_sampling_n,
+        f_input_field=f_input_field,
+        local_coordinates=local_coordinates,
         internal=True,
-        total_field=total_field,
-        magnetic_field=magnetic_field,
-    )
+    )(bead_center, True, magnetic_field)
+
+    for external, internal in zip(external_fields, internal_fields):
+        external += internal
+    ret = external_fields
 
     logging.getLogger().setLevel(loglevel)
-    ks = bead.k * objective.NA / bead.n_medium
-    dk = ks / (bfp_sampling_n - 1)
-    phase = (-1j * objective.focal_length) * (
-        np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi)
-    )
-
-    for component in (Ex, Ey, Ez):
-        component *= phase
-
-    Ex = np.squeeze(Ex)
-    Ey = np.squeeze(Ey)
-    Ez = np.squeeze(Ez)
-
-    ret = (Ex, Ey, Ez)
-
-    if magnetic_field:
-        for component in (Hx, Hy, Hz):
-            component *= phase
-        Hx = np.squeeze(Hx)
-        Hy = np.squeeze(Hy)
-        Hz = np.squeeze(Hz)
-
-        ret += (Hx, Hy, Hz)
 
     if return_grid:
-        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
-        X = np.squeeze(X)
-        Y = np.squeeze(Y)
-        Z = np.squeeze(Z)
+        grid = np.meshgrid(x, y, z, indexing="ij")
+        X, Y, Z = (np.squeeze(axis) for axis in grid)
         ret += (X, Y, Z)
 
     return ret
@@ -434,119 +436,36 @@ def fields_plane_wave(
     if verbose:
         logging.getLogger().setLevel(logging.INFO)
 
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
+    # Enforce floats to ensure Numba gets the same type in @ / np.matmul
+    x, y, z = [np.atleast_1d(c).astype(np.float64) for c in (x, y, z)]
 
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, grid=grid)
-    internal_coordinates = InternalBeadCoordinates(local_coordinates)
-    external_coordinates = ExternalBeadCoordinates(local_coordinates)
 
-    an, _ = bead.ab_coeffs(num_orders)
-    n_orders = an.size
-
-    # Create a FarFieldData object that contains a single pixel == single plane
-    # wave angles theta and phi and with amplitude and polarization (E_theta,
-    # E_phi) given by `polarization`
-    cos_theta = np.atleast_2d(np.cos(theta))
-    sin_theta = np.atleast_2d(np.sin(theta))
-    cos_phi = np.atleast_2d(np.cos(phi))
-    sin_phi = np.atleast_2d(np.sin(phi))
-    kz = bead.k * cos_theta
-    kp = bead.k * sin_theta
-    ky = -kp * sin_phi
-    kx = -kp * cos_phi
-
-    farfield_data = FarfieldData(
-        Einf_theta=np.atleast_2d(polarization[0]) * kz,
-        Einf_phi=np.atleast_2d(polarization[1]) * kz,
-        aperture=np.atleast_2d(True),
-        cos_theta=cos_theta,
-        sin_theta=sin_theta,
-        cos_phi=cos_phi,
-        sin_phi=sin_phi,
-        kz=kz,
-        ky=ky,
-        kx=kx,
-        kp=kp,
-    )
-
-    logging.info("Calculating Hankel functions and derivatives")
-    external_radial_data = calculate_external(bead.k, external_coordinates.r, n_orders)
-
-    logging.info("Calculating Associated Legendre polynomials for external fields")
-    legendre_data_ext = calculate_legendre(external_coordinates, farfield_data, n_orders)
-
-    Ex = np.zeros(local_coordinates.coordinate_shape, dtype="complex128")
-    Ey = np.zeros_like(Ex)
-    Ez = np.zeros_like(Ex)
-
-    if magnetic_field:
-        Hx = np.zeros_like(Ex)
-        Hy = np.zeros_like(Ex)
-        Hz = np.zeros_like(Ex)
-    else:
-        Hx = 0
-        Hy = 0
-        Hz = 0
-
-    logging.info("Calculating external fields")
-
-    calculate_fields(
-        Ex,
-        Ey,
-        Ez,
-        Hx,
-        Hy,
-        Hz,
+    external_fields = plane_wave_field_factory(
         bead=bead,
-        bead_center=(0, 0, 0),
-        local_coordinates=external_coordinates,
-        farfield_data=farfield_data,
-        legendre_data=legendre_data_ext,
-        external_radial_data=external_radial_data,
+        n_orders=n_orders,
+        theta=theta,
+        phi=phi,
+        local_coordinates=local_coordinates,
         internal=False,
-        total_field=total_field,
-        magnetic_field=magnetic_field,
-    )
-
-    logging.info("Calculating Bessel functions and derivatives")
-    internal_radial_data = calculate_internal(bead.k1, internal_coordinates.r, n_orders)
-
-    logging.info("Calculating Associated Legendre polynomials for internal fields")
-    legendre_data_int = calculate_legendre(internal_coordinates, farfield_data, n_orders)
-
+    )(polarization, True, magnetic_field, total_field)
     logging.info("Calculating internal fields")
-    calculate_fields(
-        Ex,
-        Ey,
-        Ez,
-        Hx,
-        Hy,
-        Hz,
+
+    internal_fields = plane_wave_field_factory(
         bead=bead,
-        bead_center=(0, 0, 0),
-        local_coordinates=internal_coordinates,
-        farfield_data=farfield_data,
-        legendre_data=legendre_data_int,
-        internal_radial_data=internal_radial_data,
+        n_orders=n_orders,
+        theta=theta,
+        phi=phi,
+        local_coordinates=local_coordinates,
         internal=True,
-        total_field=total_field,
-        magnetic_field=magnetic_field,
-    )
+    )(polarization, True, magnetic_field)
+
+    for external, internal in zip(external_fields, internal_fields):
+        external += internal
+    ret = external_fields
+
     logging.getLogger().setLevel(loglevel)
-
-    Ex = np.squeeze(Ex)
-    Ey = np.squeeze(Ey)
-    Ez = np.squeeze(Ez)
-
-    ret = (Ex, Ey, Ez)
-
-    if magnetic_field:
-        Hx = np.squeeze(Hx)
-        Hy = np.squeeze(Hy)
-        Hz = np.squeeze(Hz)
-        ret += (Hx, Hy, Hz)
 
     if return_grid:
         X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
@@ -615,87 +534,16 @@ def forces_focus(
     F : an array with the force on the bead in the x direction F[0], in the
         y direction F[1] and in the z direction F[2]. The force is in [N].
     """
-
-    an, _ = bead.ab_coeffs(num_orders)
-    n_orders = an.size
-
-    if integration_orders is None:
-        # Go to the next higher available order of integration than should
-        # be strictly necessary
-        order = get_nearest_order(get_nearest_order(n_orders) + 1)
-        x, y, z, w = get_integration_locations(order)
-    else:
-        x, y, z, w = get_integration_locations(
-            get_nearest_order(np.amax((1, int(integration_orders))))
-        )
-
-    x = np.asarray(x)
-    y = np.asarray(y)
-    z = np.asarray(z)
-    w = np.asarray(w)
-
-    xb = x * bead.bead_diameter * 0.51 + bead_center[0]
-    yb = y * bead.bead_diameter * 0.51 + bead_center[1]
-    zb = z * bead.bead_diameter * 0.51 + bead_center[2]
-
-    Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
-        f_input_field,
-        objective,
-        bead,
-        bead_center,
-        xb,
-        yb,
-        zb,
-        bfp_sampling_n,
-        num_orders,
-        return_grid=False,
-        total_field=True,
-        magnetic_field=True,
+    force_fun = force_factory(
+        f_input_field=f_input_field,
+        objective=objective,
+        bead=bead,
+        bfp_sampling_n=bfp_sampling_n,
+        num_orders=num_orders,
+        integration_orders=integration_orders,
         verbose=verbose,
-        grid=False,
     )
-    _eps = EPS0 * bead.n_medium**2
-    _mu = MU0
-
-    Te11 = _eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2)
-    Te12 = _eps * np.real(Ex * np.conj(Ey))
-    Te13 = _eps * np.real(Ex * np.conj(Ez))
-    Te22 = _eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2)
-    Te23 = _eps * np.real(Ey * np.conj(Ez))
-    Te33 = _eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2)
-    Th11 = _mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2)
-    Th12 = _mu * np.real(Hx * np.conj(Hy))
-    Th13 = _mu * np.real(Hx * np.conj(Hz))
-    Th22 = _mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2)
-    Th23 = _mu * np.real(Hy * np.conj(Hz))
-    Th33 = _mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2)
-    F = np.zeros((3, 1))
-    n = np.empty((3, 1))
-
-    for k in np.arange(x.size):
-        TE = np.asarray(
-            [
-                [Te11[k], Te12[k], Te13[k]],
-                [Te12[k], Te22[k], Te23[k]],
-                [Te13[k], Te23[k], Te33[k]],
-            ]
-        )
-
-        TH = np.asarray(
-            [
-                [Th11[k], Th12[k], Th13[k]],
-                [Th12[k], Th22[k], Th23[k]],
-                [Th13[k], Th23[k], Th33[k]],
-            ]
-        )
-
-        T = TE + TH
-        n[0] = x[k]
-        n[1] = y[k]
-        n[2] = z[k]
-        F += T @ n * w[k]
-    # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
-    return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
+    return force_fun(bead_center)
 
 
 def absorbed_power_focus(
@@ -758,9 +606,10 @@ def absorbed_power_focus(
     -------
     Pabs : the absorbed power in Watts.
     """
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
-    an, _ = bead.ab_coeffs(num_orders)
-    n_orders = an.size
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
     if integration_orders is None:
         # Go to the next higher available order of integration than should
@@ -772,14 +621,12 @@ def absorbed_power_focus(
             get_nearest_order(np.amax((1, int(integration_orders))))
         )
 
-    x = np.asarray(x)
-    y = np.asarray(y)
-    z = np.asarray(z)
-    w = np.asarray(w)
+    # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
+    x, y, z, w = [np.asarray(coord).astype(np.float64) for coord in (x, y, z, w)]
 
-    xb = x * bead.bead_diameter * 0.51 + bead_center[0]
-    yb = y * bead.bead_diameter * 0.51 + bead_center[1]
-    zb = z * bead.bead_diameter * 0.51 + bead_center[2]
+    xb, yb, zb = [
+        ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
+    ]
 
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
         f_input_field,
@@ -867,8 +714,10 @@ def scattered_power_focus(
     Psca : the scattered power in Watts.
     """
 
-    an, _ = bead.ab_coeffs(num_orders)
-    n_orders = an.size
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
+
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
     if integration_orders is None:
         # Go to the next higher available order of integration than should
@@ -880,14 +729,12 @@ def scattered_power_focus(
             get_nearest_order(np.amax((1, int(integration_orders))))
         )
 
-    x = np.asarray(x)
-    y = np.asarray(y)
-    z = np.asarray(z)
-    w = np.asarray(w)
+    # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
+    x, y, z, w = [np.asarray(coord).astype(np.float64) for coord in (x, y, z, w)]
 
-    xb = x * bead.bead_diameter * 0.51 + bead_center[0]
-    yb = y * bead.bead_diameter * 0.51 + bead_center[1]
-    zb = z * bead.bead_diameter * 0.51 + bead_center[2]
+    xb, yb, zb = [
+        ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
+    ]
 
     Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
         f_input_field,
