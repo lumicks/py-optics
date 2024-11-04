@@ -107,7 +107,9 @@ class Objective:
             bfp_sampling_n=bfp_sampling_n,
         )
 
-        Ex_bfp, Ey_bfp = f_input_field(*astuple(bfp_coords))
+        Ex_bfp, Ey_bfp = (
+            f_input_field(*astuple(bfp_coords)) if f_input_field is not None else (None, None)
+        )
 
         return bfp_coords, BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
 
@@ -126,7 +128,7 @@ class Objective:
         bfp_sampling_n = bfp_coords.bfp_sampling_n
         sin_theta_x = bfp_coords.x_bfp / self.focal_length
         sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length
+        sin_theta = bfp_coords.r_bfp / self.focal_length * bfp_coords.aperture
         aperture = bfp_coords.aperture  # sin_theta <= self.sin_theta_max
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
