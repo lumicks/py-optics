@@ -43,7 +43,7 @@ def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k
     )
 
 
-def _plane_wave_field_factory(
+def plane_wave_field_factory(
     bead: Bead,
     n_orders: int,
     theta: float,
