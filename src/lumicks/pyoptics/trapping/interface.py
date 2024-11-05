@@ -7,8 +7,8 @@ from .bead import Bead
 from ..mathutils.lebedev_laikov import get_integration_locations, get_nearest_order
 from .local_coordinates import LocalBeadCoordinates
 from ..objective import Objective
-from .focused_field_calculation import focus_field_factory
-from .plane_wave_field_calculation import plane_wave_field_factory
+from .focused_field_calculation import _focus_field_factory
+from .plane_wave_field_calculation import _plane_wave_field_factory
 
 
 def force_factory(
@@ -18,30 +18,24 @@ def force_factory(
     bfp_sampling_n: int = 31,
     num_orders: int = None,
     integration_orders: int = None,
-    verbose: bool = False,
 ):
     if bead.n_medium != objective.n_medium:
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
-
-    if integration_orders is None:
-        # Go to the next higher available order of integration than should
-        # be strictly necessary
-        order = get_nearest_order(get_nearest_order(n_orders) + 1)
-        x, y, z, w = get_integration_locations(order)
-    else:
-        x, y, z, w = get_integration_locations(
-            get_nearest_order(np.amax((1, int(integration_orders))))
-        )
-
-    x, y, z, w = [np.asarray(c) for c in (x, y, z, w)]
+    integration_orders = (
+        get_nearest_order(n_orders + 1)  # Get next-highest integration order if not specified
+        if integration_orders is None
+        else get_nearest_order(np.amax((1, int(integration_orders))))
+    )
+    x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
 
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
-    local_coordinates = LocalBeadCoordinates(xb, yb, zb, bead.bead_diameter, (0, 0, 0), grid=False)
-
-    external_fields_func = focus_field_factory(
+    local_coordinates = LocalBeadCoordinates(
+        xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
+    )
+    external_fields_func = _focus_field_factory(
         objective, bead, n_orders, bfp_sampling_n, f_input_field, local_coordinates, False
     )
     _eps = EPS0 * bead.n_medium**2
@@ -224,10 +218,10 @@ def fields_focus(
     f_input_field,
     objective: Objective,
     bead: Bead,
-    bead_center=(0, 0, 0),
-    x=0,
-    y=0,
-    z=0,
+    bead_center=(0.0, 0.0, 0.0),
+    x=0.0,
+    y=0.0,
+    z=0.0,
     bfp_sampling_n=31,
     num_orders=None,
     return_grid=False,
@@ -332,7 +326,7 @@ def fields_focus(
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, bead_center, grid=grid)
 
     logging.info("Calculating external fields")
-    external_fields = focus_field_factory(
+    external_fields = _focus_field_factory(
         objective=objective,
         bead=bead,
         n_orders=n_orders,
@@ -343,7 +337,7 @@ def fields_focus(
     )(bead_center, True, magnetic_field, total_field)
 
     logging.info("Calculating internal fields")
-    internal_fields = focus_field_factory(
+    internal_fields = _focus_field_factory(
         objective=objective,
         bead=bead,
         n_orders=n_orders,
@@ -442,7 +436,7 @@ def fields_plane_wave(
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, grid=grid)
 
-    external_fields = plane_wave_field_factory(
+    external_fields = _plane_wave_field_factory(
         bead=bead,
         n_orders=n_orders,
         theta=theta,
@@ -452,7 +446,7 @@ def fields_plane_wave(
     )(polarization, True, magnetic_field, total_field)
     logging.info("Calculating internal fields")
 
-    internal_fields = plane_wave_field_factory(
+    internal_fields = _plane_wave_field_factory(
         bead=bead,
         n_orders=n_orders,
         theta=theta,
@@ -541,7 +535,6 @@ def forces_focus(
         bfp_sampling_n=bfp_sampling_n,
         num_orders=num_orders,
         integration_orders=integration_orders,
-        verbose=verbose,
     )
     return force_fun(bead_center)
 

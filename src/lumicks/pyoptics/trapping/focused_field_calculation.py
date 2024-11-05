@@ -15,7 +15,7 @@ from .radial_data import calculate_external as calculate_external_radial_data
 from .radial_data import calculate_internal as calculate_internal_radial_data
 
 
-def focus_field_factory(
+def _focus_field_factory(
     objective: Objective,
     bead: Bead,
     n_orders: int,
