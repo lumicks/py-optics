@@ -86,7 +86,7 @@ def plane_wave_field_factory(
         # plane wave. But we re-use the code that can assemble the plane-wave response for a set of
         # plane waves from any angle to assemble the field for a single one.
         E_field, H_field = do_loop(
-            (0.0, 0.0, 0.0),
+            np.atleast_2d((0.0, 0.0, 0.0)),
             an,
             bn,
             cn,
@@ -130,7 +130,7 @@ def plane_wave_field_factory(
         for field, storage in zip((E, H), (E_field, H_field)):
             if field is not None:
                 for idx, component in enumerate(field):
-                    component[region] = storage[idx, :]
+                    component[region] = storage[0, idx, :]
 
         ret_val = tuple()
         if calculate_electric_field:
