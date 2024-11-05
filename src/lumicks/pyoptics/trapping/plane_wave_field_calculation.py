@@ -16,9 +16,9 @@ from .radial_data import calculate_internal as calculate_internal_radial_data
 
 
 def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k: float):
-    # Create a FarFieldData object that contains a single pixel == single
-    # plane wave with angles theta and phi and with amplitude and
-    # polarization (E_theta, E_phi) given by `polarization`
+    """Create a FarFieldData object that contains a single pixel (= single
+    plane wave) with angles `theta` and `phi`, and with amplitude and polarization (E_theta, E_phi)
+    given by `polarization`"""
     cos_theta = np.atleast_2d(np.cos(theta))
     sin_theta = np.atleast_2d(np.sin(theta))
     cos_phi = np.atleast_2d(np.cos(phi))
