@@ -10,7 +10,7 @@ from .local_coordinates import (
     InternalBeadCoordinates,
     LocalBeadCoordinates,
 )
-from .numba_loop import _do_loop
+from .numba_implementation import do_loop
 from .radial_data import calculate_external as calculate_external_radial_data
 from .radial_data import calculate_internal as calculate_internal_radial_data
 
@@ -83,7 +83,7 @@ def _plane_wave_field_factory(
         local_coords = local_coordinates.xyz_stacked
         region = np.reshape(local_coordinates.region, local_coordinates.coordinate_shape)
 
-        E_field, H_field = _do_loop(
+        E_field, H_field = do_loop(
             (0.0, 0.0, 0.0),
             an,
             bn,
