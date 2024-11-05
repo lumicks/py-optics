@@ -63,10 +63,11 @@ def force_factory(
     Returns
     -------
     callable
-        Returns a callable with the signature f(Tuple[float, float, float]). The three-element-long
-        tuple that is passed to the function is the bead location in space, for the x-, y-, and
-        z-axis respectively, and is specified in meters. The return value of a function call is the
-        force on the bead at the specifed location, in Newton.
+        Returns a callable with the signature f(Tuple[float, float, float]) -> Tuple[float, float,
+        float]. The three-element-long tuple that is passed to the function is the bead location in
+        space, for the x-, y-, and z-axis respectively, and is specified in meters. The return value
+        of a function call is the force on the bead at the specifed location, in Newton, in the x-,
+        y- and z-direction.
 
     Raises
     ------
