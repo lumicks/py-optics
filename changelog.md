@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.5.0 | TBD
+## v0.5.0 | 2024-11-05
 
 ### Changes
 * Bumped minimum version of support Python to 3.9, to easily accomodate typing
@@ -8,6 +8,8 @@
 
 ### Improvements
 
+* Added closures to prevent recalculating fixed, but computationally intense, data for force calculations. See `trapping.force_factory`.
+* Speed up trapping calculations by rewriting code such that it can be compiled by Numba
 * Added functionality to shift the coordinate system for `fast_psf()`
 * Added Pytest tests for example notebooks
 * Added Pytest test for czt equivalence between FFT and czt for specific cases
