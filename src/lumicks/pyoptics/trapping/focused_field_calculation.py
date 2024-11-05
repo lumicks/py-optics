@@ -10,7 +10,7 @@ from .local_coordinates import (
     InternalBeadCoordinates,
     LocalBeadCoordinates,
 )
-from .numba_loop import _do_loop
+from .numba_implementation import do_loop
 from .radial_data import calculate_external as calculate_external_radial_data
 from .radial_data import calculate_internal as calculate_internal_radial_data
 
@@ -72,7 +72,7 @@ def _focus_field_factory(
         dummy = np.atleast_2d(0)
 
         # It's ugly but at least Numba compiles the loop
-        E_field, H_field = _do_loop(
+        E_field, H_field = do_loop(
             bead_center,
             an,
             bn,
