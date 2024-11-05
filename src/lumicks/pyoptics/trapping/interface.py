@@ -78,8 +78,11 @@ def force_factory(
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+
+    # Get an integration order that is one level higher than the one matching n_orders if no
+    # integration order is specified
     integration_orders = (
-        get_nearest_order(n_orders + 1)  # Get next-highest integration order if not specified
+        get_nearest_order(get_nearest_order(n_orders) + 1)
         if integration_orders is None
         else get_nearest_order(np.amax((1, int(integration_orders))))
     )
