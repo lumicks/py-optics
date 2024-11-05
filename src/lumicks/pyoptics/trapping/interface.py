@@ -318,15 +318,15 @@ def fields_focus(
         the edge of the NA, and is given for convenience or potential caching. This will be the
         number as passed below to `fields_focus()`
     objective : Objective
-        Instance of the Objective class 
+        Instance of the Objective class
     bead : Bead
-        Instance of the Bead class 
+        Instance of the Bead class
     x : np.ndarray
-        Array of x locations for evaluation, in meters 
+        Array of x locations for evaluation, in meters
     y : np.ndarray
-        Array of y locations for evaluation, in meters 
+        Array of y locations for evaluation, in meters
     z : np.ndarray
-        Array of z locations for evaluation, in meters 
+        Array of z locations for evaluation, in meters
     bead_center : Tuple[float, float, float]
         Tuple of three floating point numbers determining the x, y and z position of the bead center
         in 3D space, in meters
@@ -359,22 +359,22 @@ def fields_focus(
     Returns
     -------
     Ex : np.ndarray
-        The electric field along x, as a function of (x, y, z) 
+        The electric field along x, as a function of (x, y, z)
     Ey : np.ndarray
-        The electric field along y, as a function of (x, y, z) 
+        The electric field along y, as a function of (x, y, z)
     Ez : np.ndarray
-        The electric field along z, as a function of (x, y, z) 
-    Hx : np.ndarray 
-        The magnetic field along x, as a function of (x, y, z) 
+        The electric field along z, as a function of (x, y, z)
+    Hx : np.ndarray
+        The magnetic field along x, as a function of (x, y, z)
     Hy : np.ndarray
-        The magnetic field along y, as a function of (x, y, z) 
+        The magnetic field along y, as a function of (x, y, z)
     Hz : np.ndarray
         The magnetic field along z, as a function of (x, y, z) These values are only returned when
         magnetic_field is True
     X : np.ndarray
-        x coordinates of the sampling grid 
+        x coordinates of the sampling grid
     Y : np.ndarray
-        y coordinates of the sampling grid 
+        y coordinates of the sampling grid
     Z : np.ndarray
         z coordinates of the sampling grid. These values are only returned if return_grid is True
     """
