@@ -18,7 +18,7 @@ def gen_dipole_psf(
     Parameters
     ----------
     dipole_moment : Tuple[float, float, float]
-        The x, y, and z parts of the dipole moment, in Cm 
+        The x, y, and z parts of the dipole moment, in Cm
     lambda_em : float
         Emission wavelength, in meters
     NA_objective : float
