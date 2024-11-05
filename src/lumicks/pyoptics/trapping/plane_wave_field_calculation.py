@@ -82,7 +82,9 @@ def plane_wave_field_factory(
 
         local_coords = local_coordinates.xyz_stacked
         region = np.reshape(local_coordinates.region, local_coordinates.coordinate_shape)
-
+        # The function `do_loop` doesn't actually loop over anything here, as it's just a single
+        # plane wave. But we re-use the code that can assemble the plane-wave response for a set of
+        # plane waves from any angle to assemble the field for a single one.
         E_field, H_field = do_loop(
             (0.0, 0.0, 0.0),
             an,
