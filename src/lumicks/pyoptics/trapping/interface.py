@@ -19,6 +19,61 @@ def force_factory(
     num_orders: int = None,
     integration_orders: int = None,
 ):
+    """Create and return a function suitable to calculate the force on a bead. Items that can be
+    precalculated are stored for rapid subsequent calculations of the force on the bead for
+    different positions.
+
+    Parameters
+    ----------
+    f_input_field : callable
+        A callable with the signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`,
+        where `x_bfp` is a grid of x locations in the back focal plane, determined by the focal
+        length and NA of the objective. `y_bfp` is the corresponding grid of y locations, and
+        `r_bfp` is the radial distance from the center of the back focal plane. r_max is the largest
+        distance that falls inside the NA, but r_bfp will contain larger numbers as the back focal
+        plane is sampled with a square grid. The function must return a tuple (Ex, Ey), which are
+        the electric fields in the x- and y- direction, respectively, at the sample locations in the
+        back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
+        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
+        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
+        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
+        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
+        the edge of the NA, and is given for convenience or potential caching. This will be the
+        number as passed below to `fields_focus()`
+    objective : Objective
+        instance of the Objective class
+    bead : Bead
+        instance of the Bead class
+    bfp_sampling_n : int, optional
+        Number of discrete steps with which the back focal plane is sampled, from the center to the
+        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
+        31
+    num_orders : int, optional
+        Number of orders that should be included in the calculation the Mie solution. If it is None
+        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
+        number.
+    integration_orders : int, optional
+        The order of the integration, following a Lebedev-Laikov integration scheme. If no order is
+        given, the code will determine an order based on the number of orders in the Mie solution.
+        If the integration order is provided, that order or the nearest higher order is used when
+        the provided order does not match one of the available orders.
+
+    Returns
+    -------
+    callable
+        Returns a callable with the signature f(Tuple[float, float, float]). The three-element-long
+        tuple that is passed to the function is the bead location in space, for the x-, y-, and
+        z-axis respectively, and is specified in meters. The return value of a function call is the
+        force on the bead at the specifed location, in Newton.
+
+    Raises
+    ------
+    ValueError
+        Raised if the medium surrounding the bead does not match the immersion medium of the
+        objective.
+    """
     if bead.n_medium != objective.n_medium:
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
@@ -231,81 +286,93 @@ def fields_focus(
     grid=True,
 ):
     """
-    Calculate the three-dimensional electromagnetic field of a bead in the
-    focus of an arbitrary input beam, going through an objective with a certain
-    NA and focal length. Implemented with the angular spectrum of plane waves
-    and Mie theory.
+    Calculate the three-dimensional electromagnetic field of a bead in the focus of an arbitrary
+    input beam, going through an objective with a certain NA and focal length. Implemented with the
+    angular spectrum of plane waves and Mie theory.
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes
-    electric fields in the x, y, and z directions. The input can be a
-    combination of x- and y-polarized light of complex amplitudes.
+    This function correctly incorporates the polarized nature of light in a focus. In other words,
+    the polarization state at the focus includes electric fields in the x, y, and z directions. The
+    input can be a combination of x- and y-polarized light of complex amplitudes.
 
     Parameters
     ----------
-    f_input_field : function with signature `f(aperture, x_bfp, y_bfp, r_bfp,
-        r_max, bfp_sampling_n)`, where `x_bfp` is a grid of x locations in the
-        back focal plane, determined by the focal length and NA of the
-        objective. `y_bfp` is the corresponding grid of y locations, and
-        `r_bfp` is the radial distance from the center of the back focal plane.
-        r_max is the largest distance that falls inside the NA, but r_bfp will
-        contain larger numbers as the back focal plane is sampled with a square
-        grid. The function must return a tuple (Ex, Ey), which are the electric
-        fields in the x- and y- direction, respectively, at the sample
-        locations in the back focal plane. The fields may be complex, so a
-        phase difference between x and y is possible. If only one polarization
-        is used, the other return value must be None, e.g., y polarization
-        would return (None, Ey). The fields are post-processed such that any
-        part that falls outside of the NA is set to zero. This region is
-        indicated by the variable `aperture`, which has the same shape as
-        `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates whether
-        it is inside the NA of the objective with `True` or outside the NA with
-        `False`. The integer `bfp_sampling_n` is the number of samples of the
-        back focal plane from the center to the edge of the NA, and is given
-        for convenience or potential caching. This will be the number as passed
-        below to `fields_focus()`
-    objective : instance of the Objective class bead : instance of the Bead
-    class x : array of x locations for evaluation, in meters y : array of y
-    locations for evaluation, in meters z : array of z locations for
-    evaluation, in meters bead_center : tuple of three floating point numbers
-    determining the x, y
-        and z position of the bead center in 3D space, in meters
-    bfp_sampling_n : (Default value = 31) Number of discrete steps with which
-        the back focal plane is sampled, from the center to the edge. The total
-        number of plane waves scales with the square of bfp_sampling_n
-    num_orders: number of order that should be included in the calculation
-        the Mie solution. If it is None (default), the code will use the
-        number_of_orders() method to calculate a sufficient number.
-    return_grid : (Default value = False) return the sampling grid in the
-        matrices X, Y and Z
-    total_field : If True, return the total field of incident and scattered
-        electromagnetic field (default). If False, then only return the
-        scattered field outside the bead. Inside the bead, the full field is
-        always returned.
-    magnetic_field: If True, return the magnetic fields as well. If false
-        (default), do not return the magnetic fields.
-    verbose: If True, print statements on the progress of the calculation.
-        Default is False
-    grid: If True (default), interpret the vectors or scalars x, y and z as
-        the input for the numpy.meshgrid function, and calculate the fields at
-        the locations that are the result of the numpy.meshgrid output. If
-        False, interpret the x, y and z vectors as the exact locations where
-        the field needs to be evaluated. In that case, all vectors need to be
-        of the same length.
+    f_input_field : callable
+        function with signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`, where
+        `x_bfp` is a grid of x locations in the back focal plane, determined by the focal length and
+        NA of the objective. `y_bfp` is the corresponding grid of y locations, and `r_bfp` is the
+        radial distance from the center of the back focal plane. r_max is the largest distance that
+        falls inside the NA, but r_bfp will contain larger numbers as the back focal plane is
+        sampled with a square grid. The function must return a tuple (Ex, Ey), which are the
+        electric fields in the x- and y- direction, respectively, at the sample locations in the
+        back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
+        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
+        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
+        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
+        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
+        the edge of the NA, and is given for convenience or potential caching. This will be the
+        number as passed below to `fields_focus()`
+    objective : Objective
+        Instance of the Objective class 
+    bead : Bead
+        Instance of the Bead class 
+    x : np.ndarray
+        Array of x locations for evaluation, in meters 
+    y : np.ndarray
+        Array of y locations for evaluation, in meters 
+    z : np.ndarray
+        Array of z locations for evaluation, in meters 
+    bead_center : Tuple[float, float, float]
+        Tuple of three floating point numbers determining the x, y and z position of the bead center
+        in 3D space, in meters
+    bfp_sampling_n : int
+        Number of discrete steps with which the back focal plane is sampled, from the center to the
+        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
+        31.
+    num_orders: int
+        Number of orders that should be included in the calculation the Mie solution. If it is None
+        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
+        number.
+    return_grid : bool
+        Return the sampling grid in the matrices X, Y and Z, by default False
+    total_field : bool
+        If True, return the total field of incident and scattered electromagnetic field (default).
+        If False, then only return the scattered field outside the bead. Inside the bead, the full
+        field is always returned.
+    magnetic_field: bool
+        If True, return the magnetic fields as well. If false (default), do not return the magnetic
+        fields.
+    verbose: bool
+        If True, print statements on the progress of the calculation. Default is False
+    grid: bool
+        If True (default), interpret the vectors or scalars x, y and z as the input for the
+        numpy.meshgrid function, and calculate the fields at the locations that are the result of
+        the numpy.meshgrid output. If False, interpret the x, y and z vectors as the exact locations
+        where the field needs to be evaluated. In that case, all vectors need to be of the same
+        length.
 
     Returns
     -------
-    Ex : the electric field along x, as a function of (x, y, z)
-    Ey : the electric field along y, as a function of (x, y, z)
-    Ez : the electric field along z, as a function of (x, y, z)
-    Hx : the magnetic field along x, as a function of (x, y, z)
-    Hy : the magnetic field along y, as a function of (x, y, z)
-    Hz : the magnetic field along z, as a function of (x, y, z)
-        These values are only returned when magnetic_field is True
-    X : x coordinates of the sampling grid
-    Y : y coordinates of the sampling grid
-    Z : z coordinates of the sampling grid
-        These values are only returned if return_grid is True
+    Ex : np.ndarray
+        The electric field along x, as a function of (x, y, z) 
+    Ey : np.ndarray
+        The electric field along y, as a function of (x, y, z) 
+    Ez : np.ndarray
+        The electric field along z, as a function of (x, y, z) 
+    Hx : np.ndarray 
+        The magnetic field along x, as a function of (x, y, z) 
+    Hy : np.ndarray
+        The magnetic field along y, as a function of (x, y, z) 
+    Hz : np.ndarray
+        The magnetic field along z, as a function of (x, y, z) These values are only returned when
+        magnetic_field is True
+    X : np.ndarray
+        x coordinates of the sampling grid 
+    Y : np.ndarray
+        y coordinates of the sampling grid 
+    Z : np.ndarray
+        z coordinates of the sampling grid. These values are only returned if return_grid is True
     """
     if bead.n_medium != objective.n_medium:
         raise ValueError("The immersion medium of the bead and the objective have to be the same")

@@ -24,10 +24,32 @@ BackFocalPlaneFields = namedtuple("BackFocalPlaneFields", ["Ex", "Ey"])
 
 class Objective:
     """
-    Class to describe the essential properties of an objective
+    Class to describe the essential properties of an objective.
     """
 
     def __init__(self, NA: float, focal_length: float, n_bfp: float, n_medium: float):
+        """Initialize the Objective class.
+
+        Parameters
+        ----------
+        NA : float
+            Numerical aperture (NA) of the objective. Has to be strictly positive and less than the
+            refractive index of the medium `n_medium`.
+        focal_length : float
+            Focal length of the objective in meters. Has to be strictly positive.
+        n_bfp : float
+            Refractive index of the medium present at the back-focal plane (BFP) of the objective.
+            Has to be strictly positive.
+        n_medium : float
+            Refractive index of the immersion medium of the objective. Has to be strictly positive
+            and larger than the NA.
+
+        Raises
+        ------
+        ValueError
+            Raised if `NA` > `n_medium`, if `n_medium < 0` or `n_bp < 0`, if `focal_length < 0` or
+            if `NA < 0`.
+        """
         if NA > n_medium:
             raise ValueError("The NA of the objective cannot be larger than n_medium")
 
@@ -37,10 +59,10 @@ class Objective:
             )
 
         if focal_length <= 0:
-            raise ValueError("focal_length needs to be positive")
+            raise ValueError("focal_length needs to be strictly positive")
 
         if NA <= 0:
-            raise ValueError("NA needs to be positive")
+            raise ValueError("NA needs to be strictly positive")
 
         self.NA = NA
         self.focal_length = focal_length
