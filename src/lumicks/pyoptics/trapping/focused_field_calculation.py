@@ -66,7 +66,9 @@ def focus_field_factory(
     ):
         local_coords = local_coordinates.xyz_stacked
         region = np.reshape(local_coordinates.region, local_coordinates.coordinate_shape)
-
+        bead_center = np.atleast_2d(bead_center)
+        if len(bead_center.shape) > 2:
+            raise ValueError("Invalid argument for bead_center")
         # Always provide a (dummy) 2D numpy array to satisfy Numba (can't deal with None it seems),
         # but keep it small in case the parameter isn't used
         dummy = np.atleast_2d(0)
@@ -108,7 +110,12 @@ def focus_field_factory(
 
         E, H = [
             (
-                [np.zeros(local_coordinates.coordinate_shape, dtype="complex128") for _ in range(3)]
+                [
+                    np.zeros(
+                        (len(bead_center), *local_coordinates.coordinate_shape), dtype="complex128"
+                    )
+                    for _ in range(3)
+                ]
                 if calculate
                 else None
             )
@@ -117,8 +124,9 @@ def focus_field_factory(
         for field, storage in zip((E, H), (E_field, H_field)):
             if field is not None:
                 storage *= phase_correction_factor
-                for idx, component in enumerate(field):
-                    component[region] = storage[idx, :]
+                for pos_idx in range(len(bead_center)):
+                    for idx, component in enumerate(field):
+                        component[pos_idx, region] = storage[pos_idx, idx, :]
 
         ret_val = tuple()
         if calculate_electric_field:

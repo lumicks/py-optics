@@ -46,9 +46,11 @@ def do_loop(
     # Mask r == 0:
     r_eq_zero = r == 0
 
-    dummy = np.zeros((1, 1), dtype="complex128")
-    field_storage_E = np.zeros_like(plane_wave_response_xyz) if calculate_electric else dummy
-    field_storage_H = np.zeros_like(plane_wave_response_xyz) if calculate_magnetic else dummy
+    dummy = np.zeros((1, 1, 1), dtype="complex128")
+    field_storage_E = (
+        np.zeros((len(bead_center), 3, r.size), dtype="complex128") if calculate_electric else dummy
+    )
+    field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
     # Skip points outside aperture
     rows, cols = np.nonzero(aperture)
@@ -132,20 +134,20 @@ def do_loop(
                         )
 
                     plane_wave_response_xyz[:] = A.T.astype("complex128") @ plane_wave_response
-                    plane_wave_response_xyz *= (
-                        E0[polarization]
-                        * np.exp(
-                            1j
-                            * (
-                                kx[row, col] * bead_center[0]
-                                + ky[row, col] * bead_center[1]
-                                + kz[row, col] * bead_center[2]
-                            )
-                        )
-                        / kz[row, col]
-                    )
 
-                    field_storage_E += plane_wave_response_xyz
+                    for idx in range(len(bead_center)):
+                        field_storage_E[idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
+                            )
+                            / kz[row, col]
+                        )
 
                 if calculate_magnetic:
                     if internal:
@@ -182,20 +184,20 @@ def do_loop(
                             total,
                         )
                     plane_wave_response_xyz[:] = A.T.astype("complex128") @ plane_wave_response
-                    plane_wave_response_xyz *= (
-                        E0[polarization]
-                        * np.exp(
-                            1j
-                            * (
-                                kx[row, col] * bead_center[0]
-                                + ky[row, col] * bead_center[1]
-                                + kz[row, col] * bead_center[2]
+                    for idx in range(len(bead_center)):
+                        field_storage_H[idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
                             )
+                            / kz[row, col]
                         )
-                        / kz[row, col]
-                    )
-                    # Accumulate the field for this plane wave and polarization
-                    field_storage_H += plane_wave_response_xyz
+
     return field_storage_E, field_storage_H
 
 

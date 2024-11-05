@@ -103,45 +103,50 @@ def force_factory(
     def force_on_bead(
         bead_center: Tuple[float, float, float],
     ):
+        bead_center = np.atleast_2d(bead_center)
         Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, True)
 
-        Te11 = _eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2)
-        Te12 = _eps * np.real(Ex * np.conj(Ey))
-        Te13 = _eps * np.real(Ex * np.conj(Ez))
-        Te22 = _eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2)
-        Te23 = _eps * np.real(Ey * np.conj(Ez))
-        Te33 = _eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2)
-        Th11 = _mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2)
-        Th12 = _mu * np.real(Hx * np.conj(Hy))
-        Th13 = _mu * np.real(Hx * np.conj(Hz))
-        Th22 = _mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2)
-        Th23 = _mu * np.real(Hy * np.conj(Hz))
-        Th33 = _mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2)
-        F = np.zeros((3, 1))
+        Te11 = np.atleast_2d(_eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2))
+        Te12 = np.atleast_2d(_eps * np.real(Ex * np.conj(Ey)))
+        Te13 = np.atleast_2d(_eps * np.real(Ex * np.conj(Ez)))
+        Te22 = np.atleast_2d(_eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2))
+        Te23 = np.atleast_2d(_eps * np.real(Ey * np.conj(Ez)))
+        Te33 = np.atleast_2d(_eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2))
+        Th11 = np.atleast_2d(_mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2))
+        Th12 = np.atleast_2d(_mu * np.real(Hx * np.conj(Hy)))
+        Th13 = np.atleast_2d(_mu * np.real(Hx * np.conj(Hz)))
+        Th22 = np.atleast_2d(_mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2))
+        Th23 = np.atleast_2d(_mu * np.real(Hy * np.conj(Hz)))
+        Th33 = np.atleast_2d(_mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2))
+        F = np.zeros((3, (len(bead_center))))
         n = np.empty((3, 1))
 
-        for k in np.arange(x.size):
-            TE = np.asarray(
-                [
-                    [Te11[k], Te12[k], Te13[k]],
-                    [Te12[k], Te22[k], Te23[k]],
-                    [Te13[k], Te23[k], Te33[k]],
-                ]
-            )
+        for idx in range(len(bead_center)):
+            _F = np.zeros((3, 1))
+            for k in np.arange(x.size):
+                TE = np.asarray(
+                    [
+                        [Te11[idx, k], Te12[idx, k], Te13[idx, k]],
+                        [Te12[idx, k], Te22[idx, k], Te23[idx, k]],
+                        [Te13[idx, k], Te23[idx, k], Te33[idx, k]],
+                    ]
+                )
 
-            TH = np.asarray(
-                [
-                    [Th11[k], Th12[k], Th13[k]],
-                    [Th12[k], Th22[k], Th23[k]],
-                    [Th13[k], Th23[k], Th33[k]],
-                ]
-            )
+                TH = np.asarray(
+                    [
+                        [Th11[idx, k], Th12[idx, k], Th13[idx, k]],
+                        [Th12[idx, k], Th22[idx, k], Th23[idx, k]],
+                        [Th13[idx, k], Th23[idx, k], Th33[idx, k]],
+                    ]
+                )
 
-            T = TE + TH
-            n[0] = x[k]
-            n[1] = y[k]
-            n[2] = z[k]
-            F += T @ n * w[k]
+                T = TE + TH
+                n[0] = x[k]
+                n[1] = y[k]
+                n[2] = z[k]
+                _F += T @ n * w[k]
+
+            F[:, idx] = _F[:, 0]
         # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
         return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
 
