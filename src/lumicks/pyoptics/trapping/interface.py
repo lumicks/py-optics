@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 from scipy.constants import speed_of_light as _C, epsilon_0 as EPS0, mu_0 as MU0
 import logging
@@ -9,143 +9,6 @@ from .local_coordinates import LocalBeadCoordinates
 from ..objective import Objective
 from .focused_field_calculation import focus_field_factory
 from .plane_wave_field_calculation import plane_wave_field_factory
-
-
-def force_factory(
-    f_input_field,
-    objective: Objective,
-    bead: Bead,
-    bfp_sampling_n: int = 31,
-    num_orders: int = None,
-    integration_orders: int = None,
-):
-    """Create and return a function suitable to calculate the force on a bead. Items that can be
-    precalculated are stored for rapid subsequent calculations of the force on the bead for
-    different positions.
-
-    Parameters
-    ----------
-    f_input_field : callable
-        A callable with the signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`,
-        where `x_bfp` is a grid of x locations in the back focal plane, determined by the focal
-        length and NA of the objective. `y_bfp` is the corresponding grid of y locations, and
-        `r_bfp` is the radial distance from the center of the back focal plane. r_max is the largest
-        distance that falls inside the NA, but r_bfp will contain larger numbers as the back focal
-        plane is sampled with a square grid. The function must return a tuple (Ex, Ey), which are
-        the electric fields in the x- and y- direction, respectively, at the sample locations in the
-        back focal plane. The fields may be complex, so a phase difference between x and y is
-        possible. If only one polarization is used, the other return value must be None, e.g., y
-        polarization would return (None, Ey). The fields are post-processed such that any part that
-        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
-        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
-        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
-        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
-        the edge of the NA, and is given for convenience or potential caching. This will be the
-        number as passed below to `fields_focus()`
-    objective : Objective
-        instance of the Objective class
-    bead : Bead
-        instance of the Bead class
-    bfp_sampling_n : int, optional
-        Number of discrete steps with which the back focal plane is sampled, from the center to the
-        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
-        31
-    num_orders : int, optional
-        Number of orders that should be included in the calculation the Mie solution. If it is None
-        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
-        number.
-    integration_orders : int, optional
-        The order of the integration, following a Lebedev-Laikov integration scheme. If no order is
-        given, the code will determine an order based on the number of orders in the Mie solution.
-        If the integration order is provided, that order or the nearest higher order is used when
-        the provided order does not match one of the available orders.
-
-    Returns
-    -------
-    callable
-        Returns a callable with the signature f(Tuple[float, float, float]) -> Tuple[float, float,
-        float]. The three-element-long tuple that is passed to the function is the bead location in
-        space, for the x-, y-, and z-axis respectively, and is specified in meters. The return value
-        of a function call is the force on the bead at the specifed location, in Newton, in the x-,
-        y- and z-direction.
-
-    Raises
-    ------
-    ValueError
-        Raised if the medium surrounding the bead does not match the immersion medium of the
-        objective.
-    """
-    if bead.n_medium != objective.n_medium:
-        raise ValueError("The immersion medium of the bead and the objective have to be the same")
-
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
-
-    # Get an integration order that is one level higher than the one matching n_orders if no
-    # integration order is specified
-    integration_orders = (
-        get_nearest_order(get_nearest_order(n_orders) + 1)
-        if integration_orders is None
-        else get_nearest_order(np.amax((1, int(integration_orders))))
-    )
-    x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
-
-    xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
-
-    local_coordinates = LocalBeadCoordinates(
-        xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
-    )
-    external_fields_func = focus_field_factory(
-        objective, bead, n_orders, bfp_sampling_n, f_input_field, local_coordinates, False
-    )
-    _eps = EPS0 * bead.n_medium**2
-    _mu = MU0
-
-    def force_on_bead(
-        bead_center: Tuple[float, float, float],
-    ):
-        Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, True)
-
-        Te11 = _eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2)
-        Te12 = _eps * np.real(Ex * np.conj(Ey))
-        Te13 = _eps * np.real(Ex * np.conj(Ez))
-        Te22 = _eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2)
-        Te23 = _eps * np.real(Ey * np.conj(Ez))
-        Te33 = _eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2)
-        Th11 = _mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2)
-        Th12 = _mu * np.real(Hx * np.conj(Hy))
-        Th13 = _mu * np.real(Hx * np.conj(Hz))
-        Th22 = _mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2)
-        Th23 = _mu * np.real(Hy * np.conj(Hz))
-        Th33 = _mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2)
-        F = np.zeros((3, 1))
-        n = np.empty((3, 1))
-
-        for k in np.arange(x.size):
-            TE = np.asarray(
-                [
-                    [Te11[k], Te12[k], Te13[k]],
-                    [Te12[k], Te22[k], Te23[k]],
-                    [Te13[k], Te23[k], Te33[k]],
-                ]
-            )
-
-            TH = np.asarray(
-                [
-                    [Th11[k], Th12[k], Th13[k]],
-                    [Th12[k], Th22[k], Th23[k]],
-                    [Th13[k], Th23[k], Th33[k]],
-                ]
-            )
-
-            T = TE + TH
-            n[0] = x[k]
-            n[1] = y[k]
-            n[2] = z[k]
-            F += T @ n * w[k]
-        # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
-        return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
-
-    return force_on_bead
 
 
 def fields_focus_gaussian(
@@ -540,6 +403,142 @@ def fields_plane_wave(
         ret += (X, Y, Z)
 
     return ret
+
+
+def force_factory(
+    f_input_field,
+    objective: Objective,
+    bead: Bead,
+    bfp_sampling_n: int = 31,
+    num_orders: int = None,
+    integration_orders: int = None,
+):
+    """Create and return a function suitable to calculate the force on a bead. Items that can be
+    precalculated are stored for rapid subsequent calculations of the force on the bead for
+    different positions.
+
+    Parameters
+    ----------
+    f_input_field : callable
+        A callable with the signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`,
+        where `x_bfp` is a grid of x locations in the back focal plane, determined by the focal
+        length and NA of the objective. `y_bfp` is the corresponding grid of y locations, and
+        `r_bfp` is the radial distance from the center of the back focal plane. r_max is the largest
+        distance that falls inside the NA, but r_bfp will contain larger numbers as the back focal
+        plane is sampled with a square grid. The function must return a tuple (Ex, Ey), which are
+        the electric fields in the x- and y- direction, respectively, at the sample locations in the
+        back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
+        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
+        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
+        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
+        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
+        the edge of the NA, and is given for convenience or potential caching. This will be the
+        number as passed below to `fields_focus()`
+    objective : Objective
+        instance of the Objective class
+    bead : Bead
+        instance of the Bead class
+    bfp_sampling_n : int, optional
+        Number of discrete steps with which the back focal plane is sampled, from the center to the
+        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
+        31
+    num_orders : int, optional
+        Number of orders that should be included in the calculation the Mie solution. If it is None
+        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
+        number.
+    integration_orders : int, optional
+        The order of the integration, following a Lebedev-Laikov integration scheme. If no order is
+        given, the code will determine an order based on the number of orders in the Mie solution.
+        If the integration order is provided, that order or the nearest higher order is used when
+        the provided order does not match one of the available orders.
+
+    Returns
+    -------
+    callable
+        Returns a callable with the signature `f(bead_center: Tuple[float, float, float],
+        num_threads: int) -> Tuple[float, float, float]`. The parameter `bead_center` is the bead
+        location in space, for the x-, y-, and z-axis respectively, and is specified in meters. The
+        parameter `num_threads` is the number of threads to use for the calculation. It is limited
+        by `numba.config.NUMBA_NUM_THREADS`.
+
+        The return value of a function call is the force on the bead at the specifed location, in
+        Newton, in the x-, y- and z-direction.
+
+    Raises
+    ------
+    ValueError
+        Raised if the medium surrounding the bead does not match the immersion medium of the
+        objective.
+    """
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
+
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+
+    # Get an integration order that is one level higher than the one matching n_orders if no
+    # integration order is specified
+    integration_orders = (
+        get_nearest_order(get_nearest_order(n_orders) + 1)
+        if integration_orders is None
+        else get_nearest_order(np.amax((1, int(integration_orders))))
+    )
+    x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
+
+    xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
+
+    local_coordinates = LocalBeadCoordinates(
+        xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
+    )
+    external_fields_func = focus_field_factory(
+        objective, bead, n_orders, bfp_sampling_n, f_input_field, local_coordinates, False
+    )
+    _eps = EPS0 * bead.n_medium**2
+    _mu = MU0
+
+    # Normal vectors with weight factor incorporated
+    nw = w[:, np.newaxis] * np.concatenate([np.atleast_2d(ax) for ax in (x, y, z)], axis=0).T
+
+    def force_on_bead(bead_center: Tuple[float, float, float], num_threads: Optional[int] = None):
+        bead_center = np.atleast_2d(bead_center)
+        Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, True, num_threads)
+
+        Te11 = np.atleast_2d(_eps * 0.5 * (np.abs(Ex) ** 2 - np.abs(Ey) ** 2 - np.abs(Ez) ** 2))
+        Te22 = np.atleast_2d(_eps * 0.5 * (np.abs(Ey) ** 2 - np.abs(Ex) ** 2 - np.abs(Ez) ** 2))
+        Te33 = np.atleast_2d(_eps * 0.5 * (np.abs(Ez) ** 2 - np.abs(Ey) ** 2 - np.abs(Ex) ** 2))
+
+        Te12 = np.atleast_2d(_eps * np.real(Ex * np.conj(Ey)))
+        Te13 = np.atleast_2d(_eps * np.real(Ex * np.conj(Ez)))
+        Te23 = np.atleast_2d(_eps * np.real(Ey * np.conj(Ez)))
+
+        Th11 = np.atleast_2d(_mu * 0.5 * (np.abs(Hx) ** 2 - np.abs(Hy) ** 2 - np.abs(Hz) ** 2))
+        Th22 = np.atleast_2d(_mu * 0.5 * (np.abs(Hy) ** 2 - np.abs(Hx) ** 2 - np.abs(Hz) ** 2))
+        Th33 = np.atleast_2d(_mu * 0.5 * (np.abs(Hz) ** 2 - np.abs(Hy) ** 2 - np.abs(Hx) ** 2))
+
+        Th12 = np.atleast_2d(_mu * np.real(Hx * np.conj(Hy)))
+        Th13 = np.atleast_2d(_mu * np.real(Hx * np.conj(Hz)))
+        Th23 = np.atleast_2d(_mu * np.real(Hy * np.conj(Hz)))
+
+        T = np.empty((len(bead_center), x.size, 3, 3))
+        T[..., 0, 0] = Te11 + Th11
+        T[..., 0, 1] = Te12 + Th12
+        T[..., 0, 2] = Te13 + Th13
+        T[..., 1, 0] = Te12 + Th12
+        T[..., 1, 1] = Te22 + Th22
+        T[..., 1, 2] = Te23 + Th23
+        T[..., 2, 0] = Te13 + Th13
+        T[..., 2, 1] = Te23 + Th23
+        T[..., 2, 2] = Te33 + Th33
+
+        # T is [num_bead_positions, num_coords_around_bead, 3, 3] large, nw is [num_coords, 3] large
+        # F is the 3D force on the bead at each position `num_bead_positions`.
+        F = np.matmul(T, nw[np.newaxis, ..., np.newaxis])[..., 0].sum(axis=1)
+
+        # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
+        return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
+
+    return force_on_bead
 
 
 def forces_focus(
