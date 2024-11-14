@@ -22,7 +22,6 @@ class InternalRadialData:
     the bead, and related functions (derivatives)
     """
 
-    k1r: np.ndarray
     sphBessel: np.ndarray
     jn_over_k1r: np.ndarray
     jn_1: np.ndarray
@@ -85,4 +84,4 @@ def calculate_internal(k1: float, radii: np.ndarray, n_orders: int):
     # For n > 1 taken care of by np.zeros(...)
     jn_over_k1r[0, k1r == 0] = 1 / 3
 
-    return InternalRadialData(k1r, sphBessel, jn_over_k1r, jn_1)
+    return InternalRadialData(sphBessel, jn_over_k1r, jn_1)

@@ -2,23 +2,174 @@
 plane waves, and the local fields as the subsequent response of each plane wave"""
 
 import numpy as np
-from numba import njit
+from numba import njit, get_thread_id, prange
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as C
 
 
-@njit(cache=True)
-def do_loop(
+@njit(cache=True, parallel=True)
+def external_coordinates_loop(
     bead_center,
-    an,
-    bn,
-    cn,
-    dn,
-    n_bead,
+    coeffs,
     n_medium,
     krH,
     dkrH_dkr,
     k0r,
+    aperture,
+    cos_theta,
+    sin_theta,
+    cos_phi,
+    sin_phi,
+    kx,
+    ky,
+    kz,
+    Einf_theta,
+    Einf_phi,
+    legendre_data,
+    legendre_data_dtheta,
+    r,
+    local_coords,
+    total: bool,
+    calculate_electric: bool,
+    calculate_magnetic: bool,
+    n_threads: int,
+):
+    an , bn = coeffs
+    n_orders = len(an)
+    dummy = np.zeros((1, 1, 1, 1), dtype="complex128")
+    field_storage_E = (
+        np.zeros((n_threads, len(bead_center), 3, r.size), dtype="complex128")
+        if calculate_electric
+        else dummy
+    )
+    field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
+
+    # Skip points outside aperture
+    rows, cols = np.nonzero(aperture)
+    if r.size > 0:
+        for loop_idx in prange(rows.size):
+            row, col = rows[loop_idx], cols[loop_idx]
+            t_id = get_thread_id()
+            matrices = [
+                _R_th_R_phi(
+                    cos_theta[row, col],
+                    sin_theta[row, col],
+                    cos_phi[row, col],
+                    -sin_phi[row, col],
+                ),
+                _R_pol_R_th_R_phi(
+                    cos_theta[row, col],
+                    sin_theta[row, col],
+                    cos_phi[row, col],
+                    -sin_phi[row, col],
+                ),
+            ]
+            local_cos_theta = np.empty(r.size)
+            local_sin_theta = np.empty_like(local_cos_theta)
+            alp_sin_expanded = np.empty((n_orders, r.size))
+            alp_expanded = np.empty_like(alp_sin_expanded)
+            alp_deriv_expanded = np.empty_like(alp_sin_expanded)
+
+            E0 = [Einf_theta[row, col], Einf_phi[row, col]]
+
+            for polarization in range(2):
+                A = matrices[polarization]
+                coords = A @ local_coords
+                x = coords[0, :]
+                y = coords[1, :]
+                z = coords[2, :]
+                if polarization == 0:
+                    local_cos_theta[:] = z / r
+                    np.clip(local_cos_theta, a_max=1, a_min=-1, out=local_cos_theta)
+
+                    # Expand the legendre derivatives from the unique version of cos(theta)
+                    local_sin_theta[:] = ((1 + local_cos_theta) * (1 - local_cos_theta)) ** 0.5
+                    indices = legendre_data[1][row, col]
+                    alp_sin_expanded[:] = legendre_data[0][:, indices]
+                    alp_expanded[:] = alp_sin_expanded * local_sin_theta
+                    indices = legendre_data_dtheta[1][row, col]
+                    alp_deriv_expanded[:] = legendre_data_dtheta[0][:, indices]
+
+                rho_l = np.hypot(x, y)
+                cosP = x / rho_l
+                sinP = y / rho_l
+                where = rho_l == 0
+                cosP[where] = 1
+                sinP[where] = 0
+
+                if calculate_electric:
+                    plane_wave_response = _scattered_electric_field(
+                        an,
+                        bn,
+                        krH,
+                        dkrH_dkr,
+                        k0r,
+                        alp_expanded,
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        local_cos_theta,
+                        local_sin_theta,
+                        cosP,
+                        sinP,
+                        total,
+                    )
+
+                    plane_wave_response_xyz = A.T.astype("complex128") @ plane_wave_response
+
+                    for idx in range(len(bead_center)):
+                        field_storage_E[t_id, idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
+                            )
+                            / kz[row, col]
+                        )
+
+                if calculate_magnetic:
+                    plane_wave_response = _scattered_magnetic_field(
+                        an,
+                        bn,
+                        krH,
+                        dkrH_dkr,
+                        k0r,
+                        alp_expanded,
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        local_cos_theta,
+                        local_sin_theta,
+                        cosP,
+                        sinP,
+                        n_medium,
+                        total,
+                    )
+                    plane_wave_response_xyz = A.T.astype("complex128") @ plane_wave_response
+                    for idx in range(len(bead_center)):
+                        field_storage_H[t_id, idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
+                            )
+                            / kz[row, col]
+                        )
+
+    return np.sum(field_storage_E, axis=0), np.sum(field_storage_H, axis=0)
+
+
+@njit(cache=True, parallel=True)
+def internal_coordinates_loop(
+    bead_center,
+    coeffs,
+    n_bead,
     sphBessel,
     jn_over_k1r,
     jn_1,
@@ -36,24 +187,29 @@ def do_loop(
     legendre_data_dtheta,
     r,
     local_coords,
-    internal: bool,
-    total: bool,
     calculate_electric: bool,
     calculate_magnetic: bool,
+    n_threads: int,
 ):
-    local_cos_theta = np.empty(r.shape)
-    plane_wave_response_xyz = np.empty((3, r.size), dtype="complex128")
+    cn, dn = coeffs
+    n_orders = len(cn)
+    # plane_wave_response_xyz = np.empty((3, r.size), dtype="complex128")
     # Mask r == 0:
     r_eq_zero = r == 0
-
-    dummy = np.zeros((1, 1), dtype="complex128")
-    field_storage_E = np.zeros_like(plane_wave_response_xyz) if calculate_electric else dummy
-    field_storage_H = np.zeros_like(plane_wave_response_xyz) if calculate_magnetic else dummy
+    dummy = np.zeros((1, 1, 1, 1), dtype="complex128")
+    field_storage_E = (
+        np.zeros((n_threads, len(bead_center), 3, r.size), dtype="complex128")
+        if calculate_electric
+        else dummy
+    )
+    field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
     # Skip points outside aperture
     rows, cols = np.nonzero(aperture)
     if r.size > 0:
-        for row, col in zip(rows, cols):
+        for loop_idx in prange(rows.size):
+            row, col = rows[loop_idx], cols[loop_idx]
+            t_id = get_thread_id()
             matrices = [
                 _R_th_R_phi(
                     cos_theta[row, col],
@@ -68,6 +224,11 @@ def do_loop(
                     -sin_phi[row, col],
                 ),
             ]
+            local_cos_theta = np.empty(r.size)
+            local_sin_theta = np.empty_like(local_cos_theta)
+            alp_sin_expanded = np.empty((n_orders, r.size))
+            alp_expanded = np.empty_like(alp_sin_expanded)
+            alp_deriv_expanded = np.empty_like(alp_sin_expanded)
 
             E0 = [Einf_theta[row, col], Einf_phi[row, col]]
 
@@ -82,14 +243,13 @@ def do_loop(
                     local_cos_theta[r_eq_zero] = 1
                     np.clip(local_cos_theta, a_max=1, a_min=-1, out=local_cos_theta)
 
-                    # Expand the legendre derivatives from the unique version
-                    # of cos(theta)
-                    local_sin_theta = ((1 + local_cos_theta) * (1 - local_cos_theta)) ** 0.5
+                    # Expand the legendre derivatives from the unique version of cos(theta)
+                    local_sin_theta[:] = ((1 + local_cos_theta) * (1 - local_cos_theta)) ** 0.5
                     indices = legendre_data[1][row, col]
-                    alp_sin_expanded = legendre_data[0][:, indices]
-                    alp_expanded = alp_sin_expanded * local_sin_theta
+                    alp_sin_expanded[:] = legendre_data[0][:, indices]
+                    alp_expanded[:] = alp_sin_expanded * local_sin_theta
                     indices = legendre_data_dtheta[1][row, col]
-                    alp_deriv_expanded = legendre_data_dtheta[0][:, indices]
+                    alp_deriv_expanded[:] = legendre_data_dtheta[0][:, indices]
 
                 rho_l = np.hypot(x, y)
                 cosP = x / rho_l
@@ -99,104 +259,68 @@ def do_loop(
                 sinP[where] = 0
 
                 if calculate_electric:
-                    if internal:
-                        plane_wave_response = _internal_electric_field(
-                            cn,
-                            dn,
-                            sphBessel,
-                            jn_over_k1r,
-                            jn_1,
-                            alp_expanded,
-                            alp_sin_expanded,
-                            alp_deriv_expanded,
-                            local_cos_theta,
-                            local_sin_theta,
-                            cosP,
-                            sinP,
-                        )
-                    else:
-                        plane_wave_response = _scattered_electric_field(
-                            an,
-                            bn,
-                            krH,
-                            dkrH_dkr,
-                            k0r,
-                            alp_expanded,
-                            alp_sin_expanded,
-                            alp_deriv_expanded,
-                            local_cos_theta,
-                            local_sin_theta,
-                            cosP,
-                            sinP,
-                            total,
-                        )
-
-                    plane_wave_response_xyz[:] = A.T.astype("complex128") @ plane_wave_response
-                    plane_wave_response_xyz *= (
-                        E0[polarization]
-                        * np.exp(
-                            1j
-                            * (
-                                kx[row, col] * bead_center[0]
-                                + ky[row, col] * bead_center[1]
-                                + kz[row, col] * bead_center[2]
-                            )
-                        )
-                        / kz[row, col]
+                    plane_wave_response = _internal_electric_field(
+                        cn,
+                        dn,
+                        sphBessel,
+                        jn_over_k1r,
+                        jn_1,
+                        alp_expanded,
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        local_cos_theta,
+                        local_sin_theta,
+                        cosP,
+                        sinP,
                     )
+                    plane_wave_response_xyz = A.T.astype("complex128") @ plane_wave_response
 
-                    field_storage_E += plane_wave_response_xyz
+                    for idx in range(len(bead_center)):
+                        field_storage_E[t_id, idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
+                            )
+                            / kz[row, col]
+                        )
 
                 if calculate_magnetic:
-                    if internal:
-                        plane_wave_response = _internal_magnetic_field(
-                            cn,
-                            dn,
-                            sphBessel,
-                            jn_over_k1r,
-                            jn_1,
-                            alp_expanded,
-                            alp_sin_expanded,
-                            alp_deriv_expanded,
-                            local_cos_theta,
-                            local_sin_theta,
-                            cosP,
-                            sinP,
-                            n_bead,
-                        )
-                    else:
-                        plane_wave_response = _scattered_magnetic_field(
-                            an,
-                            bn,
-                            krH,
-                            dkrH_dkr,
-                            k0r,
-                            alp_expanded,
-                            alp_sin_expanded,
-                            alp_deriv_expanded,
-                            local_cos_theta,
-                            local_sin_theta,
-                            cosP,
-                            sinP,
-                            n_medium,
-                            total,
-                        )
-                    plane_wave_response_xyz[:] = A.T.astype("complex128") @ plane_wave_response
-                    plane_wave_response_xyz *= (
-                        E0[polarization]
-                        * np.exp(
-                            1j
-                            * (
-                                kx[row, col] * bead_center[0]
-                                + ky[row, col] * bead_center[1]
-                                + kz[row, col] * bead_center[2]
-                            )
-                        )
-                        / kz[row, col]
+                    plane_wave_response = _internal_magnetic_field(
+                        cn,
+                        dn,
+                        sphBessel,
+                        jn_over_k1r,
+                        jn_1,
+                        alp_expanded,
+                        alp_sin_expanded,
+                        alp_deriv_expanded,
+                        local_cos_theta,
+                        local_sin_theta,
+                        cosP,
+                        sinP,
+                        n_bead,
                     )
-                    # Accumulate the field for this plane wave and polarization
-                    field_storage_H += plane_wave_response_xyz
-    return field_storage_E, field_storage_H
+                    plane_wave_response_xyz = A.T.astype("complex128") @ plane_wave_response
+                    for idx in range(len(bead_center)):
+                        field_storage_H[t_id, idx] += plane_wave_response_xyz * (
+                            E0[polarization]
+                            * np.exp(
+                                1j
+                                * (
+                                    kx[row, col] * bead_center[idx][0]
+                                    + ky[row, col] * bead_center[idx][1]
+                                    + kz[row, col] * bead_center[idx][2]
+                                )
+                            )
+                            / kz[row, col]
+                        )
+
+    return np.sum(field_storage_E, axis=0), np.sum(field_storage_H, axis=0)
 
 
 @njit(cache=True, parallel=False)
