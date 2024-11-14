@@ -1,10 +1,13 @@
-import numpy as np
-import pytest
-from scipy.constants import epsilon_0 as _EPS0
+"""This pytest compares the forces in a focus of a laser, as obtained with the dipole approximation,
+with the full Mie solution"""
+
+from itertools import product
 
 import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
-
+import numpy as np
+import pytest
+from scipy.constants import epsilon_0 as _EPS0
 
 n_medium = 1.33
 n_bead = 5
@@ -22,6 +25,18 @@ bfp_sampling_n = 11
 w0 = filling_factor * focal_length * NA / n_medium
 objective = trp.Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n_bfp=n_bfp)
 bead = trp.Bead(bead_size, n_bead, n_medium, 1064e-9)
+keyword_args = {
+    "lambda_vac": 1064e-9,
+    "n_bfp": 1.0,
+    "n_medium": n_medium,
+    "focal_length": 4.43e-3,
+    "NA": 1.2,
+    "x_range": dim,
+    "numpoints_x": numpoints,
+    "y_range": dim,
+    "numpoints_y": numpoints,
+    "bfp_sampling_n": bfp_sampling_n,
+}
 
 # quasi-static polarizability
 a_s = (4 * np.pi * _EPS0 * n_medium**2 * (bead_size / 2) ** 3 * (n_bead**2 - n_medium**2)) / (
@@ -87,66 +102,10 @@ def field_func_kz(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
 
 @pytest.mark.parametrize("z_pos", zrange)
 def test_force_focus(z_pos):
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        field_func,
-        1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
-        x_range=dim,
-        numpoints_x=numpoints,
-        y_range=dim,
-        numpoints_y=numpoints,
-        z=z_pos,
-        bfp_sampling_n=bfp_sampling_n,
-        return_grid=True,
-    )
-    Exdx, Eydx, Ezdx = psf.fast_psf(
-        field_func_kx,
-        1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
-        x_range=dim,
-        numpoints_x=numpoints,
-        y_range=dim,
-        numpoints_y=numpoints,
-        z=z_pos,
-        bfp_sampling_n=bfp_sampling_n,
-        return_grid=False,
-    )
-    Exdy, Eydy, Ezdy = psf.fast_psf(
-        field_func_ky,
-        1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
-        x_range=dim,
-        numpoints_x=numpoints,
-        y_range=dim,
-        numpoints_y=numpoints,
-        z=z_pos,
-        bfp_sampling_n=bfp_sampling_n,
-        return_grid=False,
-    )
-    Exdz, Eydz, Ezdz = psf.fast_psf(
-        field_func_kz,
-        1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
-        x_range=dim,
-        numpoints_x=numpoints,
-        y_range=dim,
-        numpoints_y=numpoints,
-        z=z_pos,
-        bfp_sampling_n=bfp_sampling_n,
-        return_grid=False,
-    )
+    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(field_func, z=z_pos, return_grid=True, **keyword_args)
+    Exdx, Eydx, Ezdx = psf.fast_psf(field_func_kx, z=z_pos, return_grid=False, **keyword_args)
+    Exdy, Eydy, Ezdy = psf.fast_psf(field_func_ky, z=z_pos, return_grid=False, **keyword_args)
+    Exdz, Eydz, Ezdz = psf.fast_psf(field_func_kz, z=z_pos, return_grid=False, **keyword_args)
 
     E_grad_E_x = np.conj(Ex) * Exdx + np.conj(Ey) * Eydx + np.conj(Ez) * Ezdx
     E_grad_E_y = np.conj(Ex) * Exdy + np.conj(Ey) * Eydy + np.conj(Ez) * Ezdy
@@ -159,16 +118,18 @@ def test_force_focus(z_pos):
     Fy_mie = np.empty(Ex.shape)
     Fz_mie = np.empty(Ex.shape)
 
+    force_func = trp.force_factory(
+        field_func,
+        objective,
+        bead=bead,
+        bfp_sampling_n=bfp_sampling_n,
+        num_orders=None,
+        integration_orders=None,
+    )
     for p in range(numpoints):
         for m in range(numpoints):
-            F = trp.forces_focus(
-                field_func,
-                objective,
-                bead=bead,
+            F = force_func(
                 bead_center=(X[p, m], Y[p, m], z_pos),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=None,
-                integration_orders=None,
             )
             Fx_mie[p, m] = F[0]
             Fy_mie[p, m] = F[1]
@@ -176,3 +137,21 @@ def test_force_focus(z_pos):
     np.testing.assert_allclose(Fx, Fx_mie, rtol=1e-2, atol=1e-23)
     np.testing.assert_allclose(Fy, Fy_mie, rtol=1e-2, atol=1e-23)
     np.testing.assert_allclose(Fz, Fz_mie, rtol=1e-2, atol=1e-23)
+
+    bead_positions = [
+        (X[p, m], Y[p, m], z_pos) for p, m in product(range(numpoints), range(numpoints))
+    ]
+    F = trp.forces_focus(
+        field_func,
+        objective,
+        bead=bead,
+        bead_center=bead_positions,
+        bfp_sampling_n=bfp_sampling_n,
+        num_orders=None,
+        integration_orders=None,
+    )
+    Fx_mie, Fy_mie, Fz_mie = [F[:, idx].reshape(numpoints, numpoints) for idx in range(3)]
+    [
+        np.testing.assert_allclose(a, b, rtol=1e-2, atol=5e-24)
+        for a, b in ((Fx, Fx_mie), (Fy, Fy_mie), (Fz, Fz_mie))
+    ]
