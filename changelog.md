@@ -1,5 +1,13 @@
 # Changelog
 
+
+## v0.6.0 | 2024-11-15
+
+### Improvements
+
+* Speed up trapping calculations by making loops multi-threaded
+* Update Trapping forces example with closures
+
 ## v0.5.0 | 2024-11-05
 
 ### Changes
