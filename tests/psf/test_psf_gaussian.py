@@ -1,4 +1,5 @@
 """Test the discrete version of a focused Gaussian beam against a reference implementation"""
+
 import numpy as np
 import pytest
 import scipy.special as sp
@@ -127,4 +128,3 @@ def test_gaussian(focal_length, n_medium, NA, x_shift, y_shift, z_shift):
 
     # Allow 1 V/m absolute error and 5% relative error
     np.testing.assert_allclose([Ex_ref, Ey_ref, Ez_ref], [Ex, Ey, Ez], rtol=0.05, atol=1)
-
