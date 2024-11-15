@@ -1,10 +1,11 @@
-import pytest
 import numpy as np
 import numpy.polynomial as npp
+import pytest
+
 from lumicks.pyoptics.mathutils.associated_legendre import (
     associated_legendre,
-    associated_legendre_over_sin_theta,
     associated_legendre_dtheta,
+    associated_legendre_over_sin_theta,
 )
 
 

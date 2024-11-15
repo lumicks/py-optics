@@ -1,5 +1,6 @@
-import pytest
 import numpy as np
+import pytest
+
 import lumicks.pyoptics.mathutils.czt as czt
 
 

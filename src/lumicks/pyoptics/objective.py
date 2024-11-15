@@ -1,6 +1,8 @@
-import numpy as np
-from dataclasses import dataclass, astuple
 from collections import namedtuple
+from dataclasses import astuple, dataclass
+
+import numpy as np
+
 from .farfield_data import FarfieldData
 
 

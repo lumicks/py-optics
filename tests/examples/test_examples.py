@@ -1,6 +1,7 @@
 import pathlib
-import matplotlib
 import runpy
+
+import matplotlib
 import pytest
 
 matplotlib.use("Agg")

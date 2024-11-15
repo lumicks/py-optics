@@ -1,7 +1,7 @@
 """Chirp Z transforms"""
 
-from scipy.fft import fft, ifft, next_fast_len
 import numpy as np
+from scipy.fft import fft, ifft, next_fast_len
 
 
 def init_czt(x, M, w, a):

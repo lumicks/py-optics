@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
+import lumicks.pyoptics.farfield_transform as tf
 import lumicks.pyoptics.field_distributions as fd
 import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.psf.reference as ref
-import lumicks.pyoptics.farfield_transform as tf
 from lumicks.pyoptics.objective import Objective
 
 

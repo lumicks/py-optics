@@ -1,6 +1,7 @@
+from dataclasses import dataclass
+
 import numpy as np
 import scipy.special as sp
-from dataclasses import dataclass
 
 
 @dataclass

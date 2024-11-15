@@ -1,5 +1,14 @@
 [flake8]
-per-file-ignores = __init__.py:F401
-max-line-length = 88
-; select = C,E,F,W,B,B950
-extend-ignore = E203, E501, E704
+per-file-ignores = 
+	__init__.py:F401
+	src/lumicks/pyoptics/psf/reference.py:B023
+max-line-length = 100
+extend-ignore = E501, E203, E741, B023
+
+exclude =
+    build,
+    .git,
+    __pycache__,
+    .ipynb_checkpoints,
+    .pytest_cache,
+    .venv,

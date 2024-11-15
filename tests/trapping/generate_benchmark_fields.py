@@ -1,27 +1,27 @@
-import numpy as np
 import miepy
+import numpy as np
 
 
-def create_ref_data(n_bead=1.5, n_medium=1.33, bead_diam=1e-6,
-                    lambda_vac=1064e-9, num_pts=100, filename='data'):
+def create_ref_data(
+    n_bead=1.5, n_medium=1.33, bead_diam=1e-6, lambda_vac=1064e-9, num_pts=100, filename="data"
+):
 
     print(f"calculating results for {filename}")
 
     bead = miepy.constant_material(n_bead**2, 1.0)
     medium = miepy.constant_material(n_medium**2, 1.0)
 
-    size_param = 2*np.pi*bead_diam*n_medium/(2*lambda_vac)
-    lmax = int(np.round(size_param + 4 * size_param**(1/3) + 2.0))
-    sphere = miepy.single_mie_sphere(
-        bead_diam / 2, bead, lambda_vac, lmax, medium=medium)
+    size_param = 2 * np.pi * bead_diam * n_medium / (2 * lambda_vac)
+    lmax = int(np.round(size_param + 4 * size_param ** (1 / 3) + 2.0))
+    sphere = miepy.single_mie_sphere(bead_diam / 2, bead, lambda_vac, lmax, medium=medium)
 
     x = np.linspace(-bead_diam, bead_diam, 100)
     y = x
     z = x
 
-    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+    X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
     R = np.hypot(np.hypot(X, Y), Z)
-    Th = np.arccos(Z/R)
+    Th = np.arccos(Z / R)
     Ph = np.arctan2(Y, X)
 
     print("calculating E field")
@@ -69,16 +69,27 @@ def create_ref_data(n_bead=1.5, n_medium=1.33, bead_diam=1e-6,
     Hz = np.squeeze(Hz)
 
     np.savez_compressed(
-        filename, x=x, y=y, z=z, Ex=Ex, Ey=Ey, Ez=Ez,
-        Hx=Hx, Hy=Hy, Hz=Hz,
-        num_pts=num_pts, num_orders=lmax, n_bead=n_bead, n_medium=n_medium,
-        bead_diam=bead_diam, lambda_vac=lambda_vac
+        filename,
+        x=x,
+        y=y,
+        z=z,
+        Ex=Ex,
+        Ey=Ey,
+        Ez=Ez,
+        Hx=Hx,
+        Hy=Hy,
+        Hz=Hz,
+        num_pts=num_pts,
+        num_orders=lmax,
+        n_bead=n_bead,
+        n_medium=n_medium,
+        bead_diam=bead_diam,
+        lambda_vac=lambda_vac,
     )
 
 
-create_ref_data(filename='ref1')
-create_ref_data(bead_diam=4.4e-6, filename='ref2')
-create_ref_data(n_bead=0.1+2j, bead_diam=0.2e-6,
-                n_medium=1.33, filename='ref3')
-create_ref_data(n_bead=1.0, bead_diam=2e-6, filename='ref4')
-create_ref_data(n_bead=1.33+1e-3j, bead_diam=0.8e-6, filename='ref5')
+create_ref_data(filename="ref1")
+create_ref_data(bead_diam=4.4e-6, filename="ref2")
+create_ref_data(n_bead=0.1 + 2j, bead_diam=0.2e-6, n_medium=1.33, filename="ref3")
+create_ref_data(n_bead=1.0, bead_diam=2e-6, filename="ref4")
+create_ref_data(n_bead=1.33 + 1e-3j, bead_diam=0.8e-6, filename="ref5")

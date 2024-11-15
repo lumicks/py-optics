@@ -1,6 +1,7 @@
+from typing import Union
+
 import numpy as np
 import scipy.special as sp
-from typing import Union
 
 
 class Bead:

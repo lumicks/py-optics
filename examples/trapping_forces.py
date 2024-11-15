@@ -17,12 +17,13 @@
 # # Calculating forces on a trapped bead
 
 # %%
-# %matplotlib inline
-import numpy as np
 import matplotlib.pyplot as plt
-import lumicks.pyoptics.trapping as trp
+import numpy as np
+from scipy.constants import epsilon_0
+from scipy.constants import speed_of_light as C
 from scipy.interpolate import interp1d
-from scipy.constants import epsilon_0, speed_of_light as C
+
+import lumicks.pyoptics.trapping as trp
 
 # %% [markdown]
 # ## Definition of coordinate system

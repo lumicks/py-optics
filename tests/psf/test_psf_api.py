@@ -1,6 +1,8 @@
 """Test the czt-based implementation against a trivial implementation which sums plane waves"""
-import pytest
+
 import re
+
+import pytest
 
 from lumicks.pyoptics.psf.fast import fast_gauss
 

@@ -2,7 +2,7 @@
 plane waves, and the local fields as the subsequent response of each plane wave"""
 
 import numpy as np
-from numba import njit, get_thread_id, prange
+from numba import get_thread_id, njit, prange
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as C
 
@@ -34,7 +34,7 @@ def external_coordinates_loop(
     calculate_magnetic: bool,
     n_threads: int,
 ):
-    an , bn = coeffs
+    an, bn = coeffs
     n_orders = len(an)
     dummy = np.zeros((1, 1, 1, 1), dtype="complex128")
     field_storage_E = (

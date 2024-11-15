@@ -19,9 +19,11 @@
 # *Note:* this code probably needs a computer with at least 16 GB of memory.
 
 # %%
+import matplotlib.pyplot as plt
+
 # %matplotlib inline
 import numpy as np
-import matplotlib.pyplot as plt
+
 from lumicks.pyoptics import trapping as trp
 
 # %%

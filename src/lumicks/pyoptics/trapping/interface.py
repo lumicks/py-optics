@@ -1,13 +1,16 @@
-from typing import Optional, Tuple
-import numpy as np
-from scipy.constants import speed_of_light as _C, epsilon_0 as EPS0, mu_0 as MU0
 import logging
+from typing import Optional, Tuple
 
-from .bead import Bead
+import numpy as np
+from scipy.constants import epsilon_0 as EPS0
+from scipy.constants import mu_0 as MU0
+from scipy.constants import speed_of_light as _C
+
 from ..mathutils.lebedev_laikov import get_integration_locations, get_nearest_order
-from .local_coordinates import LocalBeadCoordinates
 from ..objective import Objective
+from .bead import Bead
 from .focused_field_calculation import focus_field_factory
+from .local_coordinates import LocalBeadCoordinates
 from .plane_wave_field_calculation import plane_wave_field_factory
 
 
@@ -492,7 +495,13 @@ def force_factory(
         xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
     )
     external_fields_func = focus_field_factory(
-        objective, bead, n_orders, bfp_sampling_n, f_input_field, local_coordinates, False
+        objective,
+        bead,
+        n_orders,
+        bfp_sampling_n,
+        f_input_field,
+        local_coordinates,
+        False,
     )
     _eps = EPS0 * bead.n_medium**2
     _mu = MU0

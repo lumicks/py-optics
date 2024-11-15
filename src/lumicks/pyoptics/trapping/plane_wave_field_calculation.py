@@ -12,9 +12,9 @@ from .local_coordinates import (
     LocalBeadCoordinates,
 )
 from .numba_implementation import external_coordinates_loop, internal_coordinates_loop
-from .thread_limiter import thread_limiter
 from .radial_data import calculate_external as calculate_external_radial_data
 from .radial_data import calculate_internal as calculate_internal_radial_data
+from .thread_limiter import thread_limiter
 
 
 def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k: float):

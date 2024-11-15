@@ -6,8 +6,9 @@ References:
 This implementation is original code and not based on any other software
 """
 
-from ..mathutils.czt import czt
 import numpy as np
+
+from ..mathutils.czt import czt
 
 
 def czt_nf_to_ff(

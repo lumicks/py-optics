@@ -1,7 +1,9 @@
 """Field distributions of dipoles, implemented from various sources"""
 
 import numpy as np
-from scipy.constants import mu_0 as MU0, epsilon_0 as EPS0, speed_of_light as C
+from scipy.constants import epsilon_0 as EPS0
+from scipy.constants import mu_0 as MU0
+from scipy.constants import speed_of_light as C
 
 
 def field_dipole_x(px, n_medium, lambda_vac, x, y, z):

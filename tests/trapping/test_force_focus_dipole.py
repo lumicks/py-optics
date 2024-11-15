@@ -3,11 +3,12 @@ with the full Mie solution"""
 
 from itertools import product
 
-import lumicks.pyoptics.psf as psf
-import lumicks.pyoptics.trapping as trp
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
+
+import lumicks.pyoptics.psf as psf
+import lumicks.pyoptics.trapping as trp
 
 n_medium = 1.33
 n_bead = 5

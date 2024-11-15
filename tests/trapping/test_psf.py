@@ -1,11 +1,10 @@
 import numpy as np
 import pytest
-from scipy.constants import (
-    speed_of_light as _C,
-    epsilon_0 as _EPS0,
-)
-import lumicks.pyoptics.trapping as trp
+from scipy.constants import epsilon_0 as _EPS0
+from scipy.constants import speed_of_light as _C
+
 import lumicks.pyoptics.psf as psf
+import lumicks.pyoptics.trapping as trp
 from lumicks.pyoptics.psf.direct import focused_gauss
 
 

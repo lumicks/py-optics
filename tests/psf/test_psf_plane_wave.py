@@ -1,8 +1,10 @@
+from itertools import product
+
 import numpy as np
 import pytest
-from itertools import product
-from lumicks.pyoptics.psf.direct import direct_psf
+
 from lumicks.pyoptics.objective import Objective
+from lumicks.pyoptics.psf.direct import direct_psf
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])

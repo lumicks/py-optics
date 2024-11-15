@@ -35,14 +35,13 @@
 # [<sup id="#bh_def">1</sup>](#bh_def_rev) Note that Ref. [2] defines $\mathbf{p}$ as $\mathbf{p} = \varepsilon_m \alpha \mathbf{E}$, and therefore the definition of $\alpha$ there is slightly modified compared to below</span>
 
 # %%
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import epsilon_0
 from scipy.constants import speed_of_light as C
-from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
-import lumicks.pyoptics.trapping as trp
+
 import lumicks.pyoptics.psf as psf
-from tqdm.auto import tqdm
+import lumicks.pyoptics.trapping as trp
 
 # %% [markdown]
 # ## Case 1: small bead, approximation valid
@@ -73,13 +72,15 @@ print(small_bead)
 #
 # Here, $k = 2 \pi n_m / \lambda_0$
 
+
 # %%
 # get the polarizability based on the refractive index of a bead, the medium and the size of a bead
 def polarizability(bead: trp.Bead):
     # quasi-static polarizability
     a_s = (
-        4 * np.pi * epsilon_0 * bead.n_medium**2 * (bead.bead_diameter/2)**3
-        * (bead.n_bead**2 - bead.n_medium**2)/(bead.n_bead**2 + 2 * bead.n_medium**2)
+        (4 * np.pi * epsilon_0 * bead.n_medium**2 * (bead.bead_diameter / 2) ** 3)
+        * (bead.n_bead**2 - bead.n_medium**2)
+        / (bead.n_bead**2 + 2 * bead.n_medium**2)
     )
     k = 2 * np.pi * bead.n_medium / bead.lambda_vac
     # correct for radiation reaction
@@ -115,9 +116,10 @@ P = Pmax * power_percentage / 100.0  # [W]
 I0 = 2 * P / (np.pi * w0**2)  # [W/m^2]
 E0 = (I0 * 2 / (epsilon_0 * C * n_bfp)) ** 0.5  # [V/m]
 
+
 # Field distribution of the incoming laser beam. Polarization is purely in the x-direction.
 def gaussian_beam(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
-    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2).astype('complex128') * E0
+    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2).astype("complex128") * E0
     return (Ex, None)
 
 
@@ -126,7 +128,7 @@ def gaussian_beam(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
 numpoints = 81
 half_dim_xy = 2e-6  # [m]
 dim_z = 4e-6  # [m]
-z = np.linspace(-dim_z / 2, dim_z / 2, numpoints) 
+z = np.linspace(-dim_z / 2, dim_z / 2, numpoints)
 x = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 y = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 
@@ -136,28 +138,38 @@ y = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 
 # %%
 Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        gaussian_beam, lambda_vac, objective.n_bfp, objective.n_medium, objective.focal_length, objective.NA,
-        x_range=(-half_dim_xy, half_dim_xy), numpoints_x=numpoints, y_range=(-half_dim_xy, half_dim_xy), numpoints_y=numpoints, z=z,
-        bfp_sampling_n=bfp_sampling_n, return_grid=True
+    gaussian_beam,
+    lambda_vac,
+    objective.n_bfp,
+    objective.n_medium,
+    objective.focal_length,
+    objective.NA,
+    x_range=(-half_dim_xy, half_dim_xy),
+    numpoints_x=numpoints,
+    y_range=(-half_dim_xy, half_dim_xy),
+    numpoints_y=numpoints,
+    z=z,
+    bfp_sampling_n=bfp_sampling_n,
+    return_grid=True,
 )
 
 # Calculate the intensity, which is proportional to |E|^2
-I = (np.abs(Ex)**2 + np.abs(Ey)**2 + np.abs(Ez)**2)
+I = np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2
 
 slice = (numpoints - 1) // 2
 fig, ax = plt.subplots(1, 2)
-ax[0].set_aspect('equal', adjustable='box')
+ax[0].set_aspect("equal", adjustable="box")
 ax[0].pcolormesh(Z[:, slice, :] * 1e6, X[:, slice, :] * 1e6, I[:, slice, :])
-ax[0].set_xlabel('z [μm]')
-ax[0].set_ylabel('x [μm]')
-ax[0].set_title('Slice at y = 0')
-ax[1].set_aspect('equal', adjustable='box')
+ax[0].set_xlabel("z [μm]")
+ax[0].set_ylabel("x [μm]")
+ax[0].set_title("Slice at y = 0")
+ax[1].set_aspect("equal", adjustable="box")
 ax[1].pcolormesh(Z[slice, :, :] * 1e6, Y[slice, :, :] * 1e6, I[slice, :, :])
-ax[1].set_xlabel('z [μm]')
-ax[1].set_ylabel('y [μm]')
-ax[1].set_title('Slice at x = 0')
+ax[1].set_xlabel("z [μm]")
+ax[1].set_ylabel("y [μm]")
+ax[1].set_title("Slice at x = 0")
 plt.tight_layout()
-plt.suptitle('Cross sections through point spread function')
+plt.suptitle("Cross sections through point spread function")
 plt.show()
 
 
@@ -167,13 +179,14 @@ plt.show()
 # ### Field gradients
 # In order to get the field gradient $\nabla E_i,\, i \in (x, y, z)$, we need to take the derivative of each field component with respect to every coordinate. For example, $\nabla E_x = (\partial E_x/\partial x,\, \partial E_x/\partial y,\, \partial E_x/\partial z)$. Here we can use the fact that we can perform the differentation on the Gaussian beam *before* it enters the objective. As such, we only need to modify the field function, and in the focus we will get the desired derivatives.
 
+
 # %%
 def get_kx_ky_kz(focal_length, k, aperture, x_bfp, y_bfp, r_bfp, r_max):
     """Calculate the values of kx, ky and kz, properties of plane waves that make up the focus"""
     bfp_sampling_n = (x_bfp.shape[0] + 1) // 2
     sin_theta = r_bfp / focal_length
     cos_theta = np.ones_like(sin_theta)
-    cos_theta[aperture] = (1 - sin_theta[aperture]**2)**0.5
+    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
     region = sin_theta > 0
     cos_phi = np.empty_like(sin_theta)
     sin_phi = np.empty_like(sin_theta)
@@ -186,44 +199,67 @@ def get_kx_ky_kz(focal_length, k, aperture, x_bfp, y_bfp, r_bfp, r_max):
     kz = k * cos_theta
     kp = k * sin_theta
     kx = -kp * cos_phi
-    ky = - kp * sin_phi
+    ky = -kp * sin_phi
     return kx, ky, kz
 
 
 def dEd_(field_func, focal_length, k, coordinate):
     """Wrap a `field_func` such that we get the derivative of the fields to `coordinate` in the focus"""
+
     def field_derivative(*args):
         # Takes the derivative of the fields to x, y or z in the focus
         kx, ky, kz = get_kx_ky_kz(focal_length, k, *args[:-1])
         Ex, Ey = field_func(*args)
-        _k = {'x': kx, 'y': ky, 'z': kz}
-            
+        _k = {"x": kx, "y": ky, "z": kz}
+
         for E in (Ex, Ey):
             if E is not None:
                 E *= 1j * _k[coordinate]
         return (Ex, Ey)
+
     return field_derivative
 
 
 def dipole_force(alpha, z_pos, dim, numpoints):
     """Calculate the force on a dipole with polarizability `alpha`"""
     # Field functions to get the gradient of the electric field
-    dEdx = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, 'x')
-    dEdy = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, 'y')
-    dEdz = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, 'z')
+    dEdx = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "x")
+    dEdy = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "y")
+    dEdz = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "z")
 
     # Actual PSF
     Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        gaussian_beam, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=(-dim / 2, dim / 2),
-        numpoints_x=numpoints, y_range=(-dim / 2, dim / 2), numpoints_y=numpoints, z=z_pos,
-        bfp_sampling_n=bfp_sampling_n, return_grid=True
+        gaussian_beam,
+        1064e-9,
+        1.0,
+        n_medium,
+        4.43e-3,
+        1.2,
+        x_range=(-dim / 2, dim / 2),
+        numpoints_x=numpoints,
+        y_range=(-dim / 2, dim / 2),
+        numpoints_y=numpoints,
+        z=z_pos,
+        bfp_sampling_n=bfp_sampling_n,
+        return_grid=True,
     )
     # Gradients at sampling points. Edx is [Exdx, Eydx, Ezdx]. Edy is [Exdy, Eydy, Ezdy] etc..
     Edx, Edy, Edz = [
         psf.fast_psf(
-            dEd_, 1064e-9, 1.0, n_medium, 4.43e-3, 1.2, x_range=(-dim / 2, dim / 2),
-            numpoints_x=numpoints, y_range=(-dim / 2, dim / 2), numpoints_y=numpoints, z=z_pos,
-            bfp_sampling_n=bfp_sampling_n, return_grid=False)
+            dEd_,
+            1064e-9,
+            1.0,
+            n_medium,
+            4.43e-3,
+            1.2,
+            x_range=(-dim / 2, dim / 2),
+            numpoints_x=numpoints,
+            y_range=(-dim / 2, dim / 2),
+            numpoints_y=numpoints,
+            z=z_pos,
+            bfp_sampling_n=bfp_sampling_n,
+            return_grid=False,
+        )
         for dEd_ in (dEdx, dEdy, dEdz)
     ]
 
@@ -232,8 +268,8 @@ def dipole_force(alpha, z_pos, dim, numpoints):
     E_grad_E_y = np.conj(Ex) * Edy[0] + np.conj(Ey) * Edy[1] + np.conj(Ez) * Edy[2]
     E_grad_E_z = np.conj(Ex) * Edz[0] + np.conj(Ey) * Edz[1] + np.conj(Ez) * Edz[2]
     Fx, Fy, Fz = [
-        np.real(alpha) / 2 * E_grad_E__.real + np.imag(alpha) / 2 * E_grad_E__.imag 
-                  for E_grad_E__ in (E_grad_E_x, E_grad_E_y, E_grad_E_z)
+        np.real(alpha) / 2 * E_grad_E__.real + np.imag(alpha) / 2 * E_grad_E__.imag
+        for E_grad_E__ in (E_grad_E_x, E_grad_E_y, E_grad_E_z)
     ]
     return Fx, Fy, Fz
 
@@ -248,22 +284,19 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 
 # %% [markdown]
 # ## Forces in the $z$ direction
-# We now calculate the force on the bead with the full electromagnetic treatment. Since this calculation is orders of magnitude slower, we will only calculate 41 points along the z-axis to find the equilibrium position
+# We now calculate the force on the bead with the full electromagnetic treatment.
 
 # %%
-Fz_mie = np.empty(z.shape)
-for idx, zz in enumerate(tqdm(z)):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        small_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(0, 0, zz),
-        num_orders=None,
-        integration_orders=None,
-        verbose=False,
-    )
-    Fz_mie[idx] = F[2]
+force_function = trp.force_factory(
+    gaussian_beam,
+    objective,
+    small_bead,
+    bfp_sampling_n=bfp_sampling_n,
+    num_orders=None,
+    integration_orders=None,
+)
+
+Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
 
 
 # %% [markdown]
@@ -272,14 +305,22 @@ for idx, zz in enumerate(tqdm(z)):
 
 # %%
 fig, ax = plt.subplots(2, 1, sharex=True)
-ax[0].plot(z * 1e6, Fz_mie * 1e12, label='Mie')
-ax[0].plot(z * 1e6, Fz_dipole[(numpoints -1) // 2, (numpoints -1) // 2, :] * 1e12, label='dipole approximation')
+ax[0].plot(z * 1e6, Fz_mie * 1e12, label="Mie")
+ax[0].plot(
+    z * 1e6,
+    Fz_dipole[(numpoints - 1) // 2, (numpoints - 1) // 2, :] * 1e12,
+    label="dipole approximation",
+)
 ax[0].legend()
-ax[0].set_ylabel('Force [pN]')
-ax[1].plot(z * 1e6, (Fz_mie - Fz_dipole[(numpoints -1) // 2, (numpoints -1) // 2,:]) * 1e12, label='error')
-ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
+ax[0].set_ylabel("Force [pN]")
+ax[1].plot(
+    z * 1e6,
+    (Fz_mie - Fz_dipole[(numpoints - 1) // 2, (numpoints - 1) // 2, :]) * 1e12,
+    label="error",
+)
+ax[1].set_ylabel("$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]")
 ax[1].legend()
-ax[1].set_xlabel('z [μm]')
+ax[1].set_xlabel("z [μm]")
 plt.show()
 
 # %% [markdown]
@@ -289,31 +330,9 @@ plt.show()
 # We calculate the forces in the $x$ and $y$ direction at the location where the force in the $z$ direction is (nearly) zero, that is, near the equilibrium. We only need to calculate the forces with the full electromagnetic approach, as we already have the full solution everywhere in our volume for the dipole approximation.
 
 # %%
-Fx_mie = np.empty(x.shape)
-for idx, xx in enumerate(tqdm(x, desc='Calculating Fx')):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        small_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(xx, 0, 0),
-        num_orders=None,
-        integration_orders=None,
-    )
-    Fx_mie[idx] = F[0]
+Fx_mie = force_function(bead_center=[(xx, 0, 0) for xx in x])[:, 0]
 
-Fy_mie = np.empty(y.shape)
-for idx, yy in enumerate(tqdm(y, desc='Calculating Fy')):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        small_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(0, yy, 0),
-        num_orders=None,
-        integration_orders=None,
-    )
-    Fy_mie[idx] = F[1]
+Fy_mie = force_function(bead_center=[(0, yy, 0) for yy in y])[:, 1]
 
 
 # %% [markdown]
@@ -321,18 +340,34 @@ for idx, yy in enumerate(tqdm(y, desc='Calculating Fy')):
 # We plot the forces in $x$ and $y$, obtained with both methods, and the error between the two:
 
 # %%
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(6,6))
-ax[0].plot(x * 1e6, Fx_mie * 1e12, label='Mie - x')
-ax[0].plot(x * 1e6, Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2] * 1e12, label='dipole approximation - x')
-ax[0].plot(y * 1e6, Fy_mie * 1e12, label='Mie - y')
-ax[0].plot(y * 1e6, Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2] * 1e12, label='dipole approximation - y')
-ax[0].legend(loc='upper right')
-ax[0].set_ylabel('Force [pN]')
-ax[1].plot(z * 1e6, (Fx_mie - Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2]) * 1e12, label='error - x')
-ax[1].plot(z * 1e6, (Fy_mie - Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2]) * 1e12, label='error - y')
-ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(6, 6))
+ax[0].plot(x * 1e6, Fx_mie * 1e12, label="Mie - x")
+ax[0].plot(
+    x * 1e6,
+    Fx_dipole[:, (numpoints - 1) // 2, (numpoints - 1) // 2] * 1e12,
+    label="dipole approximation - x",
+)
+ax[0].plot(y * 1e6, Fy_mie * 1e12, label="Mie - y")
+ax[0].plot(
+    y * 1e6,
+    Fy_dipole[(numpoints - 1) // 2, :, (numpoints - 1) // 2] * 1e12,
+    label="dipole approximation - y",
+)
+ax[0].legend(loc="upper right")
+ax[0].set_ylabel("Force [pN]")
+ax[1].plot(
+    z * 1e6,
+    (Fx_mie - Fx_dipole[:, (numpoints - 1) // 2, (numpoints - 1) // 2]) * 1e12,
+    label="error - x",
+)
+ax[1].plot(
+    z * 1e6,
+    (Fy_mie - Fy_dipole[(numpoints - 1) // 2, :, (numpoints - 1) // 2]) * 1e12,
+    label="error - y",
+)
+ax[1].set_ylabel("$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]")
 ax[1].legend()
-ax[1].set_xlabel('distance in x / y [μm]')
+ax[1].set_xlabel("distance in x / y [μm]")
 plt.show()
 
 
@@ -364,19 +399,15 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 # We now calculate the force on the bead with the full electromagnetic treatment. Since this calculation is orders of magnitude slower, we will only calculate 81 points along the $z$-axis to find the equilibrium position
 
 # %%
-Fz_mie = np.empty(z.shape)
-for idx, zz in enumerate(tqdm(z)):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        medium_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(0, 0, zz),
-        num_orders=None,
-        integration_orders=None,
-        verbose=False,
-    )
-    Fz_mie[idx] = F[2]
+force_function = trp.force_factory(
+    gaussian_beam,
+    objective,
+    medium_bead,
+    bfp_sampling_n=bfp_sampling_n,
+    num_orders=None,
+    integration_orders=None,
+)
+Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
 
 
 # %% [markdown]
@@ -385,11 +416,16 @@ for idx, zz in enumerate(tqdm(z)):
 
 # %%
 fig, ax = plt.subplots(2, 1, sharex=True)
-ax[0].plot(z * 1e6, Fz_mie * 1e12, label='Mie')
-ax[0].set_ylabel('Force [pN]')
+ax[0].plot(z * 1e6, Fz_mie * 1e12, label="Mie")
+ax[0].set_ylabel("Force [pN]")
 ax[0].legend()
-ax[1].plot(z * 1e6, Fz_dipole[(numpoints - 1) // 2, (numpoints - 1) // 2, :] * 1e12, label='dipole approximation', color='r')
-ax[1].set_ylabel('Force [pN]')
+ax[1].plot(
+    z * 1e6,
+    Fz_dipole[(numpoints - 1) // 2, (numpoints - 1) // 2, :] * 1e12,
+    label="dipole approximation",
+    color="r",
+)
+ax[1].set_ylabel("Force [pN]")
 ax[1].legend()
 plt.show()
 
@@ -400,50 +436,41 @@ plt.show()
 # For completeness, we also check the forces in the $x$- and $y$-direction.
 
 # %%
-Fx_mie = np.empty(x.shape)
-for idx, xx in enumerate(tqdm(x, desc='Calculating Fx')):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        medium_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(xx, 0, 0),
-        num_orders=None,
-        integration_orders=None,
-    )
-    Fx_mie[idx] = F[0]
-
-Fy_mie = np.empty(y.shape)
-for idx, yy in enumerate(tqdm(y, desc='Calculating Fy')):
-    F = trp.forces_focus(
-        gaussian_beam,
-        objective,
-        medium_bead,
-        bfp_sampling_n=bfp_sampling_n,
-        bead_center=(0, yy, 0),
-        num_orders=None,
-        integration_orders=None,
-    )
-    Fy_mie[idx] = F[1]
-
-
+Fx_mie = force_function(bead_center=[(xx, 0, 0) for xx in x])[:, 0]
+Fy_mie = force_function(bead_center=[(0, yy, 0) for yy in y])[:, 1]
 # %% [markdown]
 # ### Plots
 # We plot the forces in $x$ and $y$, obtained with both methods, and the error between the two:
 
 # %%
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(6,6))
-ax[0].plot(x * 1e6, Fx_mie * 1e12, label='Mie - x')
-ax[0].plot(x * 1e6, Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2] * 1e12, label='dipole approximation - x')
-ax[0].plot(y * 1e6, Fy_mie * 1e12, label='Mie - y')
-ax[0].plot(y * 1e6, Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2] * 1e12, label='dipole approximation - y')
-ax[0].legend(loc='upper right')
-ax[0].set_ylabel('Force [pN]')
-ax[1].plot(z * 1e6, (Fx_mie - Fx_dipole[:, (numpoints - 1)  // 2, (numpoints - 1)  // 2]) * 1e12, label='error - x')
-ax[1].plot(z * 1e6, (Fy_mie - Fy_dipole[(numpoints - 1)  // 2, :, (numpoints - 1)  // 2]) * 1e12, label='error - y')
-ax[1].set_ylabel('$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]')
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(6, 6))
+ax[0].plot(x * 1e6, Fx_mie * 1e12, label="Mie - x")
+ax[0].plot(
+    x * 1e6,
+    Fx_dipole[:, (numpoints - 1) // 2, (numpoints - 1) // 2] * 1e12,
+    label="dipole approximation - x",
+)
+ax[0].plot(y * 1e6, Fy_mie * 1e12, label="Mie - y")
+ax[0].plot(
+    y * 1e6,
+    Fy_dipole[(numpoints - 1) // 2, :, (numpoints - 1) // 2] * 1e12,
+    label="dipole approximation - y",
+)
+ax[0].legend(loc="upper right")
+ax[0].set_ylabel("Force [pN]")
+ax[1].plot(
+    z * 1e6,
+    (Fx_mie - Fx_dipole[:, (numpoints - 1) // 2, (numpoints - 1) // 2]) * 1e12,
+    label="error - x",
+)
+ax[1].plot(
+    z * 1e6,
+    (Fy_mie - Fy_dipole[(numpoints - 1) // 2, :, (numpoints - 1) // 2]) * 1e12,
+    label="error - y",
+)
+ax[1].set_ylabel("$F_\\mathit{Mie} - F_\\mathit{dipole}$ [pN]")
 ax[1].legend()
-ax[1].set_xlabel('distance in x / y [μm]')
+ax[1].set_xlabel("distance in x / y [μm]")
 plt.show()
 
 # %% [markdown]

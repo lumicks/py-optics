@@ -1,7 +1,7 @@
 import numpy as np
-from scipy.integrate import quad
 import scipy.special as sp
 from scipy.constants import epsilon_0 as EPS0
+from scipy.integrate import quad
 
 """Reference implementations of specific cases of focused wavefronts. Included are Gaussian beams,
 and dipoles in a homogeneous environment in high-NA and paraxial versions."""

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
+
 import lumicks.pyoptics.trapping as trp
 
 

@@ -3,8 +3,9 @@
 import numpy as np
 import pytest
 import scipy.special as sp
-from lumicks.pyoptics.psf.reference import focused_gauss_ref
+
 from lumicks.pyoptics.psf import fast_gauss
+from lumicks.pyoptics.psf.reference import focused_gauss_ref
 
 
 def paraxial_focus_gaussian(

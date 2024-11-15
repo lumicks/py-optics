@@ -1,8 +1,10 @@
 """Test the czt-based implementation against a trivial implementation which sums plane waves"""
+
 import numpy as np
 import pytest
-from lumicks.pyoptics.psf.fast import fast_gauss
+
 from lumicks.pyoptics.psf.direct import focused_gauss
+from lumicks.pyoptics.psf.fast import fast_gauss
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])

@@ -4,7 +4,6 @@ from typing import Optional, Tuple
 import numpy as np
 from numba.core.config import NUMBA_NUM_THREADS
 
-from .thread_limiter import thread_limiter
 from ..objective import Objective
 from .bead import Bead
 from .legendre_data import calculate_legendre
@@ -16,6 +15,7 @@ from .local_coordinates import (
 from .numba_implementation import external_coordinates_loop, internal_coordinates_loop
 from .radial_data import calculate_external as calculate_external_radial_data
 from .radial_data import calculate_internal as calculate_internal_radial_data
+from .thread_limiter import thread_limiter
 
 
 def focus_field_factory(
