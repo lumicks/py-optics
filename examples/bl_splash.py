@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.2
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -55,7 +55,7 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     x=x,
     y=0,
     z=z,
-    num_orders=20,  # lower number of orders such that the image looks good, but we need less memory
+    num_orders=12,  # lower number of orders such that the image looks good, but we need less memory
     bead_center=bead_center,
     bfp_sampling_n=bfp_sampling_n,
     return_grid=True,
@@ -90,7 +90,7 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     x=x,
     y=0,
     z=z,
-    num_orders=20,  # lower the number of orders such that the image looks good, but we need less memory
+    num_orders=12,  # lower the number of orders such that the image looks good, but we need less memory
     bead_center=bead_center,
     bfp_sampling_n=bfp_sampling_n,
     return_grid=True,
