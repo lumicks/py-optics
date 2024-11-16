@@ -262,8 +262,8 @@ def fields_focus(
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, bead_center, grid=grid)
 
-    logging.info("Calculating external fields")
-    external_fields = focus_field_factory(
+    logging.info("Calculating auxiliary data for external fields")
+    field_fun = focus_field_factory(
         objective=objective,
         bead=bead,
         n_orders=n_orders,
@@ -271,10 +271,12 @@ def fields_focus(
         f_input_field=f_input_field,
         local_coordinates=local_coordinates,
         internal=False,
-    )(bead_center, True, magnetic_field, total_field)
+    )
+    logging.info("Calculating external fields")
+    external_fields = field_fun(bead_center, True, magnetic_field, total_field)
 
-    logging.info("Calculating internal fields")
-    internal_fields = focus_field_factory(
+    logging.info("Calculating auxiliary data for internal fields")
+    field_fun = focus_field_factory(
         objective=objective,
         bead=bead,
         n_orders=n_orders,
@@ -282,7 +284,10 @@ def fields_focus(
         f_input_field=f_input_field,
         local_coordinates=local_coordinates,
         internal=True,
-    )(bead_center, True, magnetic_field)
+    )
+
+    logging.info("Calculating internal fields")
+    internal_fields = field_fun(bead_center, True, magnetic_field)
 
     for external, internal in zip(external_fields, internal_fields):
         external += internal
@@ -373,24 +378,29 @@ def fields_plane_wave(
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, grid=grid)
 
-    external_fields = plane_wave_field_factory(
+    logging.info("Calculating auxiliary data for external fields")
+    field_fun = plane_wave_field_factory(
         bead=bead,
         n_orders=n_orders,
         theta=theta,
         phi=phi,
         local_coordinates=local_coordinates,
         internal=False,
-    )(polarization, True, magnetic_field, total_field)
-    logging.info("Calculating internal fields")
+    )
+    logging.info("Calculating external fields")
+    external_fields = field_fun(polarization, True, magnetic_field, total_field)
 
-    internal_fields = plane_wave_field_factory(
+    logging.info("Calculating auxiliary data for internal fields")
+    field_fun = plane_wave_field_factory(
         bead=bead,
         n_orders=n_orders,
         theta=theta,
         phi=phi,
         local_coordinates=local_coordinates,
         internal=True,
-    )(polarization, True, magnetic_field)
+    )
+    logging.info("Calculating internal fields")
+    internal_fields = field_fun(polarization, True, magnetic_field)
 
     for external, internal in zip(external_fields, internal_fields):
         external += internal
