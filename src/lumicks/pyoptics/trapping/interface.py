@@ -222,6 +222,11 @@ def fields_focus(
         where the field needs to be evaluated. In that case, all vectors need to be of the same
         length.
 
+    Raises
+    ------
+    ValueError: raised when the immersion medium of the bead does not match the medium of the
+    objective.
+
     Returns
     -------
     Ex : np.ndarray
@@ -688,8 +693,6 @@ def absorbed_power_focus(
     -------
     Pabs : the absorbed power in Watts.
     """
-    if bead.n_medium != objective.n_medium:
-        raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
@@ -795,9 +798,6 @@ def scattered_power_focus(
     -------
     Psca : the scattered power in Watts.
     """
-
-    if bead.n_medium != objective.n_medium:
-        raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
