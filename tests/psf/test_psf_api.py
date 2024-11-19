@@ -1,4 +1,4 @@
-"""Test the czt-based implementation against a trivial implementation which sums plane waves"""
+"""Test that exceptions are raised as required"""
 
 import re
 
