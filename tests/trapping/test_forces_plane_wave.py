@@ -104,7 +104,6 @@ def test_plane_wave_forces_bfp(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
 
@@ -128,7 +127,6 @@ def test_plane_wave_forces_bfp(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
             Fn = np.squeeze(F / np.linalg.norm(F))

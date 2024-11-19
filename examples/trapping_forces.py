@@ -174,7 +174,6 @@ Fz1 = trp.forces_focus(
     bead_center=[(0, 0, zz) for zz in z],
     num_orders=None,
     integration_orders=None,
-    verbose=False,
 )[:, 2]
 Fz2 = trp.forces_focus(
     gaussian_beam,
@@ -184,7 +183,6 @@ Fz2 = trp.forces_focus(
     bead_center=[(0, 0, zz) for zz in z],
     num_orders=None,
     integration_orders=None,
-    verbose=False,
 )[:, 2]
 
 # %%

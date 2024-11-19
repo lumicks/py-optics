@@ -573,7 +573,6 @@ def forces_focus(
     bfp_sampling_n=31,
     num_orders=None,
     integration_orders=None,
-    verbose=False,
 ):
     """
     Calculate the forces on a bead in the focus of an arbitrary input
