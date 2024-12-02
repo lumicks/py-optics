@@ -430,6 +430,7 @@ def force_factory(
     bfp_sampling_n: int = 31,
     num_orders: int = None,
     integration_orders: int = None,
+    method: Optional[str] = None,
 ):
     """Create and return a function suitable to calculate the force on a bead. Items that can be
     precalculated are stored for rapid subsequent calculations of the force on the bead for
@@ -494,15 +495,43 @@ def force_factory(
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+    if method is not None and method not in ["lebedev-laikov", "gauss-legendre", "gauss-chebyshev"]:
+        raise ValueError(f"Wrong type of integration method specified: {method}")
 
-    # Get an integration order that is one level higher than the one matching n_orders if no
-    # integration order is specified
-    integration_orders = (
-        get_nearest_order(get_nearest_order(n_orders) + 1)
-        if integration_orders is None
-        else get_nearest_order(np.amax((1, int(integration_orders))))
-    )
-    x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
+    if integration_orders is not None:
+        # Use user's integration order
+        integration_orders = np.amax((1, int(integration_orders)))
+        if method == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_orders = get_nearest_order(integration_orders)
+    else:
+        # Determine reasonable defaults for integrating over a certain bead size
+        if method in ["gauss-chebyshev", "gauss-legendre"]:
+            # Guesstimate based on P_n ** 2 ~ x ** (2 * n + 2) and integration
+            # order m is accurate to x ** (2 * m - 1)
+            integration_orders = n_orders + 2
+        # Default integration method is lebedev-laikov
+        else:
+            # Get an integration order that is one level higher than the one matching n_orders if no
+            # integration order is specified
+            integration_orders = get_nearest_order(get_nearest_order(get_nearest_order(n_orders) + 1) + 1)
+    if method in ["gauss-legendre", "gauss-chebyshev"]:
+        from scipy.special import roots_legendre, roots_chebyu
+
+        phi = np.arange(1, 2 * integration_orders + 1) * np.pi / integration_orders
+        z, w = (
+            roots_legendre(integration_orders)
+            if method == "gauss-legendre"
+            else roots_chebyu(integration_orders)
+        )
+        x, y = np.cos(phi), np.sin(phi)
+        sin_theta = ((1 - z) * (1 + z)) ** 0.5
+        x = (sin_theta[:, np.newaxis] * x[np.newaxis, :]).flatten()
+        y = (sin_theta[:, np.newaxis] * y[np.newaxis, :]).flatten()
+        z = np.repeat(z, phi.size)
+        w = np.repeat(w, phi.size) * 0.25 / integration_orders
+    else:
+        x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
 
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
@@ -573,6 +602,7 @@ def forces_focus(
     bfp_sampling_n=31,
     num_orders=None,
     integration_orders=None,
+    method=None,
 ):
     """
     Calculate the forces on a bead in the focus of an arbitrary input
@@ -628,6 +658,7 @@ def forces_focus(
         bfp_sampling_n=bfp_sampling_n,
         num_orders=num_orders,
         integration_orders=integration_orders,
+        method=method,
     )
     return force_fun(bead_center)
 
