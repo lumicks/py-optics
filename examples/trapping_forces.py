@@ -161,7 +161,7 @@ plt.show()
 # %% [markdown]
 # ## Convergence
 # ### To check accuracy:
-# 1. Increase the number of integration orders `integration_orders` and check the difference between the old and newly calculated forces
+# 1. Increase the order of the integration `integration_order` and check the difference between the old and newly calculated forces
 # 1. Increase the number of samples at the back focal plane `bfp_sampling_n` and check the difference between the old and newly calculated forces
 # 1. Increase the number of Mie scattering orders and check the difference between the old and newly calculated forces
 
@@ -173,7 +173,7 @@ Fz1 = trp.forces_focus(
     bfp_sampling_n=bfp_sampling_n,
     bead_center=[(0, 0, zz) for zz in z],
     num_orders=None,
-    integration_orders=None,
+    integration_order=None,
 )[:, 2]
 Fz2 = trp.forces_focus(
     gaussian_beam,
@@ -182,7 +182,7 @@ Fz2 = trp.forces_focus(
     bfp_sampling_n=bfp_sampling_n * 2,
     bead_center=[(0, 0, zz) for zz in z],
     num_orders=None,
-    integration_orders=None,
+    integration_order=None,
 )[:, 2]
 
 # %%

@@ -97,7 +97,6 @@ def test_plane_wave_absorption_scattering(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
 
@@ -107,7 +106,6 @@ def test_plane_wave_absorption_scattering(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
 
@@ -122,7 +120,6 @@ def test_plane_wave_absorption_scattering(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
 
@@ -132,7 +129,6 @@ def test_plane_wave_absorption_scattering(
                 bead=bead,
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
-                verbose=False,
                 num_orders=num_orders,
             )
 

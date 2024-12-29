@@ -125,7 +125,7 @@ def test_force_focus(z_pos):
         bead=bead,
         bfp_sampling_n=bfp_sampling_n,
         num_orders=None,
-        integration_orders=None,
+        integration_order=None,
     )
     for p in range(numpoints):
         for m in range(numpoints):
@@ -149,7 +149,7 @@ def test_force_focus(z_pos):
         bead_center=bead_positions,
         bfp_sampling_n=bfp_sampling_n,
         num_orders=None,
-        integration_orders=None,
+        integration_order=None,
     )
     Fx_mie, Fy_mie, Fz_mie = [F[:, idx].reshape(numpoints, numpoints) for idx in range(3)]
     [

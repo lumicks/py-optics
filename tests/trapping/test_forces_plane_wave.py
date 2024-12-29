@@ -29,13 +29,9 @@ def test_plane_wave_forces_bfp(
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     num_orders = bead.number_of_orders * 2
     Fpr = (
-        bead.pressure_eff(num_orders)
-        * np.pi
-        * bead.bead_diameter**2
-        / 8
-        * E0**2
-        * bead.n_medium**2
-        * _EPS0
+        bead.pressure_eff(num_orders)  # Qpr
+        * (np.pi * bead.bead_diameter**2 / 4)  # Area
+        * (0.5 * E0**2 * bead.n_medium**2 * _EPS0)  # Intensity
     )
     k = bead.k
     ks = k * NA / n_medium

@@ -293,7 +293,7 @@ force_function = trp.force_factory(
     small_bead,
     bfp_sampling_n=bfp_sampling_n,
     num_orders=None,
-    integration_orders=None,
+    integration_order=None,
 )
 
 Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
@@ -405,7 +405,7 @@ force_function = trp.force_factory(
     medium_bead,
     bfp_sampling_n=bfp_sampling_n,
     num_orders=None,
-    integration_orders=None,
+    integration_order=None,
 )
 Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
 

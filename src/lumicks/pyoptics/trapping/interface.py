@@ -6,7 +6,8 @@ from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as _C
 
-from ..mathutils.lebedev_laikov import get_integration_locations, get_nearest_order
+from ..mathutils.integration import determine_integration_order, get_integration_locations
+from ..mathutils.lebedev_laikov import get_nearest_order
 from ..objective import Objective
 from .bead import Bead
 from .focused_field_calculation import focus_field_factory
@@ -428,8 +429,9 @@ def force_factory(
     objective: Objective,
     bead: Bead,
     bfp_sampling_n: int = 31,
-    num_orders: int = None,
-    integration_orders: int = None,
+    num_orders: Optional[int] = None,
+    integration_order: Optional[int] = None,
+    method: str = "lebedev-laikov",
 ):
     """Create and return a function suitable to calculate the force on a bead. Items that can be
     precalculated are stored for rapid subsequent calculations of the force on the bead for
@@ -466,11 +468,22 @@ def force_factory(
         Number of orders that should be included in the calculation the Mie solution. If it is None
         (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
         number.
-    integration_orders : int, optional
-        The order of the integration, following a Lebedev-Laikov integration scheme. If no order is
-        given, the code will determine an order based on the number of orders in the Mie solution.
-        If the integration order is provided, that order or the nearest higher order is used when
-        the provided order does not match one of the available orders.
+    integration_order : int, optional
+        The order of the integration. If no order is given, the code will determine an order based
+        on the number of orders in the Mie solution. If the integration order is provided, that
+        order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
+        the nearest higher order is used when the provided order does not match one of the available
+        orders. The automatic determination of the integration order sets `integration_order` to
+        `num_orders + 1` for Gauss-Legendre integration, and to `2 * num_orders` for Lebedev-Laikov
+        and Clenshaw-Curtis integration. This typically leads to sufficiently accurate forces, but a
+        convergence check is recommended.
+    method : string, optional
+        Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
+        "clenshaw-curtis". With automatic determination of the integration order (`integration_order
+        = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
+        faster for similar precision. However, the order is limited to 131. The Gauss-Legendre
+        integration scheme is the next most efficient, but may have issues at a very high
+        integration order. In that case, the Clenshaw-Curtis method may be used.
 
     Returns
     -------
@@ -488,22 +501,22 @@ def force_factory(
     ------
     ValueError
         Raised if the medium surrounding the bead does not match the immersion medium of the
-        objective.
+        objective. Raised when an invalid integration method was specified.
     """
     if bead.n_medium != objective.n_medium:
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
-    # Get an integration order that is one level higher than the one matching n_orders if no
-    # integration order is specified
-    integration_orders = (
-        get_nearest_order(get_nearest_order(n_orders) + 1)
-        if integration_orders is None
-        else get_nearest_order(np.amax((1, int(integration_orders))))
-    )
-    x, y, z, w = [np.asarray(c) for c in get_integration_locations(integration_orders)]
-
+    if integration_order is not None:
+        # Use user's integration order
+        integration_order = np.max((2, int(integration_order)))
+        if method == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_order = get_nearest_order(integration_order)
+    else:
+        integration_order = determine_integration_order(method, n_orders)
+    x, y, z, w = get_integration_locations(integration_order, method)
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
     local_coordinates = LocalBeadCoordinates(
@@ -544,6 +557,9 @@ def force_factory(
         Th13 = np.atleast_2d(_mu * np.real(Hx * np.conj(Hz)))
         Th23 = np.atleast_2d(_mu * np.real(Hy * np.conj(Hz)))
 
+        # F = 1/2 Int Re[T dot n] da ~ 4 pi r^2 Sum w * T dot n, with r the diameter of the
+        # imaginary sphere surrounding the bead on which the force (density) is calculated
+
         T = np.empty((len(bead_center), x.size, 3, 3))
         T[..., 0, 0] = Te11 + Th11
         T[..., 0, 1] = Te12 + Th12
@@ -556,10 +572,11 @@ def force_factory(
         T[..., 2, 2] = Te33 + Th33
 
         # T is [num_bead_positions, num_coords_around_bead, 3, 3] large, nw is [num_coords, 3] large
-        # F is the 3D force on the bead at each position `num_bead_positions`.
+        # F is the 3D force on the bead at each position `num_bead_positions`, except for the factor
+        # 1/2 * 4 pi r^2
         F = np.matmul(T, nw[np.newaxis, ..., np.newaxis])[..., 0].sum(axis=1)
 
-        # Note: factor 1/2 incorporated as 2 pi instead of 4 pi
+        # Note: the factor 1/2 is incorporated as 2 pi instead of 4 pi
         return np.squeeze(F) * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
 
     return force_on_bead
@@ -572,7 +589,8 @@ def forces_focus(
     bead_center=(0, 0, 0),
     bfp_sampling_n=31,
     num_orders=None,
-    integration_orders=None,
+    integration_order=None,
+    method="lebedev-laikov",
 ):
     """
     Calculate the forces on a bead in the focus of an arbitrary input
@@ -627,7 +645,8 @@ def forces_focus(
         bead=bead,
         bfp_sampling_n=bfp_sampling_n,
         num_orders=num_orders,
-        integration_orders=integration_orders,
+        integration_order=integration_order,
+        method=method,
     )
     return force_fun(bead_center)
 
@@ -639,8 +658,8 @@ def absorbed_power_focus(
     bead_center=(0, 0, 0),
     bfp_sampling_n=31,
     num_orders=None,
-    integration_orders=None,
-    verbose=False,
+    integration_order=None,
+    method="lebedev-laikov",
 ):
     """
     Calculate the dissipated power in a bead in the focus of an arbitrary
@@ -695,19 +714,15 @@ def absorbed_power_focus(
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
-    if integration_orders is None:
-        # Go to the next higher available order of integration than should
-        # be strictly necessary
-        order = get_nearest_order(get_nearest_order(n_orders) + 1)
-        x, y, z, w = get_integration_locations(order)
+    if integration_order is not None:
+        # Use user's integration order
+        integration_order = np.max((2, int(integration_order)))
+        if method == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_order = get_nearest_order(integration_order)
     else:
-        x, y, z, w = get_integration_locations(
-            get_nearest_order(np.amax((1, int(integration_orders))))
-        )
-
-    # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
-    x, y, z, w = [np.asarray(coord).astype(np.float64) for coord in (x, y, z, w)]
-
+        integration_order = determine_integration_order(method, n_orders)
+    x, y, z, w = get_integration_locations(integration_order, method)
     xb, yb, zb = [
         ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
     ]
@@ -725,7 +740,7 @@ def absorbed_power_focus(
         return_grid=False,
         total_field=True,
         magnetic_field=True,
-        verbose=verbose,
+        verbose=False,
         grid=False,
     )
 
@@ -747,8 +762,8 @@ def scattered_power_focus(
     bead_center=(0, 0, 0),
     bfp_sampling_n=31,
     num_orders=None,
-    integration_orders=None,
-    verbose=False,
+    integration_order=None,
+    method="lebedev-laikov",
 ):
     """
     Calculate the scattered power by a bead in the focus of an arbitrary
@@ -800,18 +815,16 @@ def scattered_power_focus(
 
     n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
 
-    if integration_orders is None:
-        # Go to the next higher available order of integration than should
-        # be strictly necessary
-        order = get_nearest_order(get_nearest_order(n_orders) + 1)
-        x, y, z, w = get_integration_locations(order)
+    if integration_order is not None:
+        # Use user's integration order
+        integration_order = np.max((2, int(integration_order)))
+        if method == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_order = get_nearest_order(integration_order)
     else:
-        x, y, z, w = get_integration_locations(
-            get_nearest_order(np.amax((1, int(integration_orders))))
-        )
+        integration_order = determine_integration_order(method, n_orders)
 
-    # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
-    x, y, z, w = [np.asarray(coord).astype(np.float64) for coord in (x, y, z, w)]
+    x, y, z, w = get_integration_locations(integration_order, method)
 
     xb, yb, zb = [
         ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
@@ -830,7 +843,7 @@ def scattered_power_focus(
         return_grid=False,
         total_field=False,
         magnetic_field=True,
-        verbose=verbose,
+        verbose=False,
         grid=False,
     )
 
