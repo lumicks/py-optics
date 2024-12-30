@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.0 | TBD
+
+### Improvements
+
+* Added Gauss-Legendre and Clenshaw-Curtis integration methods for force calculations
+* Changed the default integration order to twice the number of Mie modes for the Lebedev-Laikov integration scheme when no integration order is given.
+* Renamed `integration_orders` to `integration_order`
 
 ## v0.6.0 | 2024-11-15
 
