@@ -80,7 +80,7 @@ def clenshaw_curtis_weights(integration_order: int):
     vk[: integration_order // 2] = 2 * (1 - 4 * np.arange(integration_order // 2) ** 2) ** -1.0
     vk[integration_order // 2] = (integration_order - 3) * (
         2 * (integration_order // 2) - 1
-    ) ** -1 - 1
+    ) ** -1.0 - 1
     if integration_order & 1:
         gk[integration_order // 2 + 1] = gk[integration_order // 2]
         vk[integration_order - 1 : integration_order // 2 : -1] = vk[1 : integration_order // 2 + 1]
@@ -90,4 +90,4 @@ def clenshaw_curtis_weights(integration_order: int):
     w = np.empty(integration_order + 1, dtype="complex128")
     np.fft.ifft(gk + vk, out=w[:integration_order])
     w[-1] = w[0]
-    return np.cos(np.arange(integration_order + 1) * np.pi / integration_order), w.real * 0.5
+    return np.cos(np.arange(integration_order + 1) * np.pi / integration_order), w.real
