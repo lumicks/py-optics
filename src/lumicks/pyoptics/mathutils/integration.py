@@ -26,31 +26,35 @@ def determine_integration_order(method: str, n_orders: int):
     -------
     int
         Integration order based on the integration method and number of Mie
-        scattering orders.
+        scattering orders. Must be > 0
 
     Raises
     ------
     ValueError
         Raised if an invalid integration method is passed
+        Raised if `n_orders <= 0`
     """
     if method not in ["lebedev-laikov", "gauss-legendre", "clenshaw-curtis"]:
         raise ValueError(f"Wrong type of integration method specified: {method}")
 
+    if (n := math.ceil(n_orders)) <= 0:
+        raise ValueError(f"Invalid value for n_orders. Must be > 0, got {n_orders}")
+
     # Determine reasonable defaults for integrating over a certain bead size
     # Guesstimate based on P^1_n ** 2 ~ (1 - x ** 2) * (x ** (n - 1)) ** 2 ~ x ** 2n
     if method == "gauss-legendre":  # integration order m is accurate to x ** (2 * m - 1)
-        integration_order = n_orders + 1
+        integration_order = n + 1
     elif method == "clenshaw-curtis":  # integration order m is accurate to x ** m
-        integration_order = 2 * n_orders
+        integration_order = 2 * n
     # lebedev-laikov
     else:
         # Get an integration order that is one level higher than the one matching 2 * n_orders
         # if no integration order is specified
-        integration_order = get_nearest_order(2 * n_orders)
+        integration_order = get_nearest_order(2 * n)
     return integration_order
 
 
-@cache
+@lru_cache(maxsize=8)
 def get_integration_locations(integration_order: int, method: str):
     if method == "lebedev-laikov":
         return [np.asarray(c) for c in ll_get_integration_locations(integration_order)]
