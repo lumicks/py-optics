@@ -5,10 +5,11 @@ from scipy.constants import epsilon_0 as _EPS0
 import lumicks.pyoptics.trapping as trp
 
 
+@pytest.mark.parametrize("method", ("lebedev-laikov", "gauss-legendre", "clenshaw-curtis"))
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave_forces_bfp(
-    focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=3, lambda_vac=1064e-9
+    method, focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=3, lambda_vac=1064e-9
 ):
     """
     Test the numerically obtained force on a bead, exerted by a plane wave,
@@ -27,7 +28,7 @@ def test_plane_wave_forces_bfp(
     bead_size = 1e-6  # larger than dipole approximation is valid for
     E0 = 2.2
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
-    num_orders = bead.number_of_orders * 2
+    num_orders = int(0.8 * bead.number_of_orders)  # Speed up testing a bit
     Fpr = (
         bead.pressure_eff(num_orders)  # Qpr
         * (np.pi * bead.bead_diameter**2 / 4)  # Area
@@ -101,6 +102,7 @@ def test_plane_wave_forces_bfp(
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
                 num_orders=num_orders,
+                method=method,
             )
 
             # direction of the plane wave, hence direction of the force
@@ -112,10 +114,10 @@ def test_plane_wave_forces_bfp(
 
             # check that the magnitude is the same as predicted for Mie
             # scattering
-            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-8, atol=1e-4)
+            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-6, atol=1e-6)
             # check that the force direction is in the same direction as the
             # plane wave
-            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-4)
+            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-6)
 
             F = trp.forces_focus(
                 input_field_Ephi,
@@ -124,12 +126,13 @@ def test_plane_wave_forces_bfp(
                 bead_center=(0, 0, 0),
                 bfp_sampling_n=bfp_sampling_n,
                 num_orders=num_orders,
+                method=method,
             )
             Fn = np.squeeze(F / np.linalg.norm(F))
 
             # check that the magnitude is the same as predicted for Mie
             # scattering
-            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-8, atol=1e-4)
+            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-6, atol=1e-7)
             # check that the force direction is in the same direction as the
             # plane wave
-            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-4)
+            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-7)
