@@ -1,4 +1,5 @@
-from functools import cache
+import math
+from functools import lru_cache
 
 import numpy as np
 from scipy.special import roots_legendre
@@ -70,8 +71,31 @@ def get_integration_locations(integration_order: int, method: str):
     return x, y, z, w
 
 
-@cache
+@lru_cache(maxsize=8)
 def clenshaw_curtis_weights(integration_order: int):
+    """Generate sample locations and weigths for Clenshaw-Curtis integration.
+
+    Based on the paper by J. Waldvogel (2006) DOI: 10.1007/s10543-006-0045-4
+
+    Parameters
+    ----------
+    integration_order : int
+        Order of the integration, must be ≥ 2.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        A tuple (x, w): x contains the locations where the function to be integrated is sampled, and
+        w contains the weights for each sample.
+
+    Raises
+    ------
+    ValueError
+        Raised if integration_order is < 2.
+    """
+    if integration_order < 2:
+        raise ValueError("Only integration orders of 2 and higher are supported")
+    integration_order = math.floor(integration_order)
     w0cc = (integration_order**2 - 1 + (integration_order & 1)) ** -1
     gk = np.full(integration_order, fill_value=-w0cc)
     gk[integration_order // 2] *= -((2 - integration_order % 2) * integration_order - 1)
