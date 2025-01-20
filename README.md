@@ -17,10 +17,10 @@ Py-optics is free to use under the conditions of the [Apache-2.0 open source lic
 
 1. Create and activate a virtual environment. With conda:
 
-       $ conda create -n py-optics python=3.12
+       $ conda create -n py-optics python=3.13
        $ conda activate py-optics
    
-   Py-optics is tested on Python version 3.9 to 3.12. On Windows, there is a potential performance improvement if numpy and scipy are installed with conda, as they are optimized to use the Intel MKL libraries.
+   Py-optics is tested on Python version 3.9 to 3.13. On Windows, there is a potential performance improvement if numpy and scipy are installed with conda, as they are optimized to use the Intel MKL libraries.
 
 2. Clone the repository:
 
