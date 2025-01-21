@@ -1,5 +1,6 @@
 from collections import namedtuple
 from dataclasses import astuple, dataclass
+from typing import Tuple
 
 import numpy as np
 
@@ -111,7 +112,15 @@ class Objective:
         coordinates in a BackFocalPlaneCoordinates object, and the fields as a
         named tuple BackFocalPlaneFields(Ex, Ey).
         """
+        bfp_coords = self.get_back_focal_plane_coordinates(bfp_sampling_n)
 
+        Ex_bfp, Ey_bfp = (
+            f_input_field(*astuple(bfp_coords)) if f_input_field is not None else (None, None)
+        )
+
+        return bfp_coords, BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
+
+    def get_back_focal_plane_coordinates(self, bfp_sampling_n: int):
         sin_theta = self.sine_theta_range(bfp_sampling_n)
         x_bfp, y_bfp = np.meshgrid(sin_theta, sin_theta, indexing="ij")
 
@@ -131,11 +140,7 @@ class Objective:
             bfp_sampling_n=bfp_sampling_n,
         )
 
-        Ex_bfp, Ey_bfp = (
-            f_input_field(*astuple(bfp_coords)) if f_input_field is not None else (None, None)
-        )
-
-        return bfp_coords, BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
+        return bfp_coords
 
     def back_focal_plane_to_farfield(
         self,
@@ -149,33 +154,9 @@ class Objective:
         media before and after the reference surface. Returns an instance of
         the `FarfieldData` class.
         """
-        bfp_sampling_n = bfp_coords.bfp_sampling_n
-        sin_theta_x = bfp_coords.x_bfp / self.focal_length
-        sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length * bfp_coords.aperture
-        aperture = bfp_coords.aperture  # sin_theta <= self.sin_theta_max
-        # Calculate properties of the plane waves in the far field
-        k = 2 * np.pi * self.n_medium / lambda_vac
+        cos_theta, sin_theta, cos_phi, sin_phi, aperture = self.get_farfield_cosines(bfp_coords)
 
-        cos_theta = np.ones(sin_theta.shape)
-        cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
-
-        cos_phi = np.ones_like(sin_theta)
-        sin_phi = np.zeros_like(sin_theta)
-        region = sin_theta > 0 & aperture
-
-        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
-
-        cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
-        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
-        sin_phi[np.logical_not(aperture)] = 0
-        cos_phi[np.logical_not(aperture)] = 1
-
-        kz = k * cos_theta
-        kp = k * sin_theta
-        kx = -kp * cos_phi
-        ky = -kp * sin_phi
+        kx, ky, kz, kp = self.get_k_vectors(lambda_vac, sin_theta, cos_theta, cos_phi, sin_phi)
 
         # Transform the input wavefront to a spherical one, after refracting on
         # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
@@ -209,3 +190,122 @@ class Objective:
             Einf_phi=Einf_phi,
             aperture=bfp_coords.aperture,
         )
+
+    def get_k_vectors(self, lambda_vac, sin_theta, cos_theta, cos_phi, sin_phi):
+        k = 2 * np.pi * self.n_medium / lambda_vac
+
+        kz = k * cos_theta
+        kp = k * sin_theta
+        kx = -kp * cos_phi
+        ky = -kp * sin_phi
+        return kx, ky, kz, kp
+
+    def get_farfield_cosines(self, bfp_coords: BackFocalPlaneCoordinates):
+        bfp_sampling_n = bfp_coords.bfp_sampling_n
+        sin_theta_x = bfp_coords.x_bfp / self.focal_length
+        sin_theta_y = bfp_coords.y_bfp / self.focal_length
+        sin_theta = bfp_coords.r_bfp / self.focal_length * bfp_coords.aperture
+        aperture = bfp_coords.aperture  # sin_theta <= self.sin_theta_max
+        cos_theta = np.ones(sin_theta.shape)
+        cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
+        cos_phi = np.ones_like(sin_theta)
+        sin_phi = np.zeros_like(sin_theta)
+        region = sin_theta > 0 & aperture
+        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
+        cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
+        sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
+        sin_phi[np.logical_not(aperture)] = 0
+        cos_phi[np.logical_not(aperture)] = 1
+        return cos_theta, sin_theta, cos_phi, sin_phi, aperture
+
+    def farfield_to_back_focal_plane(self, E: Tuple[np.ndarray], s: Tuple[np.ndarray]):
+        Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_unit_vectors(
+            *E, *s, self.n_medium, self.n_bfp
+        )
+        return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
+
+
+def farfield_to_back_focal_plane_unit_vectors(
+    Exff: np.ndarray,
+    Eyff: np.ndarray,
+    Ezff: np.ndarray,
+    sx: np.ndarray,
+    sy: np.ndarray,
+    sz: np.ndarray,
+    n_medium: float,
+    n_bfp: float,
+):
+    Exff, Eyff, Ezff, sx, sy, sz = [np.asarray(arr) for arr in (Exff, Eyff, Ezff, sx, sy, sz)]
+    if not all([arr.shape == Exff.shape for arr in (Exff, Eyff, Ezff, sx, sy, sz)]):
+        raise RuntimeError("All input arrays need to be of the same size")
+
+    cosP, sinP = cosines_from_unit_vectors(sx, sy)
+
+    return farfield_to_back_focal_plane_cosines(
+        Exff=Exff,
+        Eyff=Eyff,
+        Ezff=Ezff,
+        cos_phi=cosP,
+        sin_phi=sinP,
+        cos_theta=sz,
+        n_medium=n_medium,
+        n_bfp=n_bfp,
+    )
+
+
+def cosines_from_unit_vectors(sx, sy):
+    sp = np.hypot(sx, sy)
+    cosP = np.ones_like(sp)
+    sinP = np.zeros_like(sp)
+    region = sp > 0
+    cosP[region] = sx[region] / sp[region]
+    sinP[region] = sy[region] / sp[region]
+    return cosP, sinP
+
+
+def unit_vectors_from_cosines(cos_theta, cos_phi, sin_phi):
+    sp = ((1 + cos_theta)(1 - cos_theta)) ** 0.5
+    sx = sp * cos_phi
+    sy = sp * sin_phi
+    return sx, sy
+
+
+def farfield_to_back_focal_plane_cosines(
+    Exff: np.ndarray,
+    Eyff: np.ndarray,
+    Ezff: np.ndarray,
+    cos_phi: np.ndarray,
+    sin_phi: np.ndarray,
+    cos_theta: np.ndarray,
+    n_medium: float,
+    n_bfp: float,
+):
+    Exff, Eyff, Ezff, cos_phi, sin_phi, cos_theta = [
+        np.asarray(arr) for arr in (Exff, Eyff, Ezff, cos_phi, sin_phi, cos_theta)
+    ]
+    Et, Ep, Ex_bfp, Ey_bfp = [np.zeros(Exff.shape, dtype="complex128") for _ in range(4)]
+
+    sin_theta = ((1 + cos_theta) * (1 - cos_theta)) ** 0.5
+
+    roc = cos_theta > 0  # roc == Region of convergence, avoid division by zero
+
+    Et[roc] = (
+        (
+            (Exff[roc] * cos_phi[roc] + Eyff[roc] * sin_phi[roc]) * cos_theta[roc]
+            - Ezff[roc] * sin_theta[roc]
+        )
+        * (n_medium / n_bfp) ** 0.5
+        / (cos_theta[roc]) ** 0.5
+    )
+
+    Ep[roc] = (
+        (Eyff[roc] * cos_phi[roc] - Exff[roc] * sin_phi[roc])
+        * (n_medium / n_bfp) ** 0.5
+        / (cos_theta[roc]) ** 0.5
+    )
+
+    Ex_bfp[roc] = Et[roc] * cos_phi[roc] - Ep[roc] * sin_phi[roc]
+    Ey_bfp[roc] = Ep[roc] * cos_phi[roc] + Et[roc] * sin_phi[roc]
+
+    return Ex_bfp, Ey_bfp
