@@ -1,1 +1,2 @@
 from .nf2ff_czt import nearfield_to_farfield_czt
+from .nf2ff_currents import farfield_factory
