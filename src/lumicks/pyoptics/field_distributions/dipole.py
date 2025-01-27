@@ -18,7 +18,7 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
         Refractive index of the medium in which the dipole is embedded
     lambda_vac : float
         Wavelength in vacuum of the radiation
-    x, y, z : Union[float, mp.ndarray]
+    x, y, z : Union[float, np.ndarray]
         (Array of) coordinates at which the electromagnetic field is to be evaluated
 
     Returns
@@ -39,9 +39,7 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
 
     ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 2
     """
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
+    x, y, z = [np.atleast_1d(ax) for ax in (x, y, z)]
     k = 2 * np.pi * n_medium / lambda_vac
     R = np.hypot(np.hypot(x, y), z)
 
@@ -239,20 +237,14 @@ def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
 
     ..  [1] Classical Electrodynamics, Ch. 9, 3rd Edition, J.D. Jackson
     """
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
+    x, y, z = [np.atleast_1d(ax) for ax in (x, y, z)]
 
     r = np.hypot(np.hypot(x, y), z)
     k = 2 * np.pi * n_medium / lambda_vac
     fix = r == 0
     r[fix] = 1
-    nx = x / r
-    ny = y / r
-    nz = z / r
-    px = p[0]
-    py = p[1]
-    pz = p[2]
+    nx, ny, nz = [ax / r for ax in (x, y, z)]
+    px, py, pz = p
 
     nxp_x = ny * pz - nz * py
     nxp_y = nz * px - nx * pz
