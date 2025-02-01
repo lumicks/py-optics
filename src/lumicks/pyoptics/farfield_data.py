@@ -1,6 +1,13 @@
 from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Tuple, Union
 
 import numpy as np
+
+
+class PropagationDirection(Enum):
+    TO_ORIGIN: auto()
+    FROM_ORIGIN: auto()
 
 
 @dataclass
@@ -38,3 +45,40 @@ class FarfieldData:
         Ez = self.Einf_theta * self.sin_theta
 
         return Ex, Ey, Ez
+
+
+def get_unit_vectors(
+    self: "FarfieldData",
+) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray], Union[float, np.ndarray]]:
+    """Returns the directional (co)sines as unit vector (sx, sy, sz)
+
+    Returns
+    -------
+    Tuple[Union[float, np.ndarray], Union[float, np.ndarray], Union[float, np.ndarray]]
+        The return values sx, sy, sz
+    """
+    sz = self.cos_theta
+    sx = self.sin_theta * self.cos_phi
+    sy = self.sin_theta * self.sin_phi
+    return sx, sy, sz
+
+
+def k_vectors_from_unit_vectors(
+    unit_vectors: Tuple[np.ndarray, np.ndarray, np.ndarray],
+    k: float,
+    direction: PropagationDirection,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    sx, sy, sz = unit_vectors
+    sign = -1 if direction == PropagationDirection.TO_ORIGIN else 1
+
+    kz = k * sz
+    kx, ky = [sign * k * s for s in (sx, sy)]
+    return kx, ky, kz
+
+
+def k_vectors_from_cosines(
+    cos_phi, sin_phi, cos_theta, sin_theta, k: float, direction: PropagationDirection
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    sign = -1 if direction == PropagationDirection.TO_ORIGIN else 1
+    kx, ky, kz = [sign * k * cos_phi * sin_theta, sign * k * sin_phi * sin_theta, cos_theta]
+    return kx, ky, kz
