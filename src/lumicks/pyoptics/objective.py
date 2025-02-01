@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from .farfield_data import FarfieldData
+from .farfield import FarfieldData
 
 
 @dataclass

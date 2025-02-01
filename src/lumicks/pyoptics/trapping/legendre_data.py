@@ -3,7 +3,7 @@ from dataclasses import fields
 import numpy as np
 from numba import njit, prange
 
-from ..farfield_data import FarfieldData
+from ..farfield import FarfieldData
 from ..mathutils.associated_legendre import (
     associated_legendre_dtheta,
     associated_legendre_over_sin_theta,
