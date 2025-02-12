@@ -91,7 +91,7 @@ def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
         As Hx, but z-polarized component
 
 
-    ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 2
+    ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 2 and "a little algebra". See also Ch. 8.
     """
     x, y, z = [np.atleast_1d(ax) for ax in (x, y, z)]
     k = 2 * np.pi * n_medium / lambda_vac
