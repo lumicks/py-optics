@@ -5,7 +5,7 @@ import lumicks.pyoptics.farfield_transform as tf
 import lumicks.pyoptics.field_distributions as fd
 import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.psf.reference as ref
-from lumicks.pyoptics.objective import Objective
+from lumicks.pyoptics.objective import Objective, farfield_to_back_focal_plane_cosines
 
 
 def gen_dipole_psf(
@@ -75,11 +75,11 @@ def gen_dipole_psf(
             ff.sin_theta,
             obj.focal_length,
         )
-        Ex_bfp, Ey_bfp = tf.ff_to_bfp_angle(
+        Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_cosines(
             Ex, Ey, Ez, ff.cos_phi, ff.sin_phi, ff.cos_theta, n_medium, n_bfp=1.0
         )
 
-        return (Ex_bfp, Ey_bfp)
+        return Ex_bfp, Ey_bfp
 
     Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
         field_func,
