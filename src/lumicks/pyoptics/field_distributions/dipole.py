@@ -28,6 +28,38 @@ def emitted_power_electric_dipole(p, n_medium, lambda_vac):
     """
     omega = 2 * np.pi * C / lambda_vac
     return abs(p) ** 2 * n_medium * omega**4 / (12 * np.pi * epsilon_0 * C**3)
+
+
+def emitted_power_magnetic_dipole(m, n_medium, lambda_vac):
+    """Calculate the emitted power by a magnetic dipole
+
+    Parameters
+    ----------
+    m : float | complex
+        Dipole moment in [Am²]
+    n_medium : float
+        Refractive index of the medium
+    lambda_vac : float
+        Wavelength of the emitted radiation in [m]
+
+    Returns
+    -------
+    float
+        Emitted power
+
+    ..  [1] Lukosz, W., & Kunz, R. E. (1977), Journal of the Optical Society of America, 67(12),
+            1607. doi:10.1364/josa.67.001607
+    """
+    #
+    omega = 2 * np.pi * C / lambda_vac
+    # below obtained by substitution of 8.71 in Principled of Nano-optics (2nd ed.) with 10.53
+    # mu_0 * m**2 * n_medium**3 * (2 * np.pi * C / lambda_vac) ** 4 / (12 * np.pi * C**3)
+    #
+    # I guess there is a factor of mu_0**2 error in the formula in [1], where mu_0 is in the
+    # denominator.
+    return mu_0 * abs(m) ** 2 * omega**4 * n_medium**3 / (12 * np.pi * C**3)
+
+
 def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of an x-oriented dipole in homogeneous space. The field includes
     both near- and farfields. The dipole is located at (0,0,0). See [1]_.
@@ -303,6 +335,112 @@ def electric_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
     Hx *= prefactor_H * nxp_x
     Hy *= prefactor_H * nxp_y
     Hz *= prefactor_H * nxp_z
+
+    Ex[fix] = Ey[fix] = Ez[fix] = Hx[fix] = Hy[fix] = Hz[fix] = np.nan + 1j * np.nan
+
+    return Ex, Ey, Ez, Hx, Hy, Hz
+
+
+def magnetic_dipole_z(mz, n_medium, lambda_vac, x, y, z):
+    """Implementation from [1], after using the equivalence principle described in Ch. 10 section 9.
+
+    ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 8 + application of 10.53
+    """
+    # Blunt implementation of 8.62-8.64, PoNO Ch. 8 and substitution from 10.53
+    r = np.hypot(np.hypot(x, y), z)
+    cos_theta, sin_theta, _, _ = cosines_from_unit_vectors(x / r, y / r, z / r)
+
+    eta = ((mu_0) / (epsilon_0 * n_medium**2)) ** 0.5
+    k = 2 * np.pi * n_medium / lambda_vac
+    prefactor = mz * k**2 / (4 * np.pi * r) * np.exp(1j * k * r)
+    Hr = prefactor * cos_theta * (2 / (k * r) ** 2 - 2j / (k * r))
+    H_theta = prefactor * sin_theta * ((k * r) ** -2 - 1j / (k * r) - 1)
+    E_phi = -prefactor * sin_theta * eta * (-1j / (k * r) - 1)
+    Hx, Hy, Hz = spherical_to_cartesian((x, y, z), Hr, H_theta, 0.0)
+    Ex, Ey, Ez = spherical_to_cartesian((x, y, z), 0.0, 0.0, E_phi)
+
+    return Ex, Ey, Ez, Hx, Hy, Hz
+
+
+def magnetic_dipole(m, n_medium, lambda_vac, x, y, z, farfield=False):
+    """Get the electromagnetic field of an arbitrarily-oriented magnetic dipole.
+    The field includes both near- and farfields. The dipole is located at (0,0,0) See [1]_. This
+    function was not tested with complex dipole moment components, and the solution was obtained by
+    appling the duality principle.
+
+    Parameters
+    ----------
+    m : tuple(float, float, float)
+        The dipole moment (mx, my, mz) of the dipole [Am²]
+    n_medium : float
+        Refractive index of the medium in which the dipole is embedded
+    lambda_vac : float
+        Wavelength in vacuum of the radiation
+    x, y, z : np.ndarray
+        (Array of) coordinates at which the electromagnetic field is to be evaluated
+
+    Returns
+    -------
+    Ex : np.ndarray
+        Array of electric field polarized in the x-direction evaluated at (x, y, z)
+    Ey : np.ndarray
+        As Ex, but y-polarized component
+    Ez : np.ndarray
+        As Ex, but z-polarized component
+    Hx : np.ndarray
+        H field polarized in the x-direction evaluated at (x, y, z)
+    Hy : np.ndarray
+        As Hx, but y-polarized component
+    Hz : np.ndarray
+        As Hx, but z-polarized component
+
+
+    ..  [1] Classical Electrodynamics, Ch. 9, 3rd Edition, J.D. Jackson
+    """
+    x, y, z = [np.atleast_1d(ax) for ax in (x, y, z)]
+
+    r = np.hypot(np.hypot(x, y), z)
+    k = 2 * np.pi * n_medium / lambda_vac
+    fix = r == 0
+    r[fix] = 1
+    nx, ny, nz = [ax / r for ax in (x, y, z)]
+    px, py, pz = [mu_0 * _m for _m in m]
+
+    nxp_x = ny * pz - nz * py
+    nxp_y = nz * px - nx * pz
+    nxp_z = nx * py - ny * px
+
+    nxpxn_x = nxp_y * nz - nxp_z * ny
+    nxpxn_y = nxp_z * nx - nxp_x * nz
+    nxpxn_z = nxp_x * ny - nxp_y * nx
+
+    ndotp = nx * px + ny * py + nz * pz
+
+    mu_inv = (mu_0) ** -1
+    G0 = np.exp(1j * k * r) / (4 * np.pi * r)
+
+    if farfield:
+        Hx = k**2 * nxpxn_x + 0j
+        Hy = k**2 * nxpxn_y + 0j
+        Hz = k**2 * nxpxn_z + 0j
+        Ex = -np.ones(Hx.shape, dtype="complex128")
+    else:
+        Hx = k**2 * nxpxn_x + (3 * nx * ndotp - px) * (r**-2 - 1j * k / r)
+        Hy = k**2 * nxpxn_y + (3 * ny * ndotp - py) * (r**-2 - 1j * k / r)
+        Hz = k**2 * nxpxn_z + (3 * nz * ndotp - pz) * (r**-2 - 1j * k / r)
+        Ex = -(1 - (1j * k * r) ** -1)
+    Ey = Ex.copy()
+    Ez = Ex.copy()
+
+    Hx *= G0 * mu_inv
+    Hy *= G0 * mu_inv
+    Hz *= G0 * mu_inv
+
+    prefactor_E = G0 * C * k**2 / n_medium
+
+    Ex *= prefactor_E * nxp_x
+    Ey *= prefactor_E * nxp_y
+    Ez *= prefactor_E * nxp_z
 
     Ex[fix] = Ey[fix] = Ez[fix] = Hx[fix] = Hy[fix] = Hz[fix] = np.nan + 1j * np.nan
 
