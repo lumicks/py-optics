@@ -7,7 +7,7 @@ from scipy.constants import speed_of_light as C
 
 from ..mathutils.vector import cosines_from_unit_vectors, spherical_to_cartesian
 
-def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
+def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of an x-oriented dipole in homogeneous space. The field includes
     both near- and farfields. The dipole is located at (0,0,0). See [1]_.
 
@@ -73,10 +73,10 @@ def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
     return Ex, Ey, Ez, Hx, Hy, Hz
 
 
-def field_dipole_y(py, n_medium, lambda_vac, x, y, z):
+def electric_dipole_y(py, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of a y-oriented dipole. The field includes
     both near- and farfields. The implementation is based on a permutation of the fields as
-    calculated by :func:`field_dipole_z()`.
+    calculated by :func:`electric_dipole_z()`.
 
     Parameters
     ----------
@@ -106,13 +106,13 @@ def field_dipole_y(py, n_medium, lambda_vac, x, y, z):
         As Hx, but z-polarized component
     """
 
-    Ex, Ez, Ey, Hx, Hz, Hy = field_dipole_z(py, n_medium, lambda_vac, x, -z, y)
+    Ex, Ez, Ey, Hx, Hz, Hy = electric_dipole_z(py, n_medium, lambda_vac, x, -z, y)
     Ez *= -1
     Hz *= -1
     return Ex, Ey, Ez, Hx, Hy, Hz
 
 
-def field_dipole_z(pz, n_medium, lambda_vac, x, y, z):
+def electric_dipole_z(pz, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of a z-oriented dipole. The field includes
     both near- and farfields. The dipole is located at (0,0,0). See [1]_
 
@@ -204,8 +204,8 @@ def field_dipole_z(pz, n_medium, lambda_vac, x, y, z):
     return Ex, Ey, Ez, Hx, Hy, Hz
 
 
-def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
-    """Get the electromagnetic field of an arbitrarily-oriented dipole.
+def electric_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
+    """Get the electromagnetic field of an arbitrarily-oriented electric dipole.
     The field includes both near- and farfields. The dipole is located at (0,0,0) See [1]_. This
     function was not tested with complex dipole moment components.
 
@@ -288,7 +288,7 @@ def field_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
     return Ex, Ey, Ez, Hx, Hy, Hz
 
 
-def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
+def electric_dipole_farfield_position(p, n_medium, lambda_vac, x, y, z):
     """Get the electric farfield of an arbitrarily-oriented dipole.
     The dipole is located at (0,0,0).
     See [1]_
@@ -322,13 +322,13 @@ def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
     r = np.hypot(x, np.hypot(y, z))
     sx, sy, sz = [ax / r for ax in (x, y, z)]
     cos_theta, sin_theta, cos_phi, sin_phi = cosines_from_unit_vectors(sx, sy, sz)
-    Ex, Ey, Ez = farfield_dipole_angle(
+    Ex, Ey, Ez = electric_dipole_farfield_angle(
         p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r
     )
     return Ex, Ey, Ez
 
 
-def farfield_dipole_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r):
+def electric_dipole_farfield_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r):
     """Get the electromagnetic farfield of an arbitrarily-oriented dipole.
     The dipole is located at (0,0,0). See [1]_.
 
