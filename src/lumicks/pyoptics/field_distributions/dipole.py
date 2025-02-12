@@ -5,6 +5,7 @@ from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as C
 
+from ..mathutils.vector import cosines_from_unit_vectors, spherical_to_cartesian
 
 def field_dipole_x(px, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of an x-oriented dipole in homogeneous space. The field includes
@@ -315,27 +316,19 @@ def farfield_dipole_position(p, n_medium, lambda_vac, x, y, z):
 
     ..  [1] Principles of Nano-optics, 2nd Ed., Appendix D
     """
-    x = np.atleast_1d(x)
-    y = np.atleast_1d(y)
-    z = np.atleast_1d(z)
-    assert (
-        x.shape == y.shape == z.shape
-    ), "Location parameters x, y and z need to be of the same shape"
+    x, y, z = [np.atleast_1d(ax) for ax in (x, y, z)]
+    if not (x.shape == y.shape == z.shape):
+        raise ValueError("Location coordinates x, y and z need to be of the same size or shape")
     r = np.hypot(x, np.hypot(y, z))
-    Sx = x / r
-    Sy = y / r
-    Sz = z / r
-
-    k = 2 * np.pi * n_medium / lambda_vac
-    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * EPS0 * 4 * np.pi * r)
-    Ex = (p[0] * (1 - Sx**2) - p[1] * Sx * Sy - p[2] * Sx * Sz) * prefactor
-    Ey = (-p[0] * Sx * Sy + p[1] * (1 - Sy**2) - p[2] * Sy * Sz) * prefactor
-    Ez = (-p[0] * Sx * Sz - p[1] * Sy * Sz + p[2] * (1 - Sz**2)) * prefactor
-
+    sx, sy, sz = [ax / r for ax in (x, y, z)]
+    cos_theta, sin_theta, cos_phi, sin_phi = cosines_from_unit_vectors(sx, sy, sz)
+    Ex, Ey, Ez = farfield_dipole_angle(
+        p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r
+    )
     return Ex, Ey, Ez
 
 
-def farfield_dipole_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, r):
+def farfield_dipole_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r):
     """Get the electromagnetic farfield of an arbitrarily-oriented dipole.
     The dipole is located at (0,0,0). See [1]_.
 
