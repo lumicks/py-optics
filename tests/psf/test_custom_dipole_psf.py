@@ -65,13 +65,14 @@ def gen_dipole_psf(
     ff.kx = ff.ky = ff.kz = 0  # make that explicit
 
     def field_func(aperture, x_bfp, y_bfp, r_bfp, r_max, _):
-        Ex, Ey, Ez = fd.dipole.farfield_dipole_angle(
+        Ex, Ey, Ez = fd.dipole.electric_dipole_farfield_angle(
             dipole_moment,
             n_medium,
             lambda_em,
             ff.cos_phi,
             ff.sin_phi,
             ff.cos_theta,
+            ff.sin_theta,
             obj.focal_length,
         )
         Ex_bfp, Ey_bfp = tf.ff_to_bfp_angle(
