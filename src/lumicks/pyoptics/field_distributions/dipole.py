@@ -6,6 +6,28 @@ from scipy.constants import speed_of_light as C
 
 from ..mathutils.vector import cosines_from_unit_vectors, spherical_to_cartesian
 
+
+def emitted_power_electric_dipole(p, n_medium, lambda_vac):
+    """Calculate the emitted power by an electric dipole
+
+    Parameters
+    ----------
+    p : float | complex
+        Dipole moment in [Cm]
+    n_medium : float
+        Refractive index of the medium
+    lambda_vac : float
+        Wavelength of the emitted radiation in [m]
+
+    Returns
+    -------
+    float
+        Emitted power
+
+    ..  [1] Principles of Nano-optics, 2nd Ed., Ch. 8
+    """
+    omega = 2 * np.pi * C / lambda_vac
+    return abs(p) ** 2 * n_medium * omega**4 / (12 * np.pi * epsilon_0 * C**3)
 def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
     """Get the electromagnetic field of an x-oriented dipole in homogeneous space. The field includes
     both near- and farfields. The dipole is located at (0,0,0). See [1]_.
