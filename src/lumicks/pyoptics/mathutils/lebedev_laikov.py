@@ -1,53 +1,53 @@
 """Lebedev-Laikov.F, translated to C with f2c (version 20160102), because I don't understand
-   FORTRAN, then further translated by hand to Python. File obtained from
-   http://www.ccl.net/cca/software/SOURCES/FORTRAN/Lebedev-Laikov-Grids/
+FORTRAN, then further translated by hand to Python. File obtained from
+http://www.ccl.net/cca/software/SOURCES/FORTRAN/Lebedev-Laikov-Grids/
 
-   Original comment in the code:
+Original comment in the code:
 
-   This subroutine is part of a set of subroutines that generate
-   Lebedev grids [1]_, [2]_, [3]_, [4]_, [5]_, [6]_, for integration on a sphere. The original
-   C-code [1]_ was kindly provided by Dr. Dmitri N. Laikov and translated into fortran by Dr.
-   Christoph van Wuellen. This subroutine was translated using a C to fortran77 conversion tool
-   written by Dr. Christoph van Wuellen.
+This subroutine is part of a set of subroutines that generate
+Lebedev grids [1]_, [2]_, [3]_, [4]_, [5]_, [6]_, for integration on a sphere. The original
+C-code [1]_ was kindly provided by Dr. Dmitri N. Laikov and translated into fortran by Dr.
+Christoph van Wuellen. This subroutine was translated using a C to fortran77 conversion tool
+written by Dr. Christoph van Wuellen.
 
-   Users of this code are asked to include reference [1]_ in their publications, and in the user-
-   and programmers-manuals describing their codes.
+Users of this code are asked to include reference [1]_ in their publications, and in the user-
+and programmers-manuals describing their codes.
 
-   This code was distributed through CCL (http://www.ccl.net/).
+This code was distributed through CCL (http://www.ccl.net/).
 
 
-   ..  [1] V.I. Lebedev, and D.N. Laikov,
-           "A quadrature formula for the sphere of the 131st algebraic order of accuracy",
-           Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481.
-   ..  [2] V.I. Lebedev,
-           "A quadrature formula for the sphere of 59th algebraic order of accuracy",
-           Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286.
-   ..  [3] V.I. Lebedev, and A.L. Skorokhodov
-           "Quadrature formulas of orders 41, 47, and 53 for the sphere",
-           Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592.
-   ..  [4] V.I. Lebedev, "Spherical quadrature formulas exact to orders 25-29",
-           Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107.
-   ..  [5] V.I. Lebedev, "Quadratures on a sphere",
-           Computational Mathematics and Mathematical Physics, Vol. 16, 1976, pp. 10-24.
-   ..  [6] V.I. Lebedev
-           "Values of the nodes and weights of ninth to seventeenth order Gauss-Markov quadrature
-           formulae invariant under the octahedron group with inversion",
-           Computational Mathematics and Mathematical Physics, Vol. 15, 1975, pp. 44-51.
+..  [1] V.I. Lebedev, and D.N. Laikov,
+        "A quadrature formula for the sphere of the 131st algebraic order of accuracy",
+        Doklady Mathematics, Vol. 59, No. 3, 1999, pp. 477-481.
+..  [2] V.I. Lebedev,
+        "A quadrature formula for the sphere of 59th algebraic order of accuracy",
+        Russian Acad. Sci. Dokl. Math., Vol. 50, 1995, pp. 283-286.
+..  [3] V.I. Lebedev, and A.L. Skorokhodov
+        "Quadrature formulas of orders 41, 47, and 53 for the sphere",
+        Russian Acad. Sci. Dokl. Math., Vol. 45, 1992, pp. 587-592.
+..  [4] V.I. Lebedev, "Spherical quadrature formulas exact to orders 25-29",
+        Siberian Mathematical Journal, Vol. 18, 1977, pp. 99-107.
+..  [5] V.I. Lebedev, "Quadratures on a sphere",
+        Computational Mathematics and Mathematical Physics, Vol. 16, 1976, pp. 10-24.
+..  [6] V.I. Lebedev
+        "Values of the nodes and weights of ninth to seventeenth order Gauss-Markov quadrature
+        formulae invariant under the octahedron group with inversion",
+        Computational Mathematics and Mathematical Physics, Vol. 15, 1975, pp. 44-51.
 
-   Given a point on a sphere (specified by `a` and `b`), generate all the equivalent points under Oh
-   symmetry, making grid points with weight `v`. The variable num is increased by the number of
-   different points generated.
+Given a point on a sphere (specified by `a` and `b`), generate all the equivalent points under Oh
+symmetry, making grid points with weight `v`. The variable num is increased by the number of
+different points generated.
 
-   Depending on code, there are 6...48 different but equivalent points::
+Depending on code, there are 6...48 different but equivalent points::
 
-        code=1:   (0,0,1) etc                                (  6 points)
-        code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points)
-        code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points)
-        code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points)
-        code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points)
-        code=6:   (a,b,c) etc, c=sqrt(1-a^2-b^2), a/b input  ( 48 points)
+     code=1:   (0,0,1) etc                                (  6 points)
+     code=2:   (0,a,a) etc, a=1/sqrt(2)                   ( 12 points)
+     code=3:   (a,a,a) etc, a=1/sqrt(3)                   (  8 points)
+     code=4:   (a,a,b) etc, b=sqrt(1-2 a^2)               ( 24 points)
+     code=5:   (a,b,0) etc, b=sqrt(1-a^2), a input        ( 24 points)
+     code=6:   (a,b,c) etc, c=sqrt(1-a^2-b^2), a/b input  ( 48 points)
 
-    """
+"""
 
 from math import sqrt
 

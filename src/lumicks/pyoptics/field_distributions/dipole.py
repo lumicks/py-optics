@@ -487,7 +487,9 @@ def electric_dipole_farfield_position(p, n_medium, lambda_vac, x, y, z):
     return Ex, Ey, Ez
 
 
-def electric_dipole_farfield_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r):
+def electric_dipole_farfield_angle(
+    p, n_medium, lambda_vac, cos_phi, sin_phi, cos_theta, sin_theta, r
+):
     """Get the electromagnetic farfield of an arbitrarily-oriented dipole.
     The dipole is located at (0,0,0). See [1]_.
 
