@@ -3,8 +3,8 @@ from dataclasses import astuple, dataclass
 
 import numpy as np
 
-from .farfield_data import FarfieldData
-
+from .farfield import FarfieldData, PropagationDirection, get_k_vectors_from_cosines
+from .mathutils.vector import cosines_from_unit_vectors
 
 @dataclass
 class BackFocalPlaneCoordinates:
