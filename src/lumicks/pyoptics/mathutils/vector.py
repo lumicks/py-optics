@@ -37,11 +37,29 @@ def cosines_from_unit_vectors(sx, sy, sz):
     return cos_theta, sin_theta, cos_phi, sin_phi
 
 
-def unit_vectors_from_cosines(cos_theta, cos_phi, sin_phi):
-    sp = ((1 + cos_theta)(1 - cos_theta)) ** 0.5
+def unit_vectors_from_cosines(cos_theta, sin_theta, cos_phi, sin_phi):
+    """Calculate the unit vectors from the sine and cosines of the corresponding angles
+
+    Parameters
+    ----------
+    cos_theta : np.ndarray
+        Cosine of the angle with the z-axis.
+    sin_theta : np.ndarray
+        Sine of the angle with the z-axis.
+    cos_phi : np.ndarray
+        Cosine of the angle with the x-axis.
+    sin_phi : _type_
+        Sine of the angle with the x-axis.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        Unit vector as a tuple (sx, sy, sz)
+    """
+    sp = sin_theta
     sx = sp * cos_phi
     sy = sp * sin_phi
-    return sx, sy
+    return sx, sy, cos_theta
 
 
 def spherical_to_cartesian(locations, f_radial, f_theta, f_phi):
