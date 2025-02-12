@@ -25,10 +25,10 @@ def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k
     sin_theta = np.atleast_2d(np.sin(theta))
     cos_phi = np.atleast_2d(np.cos(phi))
     sin_phi = np.atleast_2d(np.sin(phi))
-    kz = k * cos_theta
-    kp = k * sin_theta
-    ky = -kp * sin_phi
-    kx = -kp * cos_phi
+
+    kx, ky, kz = get_k_vectors_from_cosines(
+        cos_theta, sin_theta, cos_phi, sin_phi, k, PropagationDirection.TO_ORIGIN
+    )
 
     return FarfieldData(
         Einf_theta=np.atleast_2d(polarization[0]) * kz,
@@ -41,7 +41,6 @@ def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k
         kz=kz,
         ky=ky,
         kx=kx,
-        kp=kp,
     )
 
 
@@ -92,9 +91,10 @@ def plane_wave_field_factory(
         # Since we're not stacking plane waves, there's no need for multi-threading
         n_threads = 1
         with thread_limiter(n_threads):
-            # The function `do_loop` doesn't actually loop over anything here, as it's just a single
-            # plane wave. But we re-use the code that can assemble the plane-wave response for a set of
-            # plane waves from any angle to assemble the field for a single one.
+            # The functions `internal_coordinates_loop` and `external_coordinates_loop` don't
+            # actually loop over anything here, as it's just a single plane wave. But we re-use the
+            # (Numba-compatible) code that can assemble the plane-wave response for a set of plane
+            # waves from any angle to assemble the field for a single one.
             E_field, H_field = (
                 internal_coordinates_loop(
                     np.atleast_2d((0.0, 0.0, 0.0)),

@@ -4,6 +4,7 @@ from ..objective import Objective
 from .bead import Bead
 from .interface import (
     absorbed_power_focus,
+    farfield_factory,
     fields_focus,
     fields_focus_gaussian,
     fields_plane_wave,

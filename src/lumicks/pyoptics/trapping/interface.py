@@ -6,6 +6,7 @@ from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as _C
 
+from ..farfield_transform.equivalence import NearfieldData, near_field_to_far_field
 from ..mathutils.integration import determine_integration_order, get_integration_locations
 from ..mathutils.lebedev_laikov import get_nearest_order
 from ..objective import Objective
@@ -13,6 +14,88 @@ from .bead import Bead
 from .focused_field_calculation import focus_field_factory
 from .local_coordinates import LocalBeadCoordinates
 from .plane_wave_field_calculation import plane_wave_field_factory
+
+
+def farfield_factory(
+    f_input_field,
+    objective: Objective,
+    condenser: Objective,
+    bead: Bead,
+    objective_bfp_sampling_n: int = 31,
+    condenser_bfp_sampling_n: int = 150,
+    num_orders: Optional[int] = None,
+    integration_order: Optional[int] = None,
+    method: str = "lebedev-laikov",
+):
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
+
+    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+
+    if integration_order is not None:
+        # Use user's integration order
+        integration_order = np.max((2, int(integration_order)))
+        if method == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_order = get_nearest_order(integration_order)
+    else:
+        integration_order = determine_integration_order(method, n_orders)
+    x, y, z, w = get_integration_locations(integration_order, method)
+    xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
+
+    local_coordinates = LocalBeadCoordinates(
+        xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
+    )
+    external_fields_func = focus_field_factory(
+        objective,
+        bead,
+        n_orders,
+        objective_bfp_sampling_n,
+        f_input_field,
+        local_coordinates,
+        False,
+    )
+
+    eta = (MU0 / EPS0) ** 0.5 / bead.n_medium
+
+    bfp = condenser.get_back_focal_plane_coordinates(condenser_bfp_sampling_n)
+    cos_theta, sin_theta, cos_phi, sin_phi, aperture = condenser.get_farfield_cosines(bfp)
+
+    def farfield_func(bead_center: Tuple[float, float, float], num_threads: Optional[int] = None):
+        bead_center = np.atleast_2d(bead_center)
+        # shape = (numbers of bead positions, number of field coordinates)
+        # Ex, Ey, Ez, Hx, Hy, Hz = electric_dipole_z(1, bead.n_medium, bead.lambda_vac, xb, yb, zb)
+        Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, False, num_threads)
+        E_theta_all = np.empty((bead_center.shape[0], *cos_theta.shape), dtype="complex128")
+        E_phi_all = np.empty_like(E_theta_all)
+        for bead_idx, (bead_pos_x, bead_pos_y, bead_pos_z) in enumerate(bead_center):
+            near_field_data = NearfieldData(
+                xb + bead_pos_x,
+                yb + bead_pos_y,
+                zb + bead_pos_z,
+                [x, y, z],
+                w,
+                [Ex, Ey, Ez],
+                [Hx, Hy, Hz],
+                bead.k,
+                eta,
+            )
+
+            E_theta, E_phi = near_field_to_far_field(
+                near_field_data,
+                cos_theta,
+                sin_theta,
+                cos_phi,
+                sin_phi,
+                condenser.focal_length,
+                aperture,
+            )
+            E_theta_all[bead_idx, :] = E_theta
+            E_phi_all[bead_idx, :] = E_phi
+
+        return np.squeeze(np.asarray(E_theta_all)), np.squeeze(np.asarray(E_phi_all))
+
+    return farfield_func
 
 
 def fields_focus_gaussian(
