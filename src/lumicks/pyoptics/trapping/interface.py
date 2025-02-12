@@ -2,8 +2,7 @@ import logging
 from typing import Optional, Tuple
 
 import numpy as np
-from scipy.constants import epsilon_0 as EPS0
-from scipy.constants import mu_0 as MU0
+from scipy.constants import epsilon_0, mu_0
 from scipy.constants import speed_of_light as _C
 
 from ..farfield_transform.equivalence import NearfieldData, near_field_to_far_field
@@ -56,7 +55,7 @@ def farfield_factory(
         False,
     )
 
-    eta = (MU0 / EPS0) ** 0.5 / bead.n_medium
+    eta = (mu_0 / epsilon_0) ** 0.5 / bead.n_medium
 
     bfp = condenser.get_back_focal_plane_coordinates(condenser_bfp_sampling_n)
     cos_theta, sin_theta, cos_phi, sin_phi, aperture = condenser.get_farfield_cosines(bfp)
@@ -199,7 +198,7 @@ def fields_focus_gaussian(
     """
     w0 = filling_factor * objective.focal_length * objective.NA / bead.n_medium  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
-    E0 = (I0 * 2 / (EPS0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
+    E0 = (I0 * 2 / (epsilon_0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
     def gaussian_beam(_, x_bfp, y_bfp, *args):
         Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
@@ -614,8 +613,8 @@ def force_factory(
         local_coordinates,
         False,
     )
-    _eps = EPS0 * bead.n_medium**2
-    _mu = MU0
+    _eps = epsilon_0 * bead.n_medium**2
+    _mu = mu_0
 
     # Normal vectors with weight factor incorporated
     nw = w[:, np.newaxis] * np.concatenate([np.atleast_2d(ax) for ax in (x, y, z)], axis=0).T
