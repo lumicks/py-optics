@@ -5,11 +5,11 @@ from scipy.constants import speed_of_light as C
 
 from lumicks.pyoptics.field_distributions.dipole import (
     electric_dipole,
+    electric_dipole_farfield_position,
     electric_dipole_x,
     electric_dipole_y,
     electric_dipole_z,
     emitted_power_electric_dipole,
-    electric_dipole_farfield_position,
 )
 from lumicks.pyoptics.mathutils.integration import get_integration_locations, get_nearest_order
 from lumicks.pyoptics.mathutils.vector import outer_product
