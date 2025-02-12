@@ -1,8 +1,7 @@
 """Field distributions of dipoles, implemented from various sources"""
 
 import numpy as np
-from scipy.constants import epsilon_0 as EPS0
-from scipy.constants import mu_0 as MU0
+from scipy.constants import epsilon_0, mu_0
 from scipy.constants import speed_of_light as C
 
 from ..mathutils.vector import cosines_from_unit_vectors, spherical_to_cartesian
@@ -53,7 +52,7 @@ def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
     Ey = x * y / (k**2 * R) * (3 / R**3 - 3j * k / R**2 - k**2 / R)
     Ez = x * z / (k**2 * R) * (3 / R**3 - 3j * k / R**2 - k**2 / R)
 
-    prefactor = px * k**2 * np.exp(1j * k * R) / (4 * np.pi * R * EPS0 * n_medium**2)
+    prefactor = px * k**2 * np.exp(1j * k * R) / (4 * np.pi * R * epsilon_0 * n_medium**2)
     Ex *= prefactor
     Ey *= prefactor
     Ez *= prefactor
@@ -61,7 +60,7 @@ def electric_dipole_x(px, n_medium, lambda_vac, x, y, z):
     Hy = 1j * k * z / R - z / R**2
     Hz = y / R**2 - 1j * k * y / R
 
-    prefactor *= (1j * 2 * np.pi * C / lambda_vac * MU0) ** -1
+    prefactor *= (1j * 2 * np.pi * C / lambda_vac * mu_0) ** -1
 
     Hy *= prefactor
     Hz *= prefactor
@@ -166,8 +165,8 @@ def electric_dipole_z(pz, n_medium, lambda_vac, x, y, z):
     # as it does not affect Ez (no cosP or sinP terms)
     cosP[rho == 0] = sinP[rho == 0] = 0
 
-    _eps = EPS0 * n_medium**2
-    eta = (MU0 / _eps) ** 0.5
+    _eps = epsilon_0 * n_medium**2
+    eta = (mu_0 / _eps) ** 0.5
     k = 2 * np.pi * n_medium / lambda_vac
     w = C * (k / n_medium)
 
@@ -257,7 +256,7 @@ def electric_dipole(p, n_medium, lambda_vac, x, y, z, farfield=False):
 
     ndotp = nx * px + ny * py + nz * pz
 
-    eps_inv = (EPS0 * n_medium**2) ** -1
+    eps_inv = (epsilon_0 * n_medium**2) ** -1
     G0 = np.exp(1j * k * r) / (4 * np.pi * r)
 
     if farfield:
@@ -366,23 +365,22 @@ def electric_dipole_farfield_angle(p, n_medium, lambda_vac, cos_phi, sin_phi, co
 
     assert cos_phi.shape == sin_phi.shape == cos_theta.shape
 
-    sinT = np.zeros(cos_theta.shape)
-    sinT[cos_theta <= 1] = (1 - cos_theta[cos_theta <= 1] ** 2) ** 0.5
-
     k = 2 * np.pi * n_medium / lambda_vac
-    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * EPS0 * 4 * np.pi * r)
+    prefactor = k**2 * np.exp(1j * k * r) / (n_medium**2 * epsilon_0 * 4 * np.pi * r)
     Ex = (
-        p[0] * (1 - cos_phi**2 * sinT**2)
-        - p[1] * sin_phi * cos_phi * sinT**2
-        - p[2] * cos_phi * sinT * cos_theta
+        p[0] * (1 - cos_phi**2 * sin_theta**2)
+        - p[1] * sin_phi * cos_phi * sin_theta**2
+        - p[2] * cos_phi * sin_theta * cos_theta
     ) * prefactor
     Ey = (
-        -p[0] * sin_phi * cos_phi * sinT**2
-        + p[1] * (1 - sin_phi**2 * sinT**2)
-        - p[2] * sin_phi * sinT * cos_theta
+        -p[0] * sin_phi * cos_phi * sin_theta**2
+        + p[1] * (1 - sin_phi**2 * sin_theta**2)
+        - p[2] * sin_phi * sin_theta * cos_theta
     ) * prefactor
     Ez = (
-        -p[0] * cos_phi * sinT * cos_theta - p[1] * sin_phi * sinT * cos_theta + p[2] * sinT**2
+        -p[0] * cos_phi * sin_theta * cos_theta
+        - p[1] * sin_phi * sin_theta * cos_theta
+        + p[2] * sin_theta**2
     ) * prefactor
 
     return Ex, Ey, Ez
