@@ -54,25 +54,30 @@ def determine_integration_order(method: str, n_orders: int):
     return integration_order
 
 
-@lru_cache(maxsize=8)
 def get_integration_locations(integration_order: int, method: str):
-    if method == "lebedev-laikov":
-        return [np.asarray(c) for c in ll_get_integration_locations(integration_order)]
-    if method == "gauss-legendre":
-        z, w = roots_legendre(integration_order)
-    elif method == "clenshaw-curtis":
-        z, w = clenshaw_curtis_weights(integration_order)
-    else:
-        raise RuntimeError(f"Unsupported integration method {method}")
+    @lru_cache(maxsize=8)
+    def _get_integration_locations(integration_order: int, method: str):
+        if method == "lebedev-laikov":
+            return [np.asarray(c) for c in ll_get_integration_locations(integration_order)]
+        if method == "gauss-legendre":
+            z, w = roots_legendre(integration_order)
+        elif method == "clenshaw-curtis":
+            z, w = clenshaw_curtis_weights(integration_order)
+        else:
+            raise RuntimeError(f"Unsupported integration method {method}")
 
-    phi = np.arange(1, 2 * integration_order + 1) * np.pi / integration_order
-    x, y = np.cos(phi), np.sin(phi)
-    sin_theta = ((1 - z) * (1 + z)) ** 0.5
-    x = (sin_theta[:, np.newaxis] * x[np.newaxis, :]).flatten()
-    y = (sin_theta[:, np.newaxis] * y[np.newaxis, :]).flatten()
-    z = np.repeat(z, phi.size)
-    w = np.repeat(w, phi.size) * 0.25 / integration_order
-    return x, y, z, w
+        phi = np.arange(1, 2 * integration_order + 1) * np.pi / integration_order
+        x, y = np.cos(phi), np.sin(phi)
+        sin_theta = ((1 - z) * (1 + z)) ** 0.5
+        x = (sin_theta[:, np.newaxis] * x[np.newaxis, :]).flatten()
+        y = (sin_theta[:, np.newaxis] * y[np.newaxis, :]).flatten()
+        z = np.repeat(z, phi.size)
+        w = np.repeat(w, phi.size) * 0.25 / integration_order
+        return x, y, z, w
+
+    vals = _get_integration_locations(integration_order, method)
+    # Prevent modifications of cached version of the return values
+    return [val.copy() for val in vals]
 
 
 @lru_cache(maxsize=8)
