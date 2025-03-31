@@ -21,11 +21,19 @@ def cosines_from_unit_vectors(sx, sy, sz):
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         Returns the values for cos_theta, sin_theta, cos_phi and sin_phi, respectively.
 
+    Raises
+    ------
+    ValueError
+        Raised if the input is not a unit vector, or an array of unit vectors (norm != 1.0)
+
     Notes
     -----
-    For θ == 0.0, the angle φ is undefined. By definition, this function return cos_phi = 1.0 and
+    For θ == 0.0, the angle φ is undefined. By convention, this function return cos_phi = 1.0 and
     sin_phi = 0.0.
     """
+    if not np.allclose(np.hypot(np.hypot(sx, sy), sz), 1.0):
+        raise ValueError("The input does not seem to be a unit vector or an array of unit vectors")
+    sx, sy, sz = [np.asarray(ax) for ax in (sx, sy, sz)]
     cos_theta = sz
     sin_theta = ((1 + cos_theta) * (1 - cos_theta)) ** 0.5
     sp = np.hypot(sx, sy)
@@ -37,11 +45,42 @@ def cosines_from_unit_vectors(sx, sy, sz):
     return cos_theta, sin_theta, cos_phi, sin_phi
 
 
-def unit_vectors_from_cosines(cos_theta, cos_phi, sin_phi):
-    sp = ((1 + cos_theta)(1 - cos_theta)) ** 0.5
+def unit_vectors_from_cosines(cos_theta, sin_theta, cos_phi, sin_phi):
+    """Calculate the unit vectors from the sine and cosines of the corresponding angles. The domain
+    of θ is [0..π], and of φ is [0..2π].
+
+    Parameters
+    ----------
+    cos_theta : np.ndarray
+        Cosine of the angle with the z-axis.
+    sin_theta : np.ndarray
+        Sine of the angle with the z-axis.
+    cos_phi : np.ndarray
+        Cosine of the angle with the x-axis.
+    sin_phi : _type_
+        Sine of the angle with the x-axis.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        Unit vector as a tuple (sx, sy, sz)
+
+    Raises
+    ------
+    ValueError
+        Raised if the input does not lie on the unit circle: cos²θ + sin²θ != 1, and cos²φ + sin²φ
+        != 1, and raised if sin θ < 0.0.
+    """
+    if not (
+        np.allclose(cos_theta**2 + sin_theta**2, 1.0) and np.allclose(cos_phi**2 + sin_phi**2, 1.0)
+    ):
+        raise ValueError("The input does not lie on the unit circle")
+    if np.any(sin_theta < 0.0):
+        raise ValueError("The value of sin_theta cannot be less than zero.")
+    sp = sin_theta
     sx = sp * cos_phi
     sy = sp * sin_phi
-    return sx, sy
+    return sx, sy, cos_theta
 
 
 def spherical_to_cartesian(locations, f_radial, f_theta, f_phi):
