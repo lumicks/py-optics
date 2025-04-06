@@ -342,9 +342,9 @@ def farfield_to_back_focal_plane_unit_vectors(
         Exff=Exff,
         Eyff=Eyff,
         Ezff=Ezff,
+        cos_theta=sz,
         cos_phi=cosP,
         sin_phi=sinP,
-        cos_theta=sz,
         n_medium=n_medium,
         n_bfp=n_bfp,
     )
@@ -354,9 +354,9 @@ def farfield_to_back_focal_plane_cosines(
     Exff: np.ndarray,
     Eyff: np.ndarray,
     Ezff: np.ndarray,
+    cos_theta: np.ndarray,
     cos_phi: np.ndarray,
     sin_phi: np.ndarray,
-    cos_theta: np.ndarray,
     n_medium: float,
     n_bfp: float,
 ):
