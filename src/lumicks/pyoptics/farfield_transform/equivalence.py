@@ -57,7 +57,6 @@ def near_field_to_far_field(
     cos_phi: np.ndarray,
     sin_phi: np.ndarray,
     r: np.ndarray,
-    aperture: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
     xb, yb, zb, n_medium = [getattr(near_field_data, item) for item in ("x", "y", "z", "n_medium")]
     k = 2 * np.pi * n_medium / near_field_data.lambda_vac
@@ -73,7 +72,6 @@ def near_field_to_far_field(
         w,
         [cos_theta, sin_theta, cos_phi, sin_phi],
         r,
-        aperture,
         k,
         eta,
     )
@@ -81,7 +79,7 @@ def near_field_to_far_field(
     return E_theta, E_phi
 
 
-def _equivalent_currents_to_farfield(locations, J, M, weights, cosines, r, aperture, k, eta):
+def _equivalent_currents_to_farfield(locations, J, M, weights, cosines, r, k, eta):
     cos_theta, sin_theta, cos_phi, sin_phi = cosines
     xb, yb, zb = locations
     Jx, Jy, Jz = J

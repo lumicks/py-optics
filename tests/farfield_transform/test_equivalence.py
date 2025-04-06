@@ -45,7 +45,6 @@ def test_electric_dipoles(order, n_medium, lambda_vac, component):
         1.0,
         [cos_theta, sin_theta, cos_phi, sin_phi],
         R,
-        np.ones_like(cos_theta, dtype=bool),
         k,
         eta,
     )
@@ -83,7 +82,6 @@ def test_magnetic_dipoles(order, n_medium, lambda_vac, component):
         1.0,
         [cos_theta, sin_theta, cos_phi, sin_phi],
         R,
-        np.ones_like(cos_theta, dtype=bool),
         k,
         eta,
     )
@@ -135,7 +133,6 @@ def test_near_field_to_far_field(n_medium, lambda_vac, dipole_moment):
         cos_phi,
         sin_phi,
         r_far,
-        np.ones(cos_theta.shape, dtype=bool),
     )
 
     Ex_far, Ey_far, Ez_far = vector.spherical_to_cartesian_from_angles(
