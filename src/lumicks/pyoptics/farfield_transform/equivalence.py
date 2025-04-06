@@ -58,23 +58,16 @@ def near_field_to_far_field(
     sin_phi: np.ndarray,
     r: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    xb, yb, zb, n_medium = [getattr(near_field_data, item) for item in ("x", "y", "z", "n_medium")]
-    k = 2 * np.pi * n_medium / near_field_data.lambda_vac
+    locations = [getattr(near_field_data, item) for item in ("x", "y", "z")]
+    cosines = [cos_theta, sin_theta, cos_phi, sin_phi]
+    k = 2 * np.pi * near_field_data.n_medium / near_field_data.lambda_vac
     w = near_field_data.weight
     eta = (mu_0 / epsilon_0) ** 0.5 / near_field_data.n_medium
     J_x, J_y, J_z = outer_product(near_field_data.normals, near_field_data.H)
     M_x, M_y, M_z = outer_product(near_field_data.E, near_field_data.normals)
-    J_x, J_y, J_z, M_x, M_y, M_z = [np.atleast_1d(arr) for arr in (J_x, J_y, J_z, M_x, M_y, M_z)]
-    E_theta, E_phi = _equivalent_currents_to_farfield(
-        [xb, yb, zb],
-        [J_x, J_y, J_z],
-        [M_x, M_y, M_z],
-        w,
-        [cos_theta, sin_theta, cos_phi, sin_phi],
-        r,
-        k,
-        eta,
-    )
+    J = [np.atleast_1d(arr) for arr in (J_x, J_y, J_z)]
+    M = [np.atleast_1d(arr) for arr in (M_x, M_y, M_z)]
+    E_theta, E_phi = _equivalent_currents_to_farfield(locations, J, M, w, cosines, r, k, eta)
 
     return E_theta, E_phi
 
@@ -87,7 +80,7 @@ def _equivalent_currents_to_farfield(locations, J, M, weights, cosines, r, k, et
     L_phi, L_theta, N_phi, N_theta = [
         np.zeros_like(cos_theta, dtype="complex128") for _ in range(4)
     ]
-    for idx in np.flatnonzero(aperture):
+    for idx in range(cos_theta.size):
         weighted_phasor = weights * np.exp(
             (-1j * k)
             * (
