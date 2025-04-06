@@ -364,7 +364,10 @@ def farfield_to_back_focal_plane_cosines(
         np.asarray(arr) for arr in (Exff, Eyff, Ezff, cos_phi, sin_phi, cos_theta)
     ]
     Et, Ep, Ex_bfp, Ey_bfp = [np.zeros(Exff.shape, dtype="complex128") for _ in range(4)]
-
+    # Support multiple farfields for same angles
+    cos_theta, cos_phi, sin_phi = [
+        np.broadcast_to(array, Exff.shape) for array in (cos_theta, cos_phi, sin_phi)
+    ]
     sin_theta = ((1 + cos_theta) * (1 - cos_theta)) ** 0.5
 
     roc = cos_theta > 0  # roc == Region of convergence, avoid division by zero
