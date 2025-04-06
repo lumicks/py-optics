@@ -226,9 +226,17 @@ class Objective:
         cos_phi[np.logical_not(aperture)] = 1
         return cos_theta, sin_theta, cos_phi, sin_phi, aperture
 
-    def farfield_to_back_focal_plane(self, E: Tuple[np.ndarray], s: Tuple[np.ndarray]):
+    def farfield_to_back_focal_plane_unit_vectors(self, E: Tuple[np.ndarray], s: Tuple[np.ndarray]):
         Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_unit_vectors(
             *E, *s, self.n_medium, self.n_bfp
+        )
+        return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
+
+    def farfield_to_back_focal_plane_cosines(
+        self, E: Tuple[np.ndarray], cos_theta, cos_phi, sin_phi
+    ):
+        Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_cosines(
+            *E, cos_theta, cos_phi, sin_phi, self.n_medium, self.n_bfp
         )
         return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
 
