@@ -18,10 +18,8 @@ from .plane_wave_field_calculation import plane_wave_field_factory
 def farfield_factory(
     f_input_field,
     objective: Objective,
-    condenser: Objective,
     bead: Bead,
     objective_bfp_sampling_n: int = 31,
-    condenser_bfp_sampling_n: int = 150,
     num_orders: Optional[int] = None,
     integration_order: Optional[int] = None,
     method: str = "lebedev-laikov",
@@ -55,13 +53,17 @@ def farfield_factory(
         False,
     )
 
-    bfp = condenser.get_back_focal_plane_coordinates(condenser_bfp_sampling_n)
-    cos_theta, sin_theta, cos_phi, sin_phi, aperture = condenser.get_farfield_cosines(bfp)
-
-    def farfield_func(bead_center: Tuple[float, float, float], num_threads: Optional[int] = None):
+    def farfield_func(
+        bead_center: Tuple[float, float, float],
+        cos_theta: np.ndarray,
+        sin_theta: np.ndarray,
+        cos_phi: np.ndarray,
+        sin_phi: np.ndarray,
+        r: float,
+        num_threads: Optional[int] = None,
+    ):
         bead_center = np.atleast_2d(bead_center)
         # shape = (numbers of bead positions, number of field coordinates)
-        # Ex, Ey, Ez, Hx, Hy, Hz = electric_dipole_z(1, bead.n_medium, bead.lambda_vac, xb, yb, zb)
         Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, False, num_threads)
         E_theta_all = np.empty((bead_center.shape[0], *cos_theta.shape), dtype="complex128")
         E_phi_all = np.empty_like(E_theta_all)
@@ -79,18 +81,12 @@ def farfield_factory(
             )
 
             E_theta, E_phi = near_field_to_far_field(
-                near_field_data,
-                cos_theta,
-                sin_theta,
-                cos_phi,
-                sin_phi,
-                condenser.focal_length,
-                aperture,
+                near_field_data, cos_theta, sin_theta, cos_phi, sin_phi, r
             )
             E_theta_all[bead_idx, :] = E_theta
             E_phi_all[bead_idx, :] = E_phi
 
-        return np.squeeze(np.asarray(E_theta_all)), np.squeeze(np.asarray(E_phi_all))
+        return np.squeeze(E_theta_all), np.squeeze(E_phi_all)
 
     return farfield_func
 
