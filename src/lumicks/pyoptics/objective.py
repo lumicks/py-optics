@@ -41,10 +41,10 @@ class Objective:
             Focal length of the objective in meters. Has to be strictly positive.
         n_bfp : float
             Refractive index of the medium present at the back-focal plane (BFP) of the objective.
-            Has to be strictly positive.
+            Has to be strictly positive and real.
         n_medium : float
-            Refractive index of the immersion medium of the objective. Has to be strictly positive
-            and larger than the NA.
+            Refractive index of the immersion medium of the objective. Has to be strictly positive,
+            real, and larger than the NA.
 
         Raises
         ------
@@ -52,19 +52,23 @@ class Objective:
             Raised if `NA` > `n_medium`, if `n_medium < 0` or `n_bp < 0`, if `focal_length < 0` or
             if `NA < 0`.
         """
+        if (
+            isinstance(n_medium, complex)
+            or isinstance(n_bfp, complex)
+            or n_medium <= 0
+            or n_bfp <= 0
+        ):
+            raise ValueError(
+                "Only positive and real refractive indices are supported for n_bfp and n_medium"
+            )
         if NA > n_medium:
             raise ValueError("The NA of the objective cannot be larger than n_medium")
-
-        if n_medium <= 0 or n_bfp <= 0:
-            raise ValueError(
-                "Only positive refractive indices are supported for n_bfp and n_medium"
-            )
 
         if focal_length <= 0:
             raise ValueError("focal_length needs to be strictly positive")
 
-        if NA <= 0:
-            raise ValueError("NA needs to be strictly positive")
+        if NA <= 0 or isinstance(NA, complex):
+            raise ValueError("NA needs to be strictly positive and real")
 
         self.NA = NA
         self.focal_length = focal_length
