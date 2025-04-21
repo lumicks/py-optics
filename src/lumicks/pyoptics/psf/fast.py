@@ -1,8 +1,7 @@
 from typing import Tuple, Union
 
 import numpy as np
-
-from ..mathutils import czt
+from scipy.signal import CZT
 
 """
 Functions to calculate point spread functions of focused wavefronts by use of chirped z-transforms.
@@ -325,27 +324,22 @@ def fast_psf(
         (ax * wx ** -(np.arange(numpoints_x))) ** (bfp_sampling_n - 1),
         (numpoints_x, 1, 1),
     )
-    phase_fix_step1 = np.tile(phase_fix_x, (1, npupilsamples, Z.shape[2]))
 
     phase_fix_y = np.reshape(
         (ay * wy ** -(np.arange(numpoints_y))) ** (bfp_sampling_n - 1),
-        (numpoints_y, 1, 1),
+        (1, numpoints_y, 1),
     )
-
-    phase_fix_step2 = np.tile(phase_fix_y, (1, numpoints_x, Z.shape[2]))
 
     # We break the czt into two steps, as there is an overlap in processing that
     # needs to be done for every polarization. Therefore we can save a bit of
     # overhead by storing the results that can be reused.
-    precalc_step1 = czt.init_czt(Einfx, numpoints_x, wx, ax)
-    Ex = np.transpose(czt.exec_czt(Einfx, precalc_step1) * phase_fix_step1, (1, 0, 2))
-    precalc_step2 = czt.init_czt(Ex, numpoints_y, wy, ay)
-    Ex = np.transpose(czt.exec_czt(Ex, precalc_step2) * phase_fix_step2, (1, 0, 2))
-    Ey = np.transpose(czt.exec_czt(Einfy, precalc_step1) * phase_fix_step1, (1, 0, 2))
-    Ey = np.transpose(czt.exec_czt(Ey, precalc_step2) * phase_fix_step2, (1, 0, 2))
+    x_czt = CZT(Einfx.shape[0], numpoints_x, wx, ax)
+    y_czt = CZT(Einfx.shape[1], numpoints_y, wy, ay)
 
-    Ez = np.transpose(czt.exec_czt(Einfz, precalc_step1) * phase_fix_step1, (1, 0, 2))
-    Ez = np.transpose(czt.exec_czt(Ez, precalc_step2) * phase_fix_step2, (1, 0, 2))
+    Ex, Ey, Ez = [
+        y_czt(x_czt(Einf, axis=0) * phase_fix_x, axis=1) * phase_fix_y
+        for Einf in (Einfx, Einfy, Einfz)
+    ]
 
     Ex, Ey, Ez = [
         E * -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
