@@ -7,6 +7,7 @@
 * Added Gauss-Legendre and Clenshaw-Curtis integration methods for force calculations
 * Changed the default integration order to twice the number of Mie modes for the Lebedev-Laikov integration scheme when no integration order is given.
 * Added the electromagnetic field distribution for magnetic dipoles at arbitrary orientations
+* Added a method to determine the minimal sampling order of the back focal plane to `objective.Objective`
 
 # Changes
 * Renamed `integration_orders` to `integration_order`

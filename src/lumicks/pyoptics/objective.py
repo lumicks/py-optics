@@ -1,7 +1,10 @@
+import math
 from collections import namedtuple
+from collections.abc import Iterable
 from dataclasses import astuple, dataclass
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from .farfield_data import FarfieldData
 
@@ -213,3 +216,86 @@ class Objective:
             Einf_phi=Einf_phi,
             aperture=bfp_coords.aperture,
         )
+
+    def minimal_sampling_order(
+        self,
+        coordinates: Iterable[ArrayLike],
+        lambda_vac: float,
+        method: str = "equidistant",
+    ) -> int:
+        """
+        Retrieve the absolute minimal sampling order for sampling the back focal plane, when
+        focusing a beam of light. For the only support method "equidistant" (see below), the
+        minimally required sampling order is based on the Nyquist sampling theorem.
+
+        Parameters
+        ----------
+        coordinates : Iterable[ArrayLike]
+            The coordinates in the range of interest. First index should iterate over axis:
+            `coordinates[0, ...]` for x, `coordinates[1, ...]` for y and `coordinates[2, ...]` for
+            z. The units can be anything, as long as the wavelength `lambda_vac` (see below) is
+            provided in the same units.
+        lambda_vac : float
+            Wavelength of the light in vacuum. Has to be in the same units as the coordinates.
+        method : str, optional
+            Integration method, by default "equidistant". Currently only "equidistant" is supported,
+            which means that the back focal plane is sampled with equidistant steps. In the future,
+            other methods may be supported. See Notes for an explanation of the methods
+
+        Returns
+        -------
+        int
+            The sampling order N that is the minimum required, for the specific method.
+
+        Raises
+        ------
+        ValueError
+            Raised if an unknown method is passed.
+        RuntimeError
+            Raised if `len(coordinates)` is not equal to three.
+
+        Notes
+        -----
+        The currently only supported method of sampling the back focal plane is "equidistant". This
+        method samples the back focal plane with equidistant steps. For proper sampling, the number
+        of samples should be at least 2 per oscillation, where the frequency of the oscillation
+        depends on the maximum magnitude of the coordinates.
+
+        For in-plane vectors: :math:`\\max(|\\Delta k_\\rho \\rho|) < \\pi`, where :math:`\\Delta
+        k_\\rho = k_{\\rho, max} / (N - 1)`. :math:`k_{\\rho, max} = k \\sin(\theta)_{max} = k
+        NA/n_{medium}`.
+
+        For out-of-plane vectors: :math:`\\max(|\\Delta k_z z|) < \\pi`, where :math:`\\Delta k_z /
+        k = \\sqrt{1 - ((N - 2) NA)^2 /(n_{medium} (N - 1))^2} - \\sqrt{1 - (NA /n_{medium})^2}`.
+
+        The function returns :math:`\\max(N_\\rho, N_z)`, the minimal number of samples to fulfill
+        the sampling theorem.
+        """
+        if method != "equidistant":
+            raise ValueError(f"Unsupported method: {method}")
+
+        if len(coordinates) != 3:
+            raise RuntimeError(
+                f"Unexpected length of coordinates: expected 3, got {len(coordinates)}."
+            )
+
+        def N_z():
+            if max_z == 0.0:  # sampling not affected by z coordinate
+                return 2
+            # Threshold is sampling criterion + cos(theta_max)
+            # == pi / (k*max_z) + (1 - (NA /n_medium))**2
+            threshold = (
+                lambda_vac / (2 * self.n_medium * max_z) + (1 - self.sin_theta_max**2) ** 0.5
+            )
+            if threshold > 1:
+                return 2
+            # Solving for 1-(N-2)**2/(N-1)**2 * (NA/n_medium)**2 < threshold
+            # with x = (N-2)/(N-1) yields:
+            x = ((1 - threshold**2) / self.sin_theta_max**2) ** 0.5
+            # Solve for N in x = (N-2)/(N-1):
+            return math.ceil((x - 2) / (x - 1))
+
+        max_x, max_y, max_z = [np.max(np.abs(ax)) for ax in coordinates]
+
+        N_rho = math.ceil(1 + 2 * self.NA * math.hypot(max_x, max_y) / lambda_vac)
+        return max(N_rho, N_z())
