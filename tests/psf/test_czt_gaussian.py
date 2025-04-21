@@ -19,7 +19,8 @@ def test_fast_gaussian(focal_length, n_medium, NA, x_shift, y_shift):
     filling_factor = 0.9
 
     z_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, 10)
-    xy_eval = np.linspace(-lambda_vac, lambda_vac, 10)
+    x_eval = np.linspace(-lambda_vac, lambda_vac, 10) + x_shift
+    y_eval = np.linspace(-1.1 * lambda_vac, 1.1 * lambda_vac, 11) + y_shift
 
     Ex_pw, Ey_pw, Ez_pw = focused_gauss(
         lambda_vac=lambda_vac,
@@ -28,8 +29,8 @@ def test_fast_gaussian(focal_length, n_medium, NA, x_shift, y_shift):
         focal_length=focal_length,
         NA=NA,
         filling_factor=filling_factor,
-        x=xy_eval + x_shift,
-        y=xy_eval + y_shift,
+        x=x_eval,
+        y=y_eval,
         z=z_eval,
         bfp_sampling_n=bfp_sampling_n,
         return_grid=False,
@@ -42,10 +43,10 @@ def test_fast_gaussian(focal_length, n_medium, NA, x_shift, y_shift):
         focal_length=focal_length,
         NA=NA,
         filling_factor=filling_factor,
-        x_range=(-lambda_vac + x_shift, lambda_vac + x_shift),
+        x_range=(np.min(x_eval), np.max(x_eval)),
         numpoints_x=10,
-        y_range=(-lambda_vac + y_shift, lambda_vac + y_shift),
-        numpoints_y=10,
+        y_range=(np.min(y_eval), np.max(y_eval)),
+        numpoints_y=11,
         z=z_eval,
         bfp_sampling_n=bfp_sampling_n,
         return_grid=False,
