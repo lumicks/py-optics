@@ -195,11 +195,6 @@ def direct_psf(
     k = 2 * np.pi * n_medium / lambda_vac
     ks = k * NA / n_medium
 
-    # Calculate the minimum sampling of the Back Focal plane according to [2]
-    # We take 50x50 plane waves in one quadrant as a minimum, but > 50 is
-    # recommended [2]
-    # M = int(np.max((bfp_sampling_n, 2 * NA**2 * np.max(np.abs(z)) /
-    #            (np.sqrt(n_medium**2 - NA**2) * lambda_vac))))
     npupilsamples = 2 * bfp_sampling_n - 1
 
     dk = ks / (bfp_sampling_n - 1)
@@ -271,9 +266,7 @@ def direct_psf(
     ky = -kp * sin_phi
 
     # Initialize memory for the fields
-    Ex = np.zeros_like(X, dtype="complex128")
-    Ey = np.zeros_like(X, dtype="complex128")
-    Ez = np.zeros_like(X, dtype="complex128")
+    Ex, Ey, Ez = [np.zeros_like(X, dtype="complex128") for _ in range(3)]
 
     # Now the meat: add plane waves from the angles corresponding to the
     # sampling of the back focal plane. This numerically approximates equation
