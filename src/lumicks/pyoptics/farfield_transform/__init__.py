@@ -7,8 +7,7 @@ This implementation is original code and not based on any other software
 """
 
 import numpy as np
-
-from ..mathutils.czt import czt
+from scipy.signal import CZT
 
 
 def czt_nf_to_ff(
@@ -23,12 +22,15 @@ def czt_nf_to_ff(
     NA: float,
     bfp_sampling_n=101,
 ):
-    assert NA <= n_medium, "NA cannot be larger than n_medium"
-    Ex = np.atleast_2d(Ex)
-    Ey = np.atleast_2d(Ey)
-    Ez = np.atleast_2d(Ez)
-    assert Ex.shape == Ey.shape == Ez.shape, "All fields need to be equal size"
-    assert Ex.shape[0] == Ex.shape[1], "Field matrices need to be square"
+    Ex, Ey, Ez = [np.atleast_2d(E) for E in (Ex, Ey, Ez)]
+    if NA <= n_medium:
+        raise (ValueError, "NA cannot be larger than n_medium")
+
+    if not (Ex.shape == Ey.shape == Ez.shape):
+        raise (RuntimeError, "All fields need to be equal size")
+
+    if not (Ex.shape[0] == Ex.shape[1]):
+        raise (RuntimeError, "Field matrices need to be square")
     dx = sampling_distance
 
     f = focal_length
@@ -44,17 +46,26 @@ def czt_nf_to_ff(
     # they need to be
     samples_correction = (Ex.shape[0] - 1) / 2
     phase_fix = (a * w ** -(np.arange(bfp_sampling_n))) ** samples_correction
-    phase_fix = phase_fix.reshape((bfp_sampling_n, 1))
+    # phase_fix_x = phase_fix.reshape((bfp_sampling_n, 1))
+    # phase_fix_y = phase_fix.reshape((1, bfp_sampling_n))
 
-    phase_fix_1 = np.tile(phase_fix, (1, Ex.shape[0]))
-    phase_fix_2 = np.tile(phase_fix, (1, bfp_sampling_n))
-
-    fEx = np.transpose((czt(Ex, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
-    fEx = czt(fEx, bfp_sampling_n, w, a) * phase_fix_2
-    fEy = np.transpose((czt(Ey, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
-    fEy = czt(fEy, bfp_sampling_n, w, a) * phase_fix_2
-    fEz = np.transpose((czt(Ez, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
-    fEz = czt(fEz, bfp_sampling_n, w, a) * phase_fix_2
+    # phase_fix_1 = np.tile(phase_fix, (1, Ex.shape[0]))
+    # phase_fix_2 = np.tile(phase_fix, (1, bfp_sampling_n))
+    x_czt = CZT(Ex.shape[0], bfp_sampling_n, w, a)
+    y_czt = CZT(Ex.shape[1], bfp_sampling_n, w, a)
+    
+    fEx = x_czt(Ex, axis=0) * phase_fix[:, np.newaxis]
+    fEx = y_czt(fEx, axis=1) * phase_fix[np.newaxis, :]
+    fEy = x_czt(Ey, axis=0) * phase_fix[:, np.newaxis]
+    fEy = y_czt(fEy, axis=1) * phase_fix[np.newaxis, :]
+    fEz = x_czt(Ez, axis=0) * phase_fix[:, np.newaxis]
+    fEz = y_czt(fEz, axis=1) * phase_fix[np.newaxis, :]
+    # fEx = np.transpose((czt(Ex, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
+    # fEx = czt(fEx, bfp_sampling_n, w, a) * phase_fix_2
+    # fEy = np.transpose((czt(Ey, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
+    # fEy = czt(fEy, bfp_sampling_n, w, a) * phase_fix_2
+    # fEz = np.transpose((czt(Ez, bfp_sampling_n, w, a)) * phase_fix_1, (1, 0))
+    # fEz = czt(fEz, bfp_sampling_n, w, a) * phase_fix_2
 
     sp = np.linspace(-NA / n_medium, NA / n_medium, bfp_sampling_n)
     Sx, Sy = np.meshgrid(sp, sp)
