@@ -282,6 +282,7 @@ class Objective:
 
         N_rho = math.ceil(1 + 2 * self.NA * math.hypot(max_x, max_y) / lambda_vac)
         return max(N_rho, N_z())
+
     def get_k_vectors_for_focus(self, lambda_vac, sin_theta, cos_theta, cos_phi, sin_phi):
         k = 2 * np.pi * self.n_medium / lambda_vac
 
