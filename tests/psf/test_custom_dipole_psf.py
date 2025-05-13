@@ -75,7 +75,7 @@ def gen_dipole_psf(
             obj.focal_length,
         )
         Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_cosines(
-            Ex, Ey, Ez, ff.cos_phi, ff.sin_phi, ff.cos_theta, n_medium, n_bfp=1.0
+            Ex, Ey, Ez, ff.cos_theta, ff.cos_phi, ff.sin_phi, n_medium, n_bfp=1.0
         )
 
         return Ex_bfp, Ey_bfp
