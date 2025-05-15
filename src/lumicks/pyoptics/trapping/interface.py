@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Tuple
 
 import numpy as np
+from _collections_abc import Iterable
 from scipy.constants import epsilon_0, mu_0
 from scipy.constants import speed_of_light as _C
 
@@ -38,6 +39,8 @@ def farfield_factory(
     else:
         integration_order = determine_integration_order(method, n_orders)
     x, y, z, w = get_integration_locations(integration_order, method)
+    w = w * 4 * np.pi * (bead.bead_diameter * 0.51)**2
+
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
     local_coordinates = LocalBeadCoordinates(
@@ -54,7 +57,7 @@ def farfield_factory(
     )
 
     def farfield_func(
-        bead_center: Tuple[float, float, float],
+        bead_center: Iterable[tuple[float, float, float]] | tuple[float, float, float],
         cos_theta: np.ndarray,
         sin_theta: np.ndarray,
         cos_phi: np.ndarray,
@@ -74,8 +77,8 @@ def farfield_factory(
                 zb + bead_pos_z,
                 [x, y, z],
                 w,
-                [Ex, Ey, Ez],
-                [Hx, Hy, Hz],
+                [Ex[bead_idx], Ey[bead_idx], Ez[bead_idx]],
+                [Hx[bead_idx], Hy[bead_idx], Hz[bead_idx]],
                 bead.lambda_vac,
                 bead.n_medium,
             )
