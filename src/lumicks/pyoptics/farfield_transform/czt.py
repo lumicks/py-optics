@@ -42,7 +42,7 @@ def farfield_czt(
     n_medium : float
         Refractive index of the (semi-)infinite medium that the light propagates in.
     half_angle : float
-        Half the acceptance angle of the cone of rays, or θ in the formulaa NA = n sin θ.
+        Half the acceptance angle of the cone of rays, or θ in the formula NA = n sin θ. Radians.
     farfield_radius : float
         Radius at which to calculate the far field, in the same units as the wavelength.
     farfield_samples : int
@@ -87,7 +87,7 @@ def farfield_czt(
     k0 = 2 * np.pi / lambda_vac
     k = k0 * n_medium
     ks = 2 * np.pi / sampling_step
-    sin_theta = math.sin(math.radians(half_angle))
+    sin_theta = math.sin(half_angle)
     a = np.exp(-2j * np.pi * k / ks * sin_theta)
     w = np.exp(-4j * np.pi * k / ks * sin_theta / (farfield_samples - 1))
 
