@@ -24,13 +24,13 @@ def czt_nf_to_ff(
 ):
     Ex, Ey, Ez = [np.atleast_2d(E) for E in (Ex, Ey, Ez)]
     if NA <= n_medium:
-        raise (ValueError, "NA cannot be larger than n_medium")
+        raise ValueError("NA cannot be larger than n_medium")
 
     if not (Ex.shape == Ey.shape == Ez.shape):
-        raise (RuntimeError, "All fields need to be equal size")
+        raise RuntimeError("All fields need to be equal size")
 
     if not (Ex.shape[0] == Ex.shape[1]):
-        raise (RuntimeError, "Field matrices need to be square")
+        raise RuntimeError("Field matrices need to be square")
     dx = sampling_distance
 
     f = focal_length
