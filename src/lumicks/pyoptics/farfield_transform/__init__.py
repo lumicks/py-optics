@@ -53,7 +53,7 @@ def czt_nf_to_ff(
     # phase_fix_2 = np.tile(phase_fix, (1, bfp_sampling_n))
     x_czt = CZT(Ex.shape[0], bfp_sampling_n, w, a)
     y_czt = CZT(Ex.shape[1], bfp_sampling_n, w, a)
-    
+
     fEx = x_czt(Ex, axis=0) * phase_fix[:, np.newaxis]
     fEx = y_czt(fEx, axis=1) * phase_fix[np.newaxis, :]
     fEy = x_czt(Ey, axis=0) * phase_fix[:, np.newaxis]
