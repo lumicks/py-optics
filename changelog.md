@@ -2,6 +2,14 @@
 
 ## v0.7.0 | TBD
 
+### Changes
+
+* Bumped minimum version of Python to 3.10
+* Bumped maximum tested version of Python to 3.13
+* Removed Lebedev-Laikov code in favor of Scipy's `lebedev_rule` function.
+* Removed chirped z-transform code in favor of Scipy's `CZT` class.
+* Renamed `integration_orders` to `integration_order`
+
 ### Improvements
 
 * Added Gauss-Legendre and Clenshaw-Curtis integration methods for force calculations
@@ -9,8 +17,6 @@
 * Added the electromagnetic field distribution for magnetic dipoles at arbitrary orientations
 * Added a method to determine the minimal sampling order of the back focal plane to `objective.Objective`
 
-# Changes
-* Renamed `integration_orders` to `integration_order`
 
 ## v0.6.0 | 2024-11-15
 
@@ -22,7 +28,7 @@
 ## v0.5.0 | 2024-11-05
 
 ### Changes
-* Bumped minimum version of support Python to 3.9, to easily accomodate typing
+* Bumped minimum version of Python to 3.9, to easily accomodate typing
 * Bumped maximum tested version of Python to 3.12
 
 ### Improvements
