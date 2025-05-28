@@ -27,41 +27,7 @@ def test_determine_integration_order(method, n_orders):
 
 
 @pytest.mark.parametrize(
-    "integration_order",
-    (
-        3,
-        5,
-        7,
-        9,
-        11,
-        13,
-        15,
-        17,
-        19,
-        21,
-        23,
-        25,
-        27,
-        29,
-        31,
-        35,
-        41,
-        47,
-        53,
-        59,
-        65,
-        71,
-        77,
-        83,
-        89,
-        95,
-        101,
-        107,
-        113,
-        119,
-        125,
-        131,
-    ),
+    "integration_order", ([3 + n * 2 for n in range(15)] + [35 + n * 6 for n in range(17)])
 )
 @pytest.mark.parametrize("method", ("lebedev-laikov", "gauss-legendre", "clenshaw-curtis"))
 def test_get_integration_locations(integration_order: int, method: str):
