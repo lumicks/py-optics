@@ -2,6 +2,10 @@
 
 ## v0.7.0 | TBD
 
+### Changes
+
+* Bumped minimum version of Python to 3.10
+* Bumped maximum tested version of Python to 3.13
 ### Improvements
 
 * Added Gauss-Legendre and Clenshaw-Curtis integration methods for force calculations
@@ -22,7 +26,7 @@
 ## v0.5.0 | 2024-11-05
 
 ### Changes
-* Bumped minimum version of support Python to 3.9, to easily accomodate typing
+* Bumped minimum version of Python to 3.9, to easily accomodate typing
 * Bumped maximum tested version of Python to 3.12
 
 ### Improvements
