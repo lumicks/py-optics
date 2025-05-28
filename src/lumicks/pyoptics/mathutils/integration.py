@@ -119,3 +119,22 @@ def clenshaw_curtis_weights(integration_order: int):
     np.fft.ifft(gk + vk, out=w[:integration_order])
     w[-1] = w[0]
     return np.cos(np.arange(integration_order + 1) * np.pi / integration_order), w.real
+
+
+def annulus_rule(n_r: int, n_t: int | None = None, r_inner: float = 0.0, r_outer: float = 1.0):
+    k = 4 * n_r + 3 if n_t is None else n_t
+    theta_i = 2 * np.pi / (k + 1) * np.arange(1, k + 2)
+
+    xi, wi = roots_legendre(n_r + 1)
+
+    # Adjust range
+    ri = ((r_inner**2 + r_outer**2) / 2.0 + (r_outer**2 - r_inner**2) / 2.0 * xi) ** 0.5
+    wi = 0.5 * wi / (k + 1) * np.pi * (r_outer + r_inner) * (r_outer - r_inner)
+
+    x = np.zeros(xi.size * theta_i.size)
+    y = np.zeros_like(x)
+    w = np.tile(wi, k + 1)
+    ri, theta_i = np.meshgrid(ri, theta_i)
+    x, y = (ri * np.cos(theta_i)).flatten(), (ri * np.sin(theta_i)).flatten()
+
+    return x, y, w
