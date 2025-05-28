@@ -6,6 +6,7 @@
 
 * Bumped minimum version of Python to 3.10
 * Bumped maximum tested version of Python to 3.13
+* Removed chirped z-transform code in favor of Scipy's `CZT` class.
 ### Improvements
 
 * Added Gauss-Legendre and Clenshaw-Curtis integration methods for force calculations
