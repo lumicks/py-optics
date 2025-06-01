@@ -1,4 +1,9 @@
 import numpy as np
+from numba import njit
+from numpy.typing import ArrayLike
+
+from lumicks.pyoptics.mathutils.integration import annulus_rule
+from lumicks.pyoptics.objective import Objective
 
 """
 Functions to calculate a point spread function of a focused wavefront by direct summation of plane
@@ -14,17 +19,15 @@ References
 
 
 def focused_gauss(
+    objective: Objective,
     lambda_vac: float,
-    n_bfp: float,
-    n_medium: float,
-    focal_length: float,
     filling_factor: float,
-    NA: float,
-    x: np.array,
-    y: np.array,
-    z: np.array,
-    bfp_sampling_n=50,
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
+    integration_order=None,
     return_grid=False,
+    method="peirce",
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
     Gaussian beam, using the angular spectrum of plane waves method, see [1], chapter 3.
@@ -63,10 +66,10 @@ def focused_gauss(
     z : np.array
       array of z locations for evaluation. The final locations are determined by the
       output of numpy.meshgrid(x, y, z) [m]
-    bfp_sampling_n : int
-      Number of discrete steps with which the back focal plane is sampled, from
-      the center to the edge. The total number of plane waves scales with the square of
-      bfp_sampling_n. Default is 50 [-]
+    integration_order : int
+      Number of discrete steps with which the back focal plane is sampled, from the center to the
+      edge. The total number of plane waves scales with the square of integration_order. Default is
+      None, which means that `objective.mimimal_integration_order()` is used as a base. [-]
     return_grid : bool
       return the sampling grid. Default is False
 
@@ -85,39 +88,27 @@ def focused_gauss(
     All results are returned with the minimum number of dimensions required to store the results,
     i.e., sampling along the XZ plane will return the fields as Ex(x,z), Ey(x,z), Ez(x,z)
     """
-    w0 = filling_factor * focal_length * NA / n_medium  # See [1]
+    w0 = filling_factor * objective.r_bfp_max  # See [1]
 
     def field_func(_, x_bfp, y_bfp, *args):
         Ein = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2)
         return (Ein, None)
 
     return direct_psf(
-        field_func,
-        lambda_vac,
-        n_bfp,
-        n_medium,
-        focal_length,
-        NA,
-        x,
-        y,
-        z,
-        bfp_sampling_n,
-        return_grid,
+        field_func, objective, lambda_vac, x, y, z, integration_order, return_grid, method
     )
 
 
 def direct_psf(
     f_input_field,
+    objective: Objective,
     lambda_vac: float,
-    n_bfp: float,
-    n_medium: float,
-    focal_length: float,
-    NA: float,
-    x: np.array,
-    y: np.array,
-    z: np.array,
-    bfp_sampling_n=50,
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
+    integration_order=None,
     return_grid=False,
+    method="peirce",
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
     arbitrary input field, using the angular spectrum of plane waves method, see [1], chapter 3.
@@ -165,10 +156,10 @@ def direct_psf(
     z: np.array:
         array of z locations for evaluation. The final locations are determined by the output of
         `numpy.meshgrid(x, y, z)` [m]
-    bfp_sampling_n: int
-        number of discrete steps with which the back focal plane is sampled, from the center to the
-        edge. The total number of plane waves scales with the square of `bfp_sampling_n` (default =
-        50) [-]
+    integration_order : int
+      Number of discrete steps with which the back focal plane is sampled, from the center to the
+      edge. The total number of plane waves scales with the square of integration_order. Default is
+      None, which means that `objective.mimimal_integration_order()` is used as a base. [-]
     return_grid: bool
         return the sampling grid (default = `False`)
 
@@ -192,62 +183,86 @@ def direct_psf(
     # Generate the grid on which to evaluate the PSF, i.e., the sampling of the PSF
     X, Y, Z = np.meshgrid(np.atleast_1d(x), np.atleast_1d(y), np.atleast_1d(z), indexing="ij")
 
-    k = 2 * np.pi * n_medium / lambda_vac
-    ks = k * NA / n_medium
+    k = 2 * np.pi * objective.n_medium / lambda_vac
+    ks = k * objective.sin_theta_max
+    if method not in ["peirce", "equidistant"]:
+        raise ValueError("The argument `method` needs to be one of 'peirce' or 'equidistant'")
+    if method == "equidistant":
+        if integration_order is None:
+            integration_order = (
+                objective.minimal_integration_order([x, y, z], lambda_vac, "equidistant") * 5
+            )  # 5 times oversampling to stay consistent with psf.czt.focus_czt
+        npupilsamples = 2 * integration_order - 1
+        dk = ks / (integration_order - 1)
 
-    npupilsamples = 2 * bfp_sampling_n - 1
+        sin_th_max = objective.sin_theta_max
+        sin_theta_range = np.zeros(npupilsamples)
+        _sin_theta_range = np.linspace(0, sin_th_max, num=integration_order)
+        sin_theta_range[0:integration_order] = -_sin_theta_range[::-1]
+        sin_theta_range[integration_order:] = _sin_theta_range[1:]
+        sin_theta_x, sin_theta_y = np.meshgrid(sin_theta_range, sin_theta_range, indexing="ij")
+        sin_theta = np.hypot(sin_theta_x, sin_theta_y)
 
-    dk = ks / (bfp_sampling_n - 1)
-    sin_th_max = NA / n_medium
-    sin_theta_range = np.zeros(npupilsamples)
-    _sin_theta_range = np.linspace(0, sin_th_max, num=bfp_sampling_n)
-    sin_theta_range[0:bfp_sampling_n] = -_sin_theta_range[::-1]
-    sin_theta_range[bfp_sampling_n:] = _sin_theta_range[1:]
-    sin_theta_x, sin_theta_y = np.meshgrid(sin_theta_range, sin_theta_range, indexing="ij")
-    sin_theta = np.hypot(sin_theta_x, sin_theta_y)
+        # The back focal plane is circular, but our sampling grid is square ->
+        # Create a mask: everything outside the NA must be zero
+        aperture = sin_theta <= sin_th_max
+        r_max = objective.r_bfp_max
+        r_bfp = sin_theta * objective.focal_length
+        x_bfp = sin_theta_x * objective.focal_length
+        y_bfp = sin_theta_y * objective.focal_length
 
-    # The back focal plane is circular, but our sampling grid is square ->
-    # Create a mask: everything outside the NA must be zero
-    aperture = sin_theta <= sin_th_max
+        # Precompute some sines and cosines that are repeatedly used
+        cos_theta = np.ones(sin_theta.shape)
+        cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
+        cos_phi = np.ones_like(sin_theta)
+        sin_phi = np.zeros_like(sin_theta)
+        region = sin_theta > 0
 
-    r_max = sin_th_max * focal_length
-    r_bfp = sin_theta * focal_length
-    x_bfp = sin_theta_x * focal_length
-    y_bfp = sin_theta_y * focal_length
+        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
+        cos_phi[integration_order - 1, integration_order - 1] = 1
+        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
+        sin_phi[integration_order - 1, integration_order - 1] = 0
+        sin_phi[np.logical_not(aperture)] = 0
+        cos_phi[np.logical_not(aperture)] = 1
+        w = np.ones_like(r_bfp) * dk**2
+
+    if method == "peirce":
+        if integration_order is None:
+            integration_order = objective.minimal_integration_order(
+                [x, y, z], lambda_vac=lambda_vac, method="peirce"
+            )
+        xi, yi, w = annulus_rule(integration_order, None, 0.0, ks)
+        aperture = np.ones_like(xi, dtype=bool)
+        r_max = objective.sin_theta_max * objective.focal_length
+        sin_theta = np.hypot(xi, yi) / k
+        cos_theta = ((1 - sin_theta) * (1 + sin_theta)) ** 0.5
+        r_bfp = sin_theta * objective.focal_length
+        x_bfp = xi / k * objective.focal_length
+        y_bfp = yi / k * objective.focal_length
+        cos_phi = x_bfp / r_bfp
+        sin_phi = y_bfp / r_bfp
+
     Einx, Einy = f_input_field(aperture, x_bfp, y_bfp, r_bfp, r_max)
     if Einx is None and Einy is None:
         raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
-
-    # Precompute some sines and cosines that are repeatedly used
-    cos_theta = np.ones(sin_theta.shape)
-    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
-    cos_phi = np.ones_like(sin_theta)
-    sin_phi = np.zeros_like(sin_theta)
-    region = sin_theta > 0
-
-    cos_phi[region] = sin_theta_x[region] / sin_theta[region]
-    cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
-    sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-    sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
-    sin_phi[np.logical_not(aperture)] = 0
-    cos_phi[np.logical_not(aperture)] = 1
 
     sin_2phi = 2 * sin_phi * cos_phi
     cos_2phi = cos_phi**2 - sin_phi**2
     kz = k * cos_theta
 
+    # TODO: Use Objective.back_focal_plane_to_farfield() + spherical to cartesian
     Einfx_x, Einfy_x, Einfz_x, Einfx_y, Einfy_y, Einfz_y = [0] * 6
     if Einx is not None:
         Einx = np.complex128(Einx)
         Einx[np.logical_not(aperture)] = 0
-        Einx *= np.sqrt(n_bfp / n_medium) * np.sqrt(cos_theta) / kz
+        Einx *= np.sqrt(objective.n_bfp / objective.n_medium) * np.sqrt(cos_theta) / kz
         Einfx_x = Einx * 0.5 * ((1 - cos_2phi) + (1 + cos_2phi) * cos_theta)
         Einfy_x = Einx * 0.5 * sin_2phi * (cos_theta - 1)
         Einfz_x = cos_phi * sin_theta * Einx
     if Einy is not None:
         Einy = np.complex128(Einy)
         Einy[np.logical_not(aperture)] = 0
-        Einy *= np.sqrt(n_bfp / n_medium) * np.sqrt(cos_theta) / kz
+        Einy *= np.sqrt(objective.n_bfp / objective.n_medium) * np.sqrt(cos_theta) / kz
         Einfx_y = Einy * 0.5 * sin_2phi * (cos_theta - 1)
         Einfy_y = Einy * 0.5 * ((1 + cos_2phi) + cos_theta * (1 - cos_2phi))
         Einfz_y = Einy * sin_phi * sin_theta
@@ -265,25 +280,39 @@ def direct_psf(
     kx = -kp * cos_phi
     ky = -kp * sin_phi
 
-    # Initialize memory for the fields
-    Ex, Ey, Ez = [np.zeros_like(X, dtype="complex128") for _ in range(3)]
-
-    # Now the meat: add plane waves from the angles corresponding to the
-    # sampling of the back focal plane. This numerically approximates equation
-    # 3.33 of [2]
-    rows, cols = np.nonzero(aperture)
-    for row, col in zip(rows, cols):
-        Exp = np.exp(1j * kx[row, col] * X + 1j * ky[row, col] * Y + 1j * kz[row, col] * Z)
-        Ex += Einfx[row, col] * Exp
-        Ey += Einfy[row, col] * Exp
-        Ez += Einfz[row, col] * Exp
+    Ex, Ey, Ez = _do_loop(aperture, X, Y, Z, w, kx, ky, kz, Einfx, Einfy, Einfz)
 
     for E in [Ex, Ey, Ez]:
-        E *= -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2 / (2 * np.pi)
-
+        E *= -1j * objective.focal_length * np.exp(-1j * k * objective.focal_length) / (2 * np.pi)
     retval = (np.squeeze(Ex), np.squeeze(Ey), np.squeeze(Ez))
 
     if return_grid:
         retval += (np.squeeze(X), np.squeeze(Y), np.squeeze(Z))
 
     return retval
+
+
+def _do_loop(aperture, X, Y, Z, w, kx, ky, kz, Einfx, Einfy, Einfz):
+    aperture, w, kx, ky, kz, Einfx, Einfy, Einfz = [
+        E.reshape(E.size) for E in (aperture, w, kx, ky, kz, Einfx, Einfy, Einfz)
+    ]
+
+    # This is tucked in an inner function because Numba objected to the E.flatten above:
+    @njit(parallel=False, cache=True)
+    def _loop(aperture, X, Y, Z, w, kx, ky, kz, Einfx, Einfy, Einfz):
+        # Now the meat: add plane waves from the angles corresponding to the
+        # sampling of the back focal plane. This numerically approximates equation
+        # 3.33 of [2]
+
+        # Initialize memory for the fields
+        Ex, Ey, Ez = [np.zeros_like(X, dtype="complex128") for _ in range(3)]
+
+        items = np.nonzero(aperture)[0]
+        for index in items:
+            Exp = np.exp(1j * kx[index] * X + 1j * ky[index] * Y + 1j * kz[index] * Z) * w[index]
+            Ex += Einfx[index] * Exp
+            Ey += Einfy[index] * Exp
+            Ez += Einfz[index] * Exp
+        return Ex, Ey, Ez
+
+    return _loop(aperture, X, Y, Z, w, kx, ky, kz, Einfx, Einfy, Einfz)
