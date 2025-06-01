@@ -43,6 +43,13 @@ def gen_dipole_psf(
     f_ = f_tube_lens * n_image_plane
     f = f_tube_lens / magnification * n_medium
     NA_tube = n_image_plane * NA_objective / n_medium * f / f_
+    obj = Objective(
+        NA=NA_objective,
+        focal_length=f,
+        n_bfp=1.0,
+        n_medium=n_medium,
+    )
+    tubelens = Objective(NA=NA_tube, focal_length=f_, n_bfp=1.0, n_medium=n_image_plane)
 
     xy_range = 2 * lambda_em
     dim_xy = (-xy_range / 2, xy_range / 2)
@@ -52,12 +59,6 @@ def gen_dipole_psf(
         """A do-nothing function"""
         return (np.zeros_like(x_bfp), None)
 
-    obj = Objective(
-        NA=NA_objective,
-        focal_length=f,
-        n_bfp=1.0,
-        n_medium=n_medium,
-    )
     coords, fields = obj.sample_back_focal_plane(dummy, bfp_sampling_n)
     ff = obj.back_focal_plane_to_farfield(
         coords, fields, 1.0  # wavelength doesn't matter as we don't use kx, ky, kz
@@ -81,13 +82,10 @@ def gen_dipole_psf(
 
         return (Ex_bfp, Ey_bfp)
 
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
+    Ex, Ey, Ez, X, Y, Z = psf.focus_czt(
         field_func,
+        tubelens,
         lambda_em,
-        1.0,
-        n_image_plane,
-        f_,
-        NA_tube,
         x_range=dim_xy,
         numpoints_x=numpoints,
         y_range=dim_xy,

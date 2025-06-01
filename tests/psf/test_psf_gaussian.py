@@ -3,8 +3,10 @@
 import numpy as np
 import pytest
 import scipy.special as sp
+from numpy.typing import ArrayLike
 
-from lumicks.pyoptics.psf import fast_gauss
+from lumicks.pyoptics.objective import Objective
+from lumicks.pyoptics.psf import focus_gaussian_czt
 from lumicks.pyoptics.psf.reference import focused_gauss_ref
 
 
@@ -14,8 +16,8 @@ def paraxial_focus_gaussian(
     n_medium: float,
     focal_length: float,
     NA: float,
-    x: np.array,
-    y: np.array,
+    x: ArrayLike,
+    y: ArrayLike,
 ):
     x, y = np.atleast_1d(x, y)
     X, Y = np.meshgrid(x, y, indexing="ij")
@@ -92,6 +94,7 @@ def test_gaussian(focal_length, n_medium, NA, x_shift, y_shift, z_shift):
     lambda_vac = 1064e-9
     filling_factor = 0.9
     num_pts = 10
+    objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     z_points = np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts) + z_shift
     x_points = np.linspace(-lambda_vac, lambda_vac, num_pts) + x_shift
@@ -111,12 +114,9 @@ def test_gaussian(focal_length, n_medium, NA, x_shift, y_shift, z_shift):
         z=z_points,
     )
 
-    Ex, Ey, Ez = fast_gauss(
+    Ex, Ey, Ez = focus_gaussian_czt(
+        objective,
         lambda_vac=lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
-        NA=NA,
         filling_factor=filling_factor,
         x_range=x_dim,
         numpoints_x=num_pts,

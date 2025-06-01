@@ -28,10 +28,7 @@ objective = trp.Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n
 bead = trp.Bead(bead_size, n_bead, n_medium, 1064e-9)
 keyword_args = {
     "lambda_vac": 1064e-9,
-    "n_bfp": 1.0,
-    "n_medium": n_medium,
-    "focal_length": 4.43e-3,
-    "NA": 1.2,
+    "objective": objective,
     "x_range": dim,
     "numpoints_x": numpoints,
     "y_range": dim,
@@ -103,10 +100,10 @@ def field_func_kz(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
 
 @pytest.mark.parametrize("z_pos", zrange)
 def test_force_focus(z_pos):
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(field_func, z=z_pos, return_grid=True, **keyword_args)
-    Exdx, Eydx, Ezdx = psf.fast_psf(field_func_kx, z=z_pos, return_grid=False, **keyword_args)
-    Exdy, Eydy, Ezdy = psf.fast_psf(field_func_ky, z=z_pos, return_grid=False, **keyword_args)
-    Exdz, Eydz, Ezdz = psf.fast_psf(field_func_kz, z=z_pos, return_grid=False, **keyword_args)
+    Ex, Ey, Ez, X, Y, Z = psf.focus_czt(field_func, z=z_pos, return_grid=True, **keyword_args)
+    Exdx, Eydx, Ezdx = psf.focus_czt(field_func_kx, z=z_pos, return_grid=False, **keyword_args)
+    Exdy, Eydy, Ezdy = psf.focus_czt(field_func_ky, z=z_pos, return_grid=False, **keyword_args)
+    Exdz, Eydz, Ezdz = psf.focus_czt(field_func_kz, z=z_pos, return_grid=False, **keyword_args)
 
     E_grad_E_x = np.conj(Ex) * Exdx + np.conj(Ey) * Eydx + np.conj(Ez) * Ezdx
     E_grad_E_y = np.conj(Ex) * Exdy + np.conj(Ey) * Eydy + np.conj(Ez) * Ezdy

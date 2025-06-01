@@ -10,7 +10,6 @@ from lumicks.pyoptics.psf.direct import direct_psf
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
 def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9):
-    # We don't use the class Objective in pyoptics.psf, but it is handy here to get the angles
     objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     def dummy(_, x_bfp, *args):
@@ -21,7 +20,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
     farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
 
     k = 2 * np.pi * n_medium / lambda_vac
-    ks = k * NA / n_medium
+    ks = k * objective.sin_theta_max
     dk = ks / (bfp_sampling_n - 1)
 
     z_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, 10)
@@ -57,16 +56,14 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
 
         Ex, Ey, Ez, X, Y, _ = direct_psf(
             input_field,
+            objective,
             lambda_vac=lambda_vac,
-            n_bfp=n_bfp,
-            n_medium=n_medium,
-            focal_length=focal_length,
-            NA=NA,
             x=xy_eval,
             y=xy_eval,
             z=z_eval,
-            bfp_sampling_n=bfp_sampling_n,
+            integration_order=bfp_sampling_n,
             return_grid=True,
+            method="equidistant",
         )
 
         kz = k * farfield.cos_theta[p, m]

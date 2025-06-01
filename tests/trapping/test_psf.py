@@ -42,13 +42,10 @@ def test_gaussian_input(focal_length, n_medium, NA):
         num_orders=bead.number_of_orders * 2,
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss(
+    Exf, Eyf, Ezf = psf.focus_gaussian_czt(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x_range=(xy_eval[0], xy_eval[-1]),
         numpoints_x=num_pts,
         y_range=(xy_eval[0], xy_eval[-1]),
@@ -97,26 +94,21 @@ def test_gaussian_input_bead_shift(bead_center):
         num_orders=bead.number_of_orders * 2,
     )
     Exr, Eyr, Ezr = focused_gauss(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x=xy_eval,
         y=xy_eval,
         z=z_eval,
-        bfp_sampling_n=bfp_sampling,
+        integration_order=bfp_sampling,
         return_grid=False,
+        method="equidistant",
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss(
+    Exf, Eyf, Ezf = psf.focus_gaussian_czt(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x_range=(xy_eval[0], xy_eval[-1]),
         numpoints_x=num_pts,
         y_range=(xy_eval[0], xy_eval[-1]),
