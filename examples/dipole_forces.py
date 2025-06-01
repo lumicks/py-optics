@@ -137,13 +137,10 @@ y = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 # Let's visualize the focus of the laser beam that will exert a force on our particle
 
 # %%
-Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
+Ex, Ey, Ez, X, Y, Z = psf.focus_czt(
     gaussian_beam,
+    objective,
     lambda_vac,
-    objective.n_bfp,
-    objective.n_medium,
-    objective.focal_length,
-    objective.NA,
     x_range=(-half_dim_xy, half_dim_xy),
     numpoints_x=numpoints,
     y_range=(-half_dim_xy, half_dim_xy),
@@ -228,13 +225,10 @@ def dipole_force(alpha, z_pos, dim, numpoints):
     dEdz = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "z")
 
     # Actual PSF
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
+    Ex, Ey, Ez, X, Y, Z = psf.focus_czt(
         gaussian_beam,
+        objective,
         1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
         x_range=(-dim / 2, dim / 2),
         numpoints_x=numpoints,
         y_range=(-dim / 2, dim / 2),
@@ -245,13 +239,10 @@ def dipole_force(alpha, z_pos, dim, numpoints):
     )
     # Gradients at sampling points. Edx is [Exdx, Eydx, Ezdx]. Edy is [Exdy, Eydy, Ezdy] etc..
     Edx, Edy, Edz = [
-        psf.fast_psf(
+        psf.focus_czt(
             dEd_,
+            objective,
             1064e-9,
-            1.0,
-            n_medium,
-            4.43e-3,
-            1.2,
             x_range=(-dim / 2, dim / 2),
             numpoints_x=numpoints,
             y_range=(-dim / 2, dim / 2),
