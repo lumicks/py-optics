@@ -98,6 +98,11 @@ class Objective:
         )
 
     @property
+    def r_bfp_max(self) -> float:
+        """Radius of the back focal plane"""
+        return self.sin_theta_max * self.focal_length
+
+    @property
     def sin_theta_max(self):
         """
         Sine of the maximum acceptance angle of the objective
