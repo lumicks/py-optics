@@ -1,10 +1,9 @@
 import math
 from collections import namedtuple
-from collections.abc import Iterable
+from collections.abc import Collection
 from dataclasses import astuple, dataclass
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from .farfield_data import FarfieldData
 
@@ -217,30 +216,28 @@ class Objective:
             aperture=bfp_coords.aperture,
         )
 
-    def minimal_sampling_order(
+    def minimal_integration_order(
         self,
-        coordinates: Iterable[ArrayLike],
+        coordinates: Collection,
         lambda_vac: float,
-        method: str = "equidistant",
+        method: str,
     ) -> int:
         """
-        Retrieve the absolute minimal sampling order for sampling the back focal plane, when
-        focusing a beam of light. For the only support method "equidistant" (see below), the
-        minimally required sampling order is based on the Nyquist sampling theorem.
+        Retrieve the absolute minimal integration order for sampling the back focal plane, when
+        focusing a beam of light.
 
         Parameters
         ----------
-        coordinates : Iterable[ArrayLike]
+        coordinates : Collection
             The coordinates in the range of interest. First index should iterate over axis:
             `coordinates[0, ...]` for x, `coordinates[1, ...]` for y and `coordinates[2, ...]` for
             z. The units can be anything, as long as the wavelength `lambda_vac` (see below) is
             provided in the same units.
         lambda_vac : float
             Wavelength of the light in vacuum. Has to be in the same units as the coordinates.
-        method : str, optional
-            Integration method, by default "equidistant". Currently only "equidistant" is supported,
-            which means that the back focal plane is sampled with equidistant steps. In the future,
-            other methods may be supported. See Notes for an explanation of the methods
+        method : str
+            Integration method. Supported are "equidistant" and "peirce". See Notes for an
+            explanation of the methods.
 
         Returns
         -------
@@ -256,28 +253,55 @@ class Objective:
 
         Notes
         -----
-        The currently only supported method of sampling the back focal plane is "equidistant". This
-        method samples the back focal plane with equidistant steps. For proper sampling, the number
-        of samples should be at least 2 per oscillation, where the frequency of the oscillation
-        depends on the maximum magnitude of the coordinates.
+        Method "equidistant": this method samples the back focal plane with equidistant steps. For
+        proper sampling, the number of samples should be at least 2 per oscillation, where the
+        frequency of the oscillation depends on the maximum magnitude of the coordinates. It's
+        mostly useful for FFT/CZT-based point spread function calculation methods, such as
+        `lumicks.pyoptics.psf.fast_psf` and `lumicks.pyoptics.psf.fast_gauss`.
 
-        For in-plane vectors: :math:`\\max(|\\Delta k_\\rho \\rho|) < \\pi`, where :math:`\\Delta
-        k_\\rho = k_{\\rho, max} / (N - 1)`. :math:`k_{\\rho, max} = k \\sin(\theta)_{max} = k
-        NA/n_{medium}`.
+        For in-plane vectors: :math:`\\Delta k_{//} \\max(|x|, |y|) < \\pi`, where :math:`\\Delta
+        k_{//} = k NA / (n_\\mathit{medium} (N - 1)) = k \\sin(\\theta_\\mathit{max}) / (N - 1)`.
 
-        For out-of-plane vectors: :math:`\\max(|\\Delta k_z z|) < \\pi`, where :math:`\\Delta k_z /
-        k = \\sqrt{1 - ((N - 2) NA)^2 /(n_{medium} (N - 1))^2} - \\sqrt{1 - (NA /n_{medium})^2}`.
+        For out-of-plane vectors: :math:`\\max(\\Delta k_z) |z|| < \\pi`, where :math:`\\max(\\Delta
+        k_z) / k = \\sqrt{1 - ((N - 2) NA)^2 /(n_{medium} (N - 1))^2} - \\sqrt{1 - (NA
+        /n_{medium})^2}`.
 
-        The function returns :math:`\\max(N_\\rho, N_z)`, the minimal number of samples to fulfill
+        The function returns :math:`\\max(N_{//}, N_z)`, the minimal number of samples to fulfill
         the sampling theorem.
+
+        Method "peirce": this method samples the back focal plane with a radial scheme based on
+        Gauss-Legendre-style integration. This method typically converges faster than the
+        "equidistant" method. See[2]_.
+
+        In order to determine the minimal integration order, integration over the back focal plane
+        is divided between coordinates along the optical axis (z) and orthogonal to the optical axis
+        (x and y). For the xy-plane, the function assumes the integration of a (1D) sinusoidal
+        function, and uses an analytical expression for the error bound[1]_. The function finds the
+        order that ensures that the error bound is 1e-9 times the maximum error bound. For the
+        coordinates along the optical axis, a toy model function with a :math: `r \\cos(k z \\sqrt{1
+        - (NA /n_{medium})^2 r})`-dependency is integrated, until the relative difference between
+        successive integration results is less than 1e-9. The function returns :math:`\\max(N_{xy},
+        N_z)`
+
+        .. [1] Abramowitz & Stegun, 25.4.30
+        .. [2] W. Peirce, "Numerical Integration over the Planar Annulus", Journal of the Society
+               for Industrial and Applied Mathematics, 1957
+
         """
-        if method != "equidistant":
+        if method not in ["equidistant", "peirce"]:
             raise ValueError(f"Unsupported method: {method}")
 
         if len(coordinates) != 3:
             raise RuntimeError(
                 f"Unexpected length of coordinates: expected 3, got {len(coordinates)}."
             )
+
+        if method == "equidistant":
+            return self._minimal_integration_order_equidistant(coordinates, lambda_vac)
+        if method == "peirce":
+            return self._minimal_integration_order_peirce(coordinates, lambda_vac)
+
+    def _minimal_integration_order_equidistant(self, coordinates, lambda_vac):
 
         def N_z():
             if max_z == 0.0:  # sampling not affected by z coordinate
@@ -297,5 +321,77 @@ class Objective:
 
         max_x, max_y, max_z = [np.max(np.abs(ax)) for ax in coordinates]
 
-        N_rho = math.ceil(1 + 2 * self.NA * math.hypot(max_x, max_y) / lambda_vac)
-        return max(N_rho, N_z())
+        N_parallel = math.ceil(1 + 2 * self.NA * max(max_x, max_y) / lambda_vac)
+        return max(N_parallel, N_z())
+
+    def _minimal_integration_order_peirce(
+        self, coordinates: Collection, lambda_vac: float, max_iterations: int = 400
+    ):
+        def _min_order_xy(max_iterations=max_iterations):
+            def cost(a, b, n, x):
+                # Cost function based on A&S 25.4.30. Uses Stirling's approximation to n!, and works in
+                # logarithmic space. The 2n-th derivative of f is replaced by x^(2n), which is the
+                # resulting prefactor when differentiating a sinusoid of the type sin(k x) 2n times.
+                return (
+                    (2 * n + 1) * math.log(b - a)
+                    + 4 * (n * math.log(n) - n)
+                    + 2 * n * math.log(x)
+                    - (math.log(2 * n + 1) + 3 * (2 * n * math.log(2 * n) - 2 * n))
+                )
+
+            n = 1
+            max_cost = cost(0, 2 * np.pi * self.NA / lambda_vac, n, max_xy)
+            while (  # First get to the maximum cost (first increases, then decreases)
+                max_cost < (new_cost := cost(0, 2 * np.pi * self.NA / lambda_vac, n + 1, max_xy))
+                and max_iterations > 0
+            ):
+                n += 1
+                max_iterations -= 1
+                max_cost = new_cost
+
+            max_cost = max(max_cost, cost(0, 2 * np.pi * self.NA / lambda_vac, n, max_xy))
+            while (  # Now iterate until the cost drops sufficiently, or we're out of iterations
+                cost(0, 2 * np.pi * self.NA / lambda_vac, n + 1, max_xy) - max_cost > np.log(1e-9)
+                and max_iterations > 0
+            ):
+                n += 1
+                max_iterations -= 1
+            n_xy = n
+            return n_xy
+
+        def _min_order_z(max_iterations=max_iterations):
+            from scipy.special import roots_legendre
+
+            def g(x):
+                # Toy model function for the complex exponential e^(1j k_z z). Note that k_z is the
+                # independent variable.
+                return np.cos(
+                    2 * np.pi * (1 - self.NA / self.n_medium * x**2) ** 0.5 * max_z / lambda_vac
+                )
+
+            def integral_g(n):
+                xi, w = roots_legendre(n)
+                w /= 2
+                xi = (xi * 0.5 + 0.5) ** 0.5
+                return np.sum(g(xi) * w)
+
+            y = integral_g(max(1, n_xy - 1))
+            for n in np.arange(max(2, n_xy), max_iterations + 1):
+                y_new = integral_g(n)
+                if np.abs((y_new - y) / y_new) < 1e-9:
+                    n_z = n
+                    break
+                else:
+                    y = y_new
+            return n_z
+
+        max_x, max_y, max_z = [np.max(np.abs(ax)) for ax in coordinates]
+        n_z = n_xy = 1
+
+        if (max_xy := max(max_x, max_y)) > 0:
+            n_xy = _min_order_xy()
+
+        if max_z > 0:
+            n_z = _min_order_z()
+
+        return max(n_xy, n_z)
