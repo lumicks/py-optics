@@ -5,7 +5,7 @@ from scipy.constants import speed_of_light as _C
 
 import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
-from lumicks.pyoptics.psf.direct import focused_gauss
+from lumicks.pyoptics.psf.quad import focus_gaussian_quad
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
@@ -93,7 +93,7 @@ def test_gaussian_input_bead_shift(bead_center):
         verbose=False,
         num_orders=bead.number_of_orders * 2,
     )
-    Exr, Eyr, Ezr = focused_gauss(
+    Exr, Eyr, Ezr = focus_gaussian_quad(
         objective,
         lambda_vac,
         filling_factor=filling_factor,
