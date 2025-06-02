@@ -1,8 +1,15 @@
+import warnings
 from typing import Tuple, Union
 
 import numpy as np
 from deprecated.classic import deprecated
 from scipy.signal import CZT
+
+warnings.warn(
+    "the psf.fast module is deprecated. Use psf.czt instead",
+    FutureWarning,
+)
+
 
 """
 Functions to calculate point spread functions of focused wavefronts by use of chirped z-transforms.
@@ -10,8 +17,9 @@ Functions to calculate point spread functions of focused wavefronts by use of ch
 
 
 @deprecated(
-    reason="Use of 'Objective' class instance will be required - use `focus_gaussian_czt` instead.",
-    version="0.7",
+    reason="Deprecated in favor of using the Objective class - see `psf.czt.focus_gaussian_czt`",
+    version="0.7.0",
+    category=FutureWarning,
 )
 def fast_gauss(
     lambda_vac: float,
@@ -98,26 +106,29 @@ def fast_gauss(
         Ein = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2)
         return (Ein, None)
 
-    return fast_psf(
-        field_func,
-        lambda_vac,
-        n_bfp,
-        n_medium,
-        focal_length,
-        NA,
-        x_range,
-        numpoints_x,
-        y_range,
-        numpoints_y,
-        z,
-        bfp_sampling_n,
-        return_grid,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return fast_psf(
+            field_func,
+            lambda_vac,
+            n_bfp,
+            n_medium,
+            focal_length,
+            NA,
+            x_range,
+            numpoints_x,
+            y_range,
+            numpoints_y,
+            z,
+            bfp_sampling_n,
+            return_grid,
+        )
 
 
 @deprecated(
-    reason="Use of 'Objective' class instance will become required - use `focus_czt` instead.",
+    reason="Deprecated in favor of using the Objective class - see `psf.czt.focus_czt`",
     version="0.7",
+    category=FutureWarning,
 )
 def fast_psf(
     f_input_field,

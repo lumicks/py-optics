@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from lumicks.pyoptics.objective import Objective
-from lumicks.pyoptics.psf.direct import direct_psf
+from lumicks.pyoptics.psf.quad import focus_quad
 
 
 @pytest.mark.parametrize("n_medium, NA", [(1.0, 0.9), (1.33, 1.2), (1.5, 1.4)])
@@ -54,7 +54,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
             )  # fmt: skip
             return (Ex, Ey)
 
-        Ex, Ey, Ez, X, Y, _ = direct_psf(
+        Ex, Ey, Ez, X, Y, _ = focus_quad(
             input_field,
             objective,
             lambda_vac=lambda_vac,

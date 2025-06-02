@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from lumicks.pyoptics.psf.czt import Objective, focus_gaussian_czt
-from lumicks.pyoptics.psf.direct import focused_gauss
+from lumicks.pyoptics.psf.quad import focus_gaussian_quad
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
@@ -22,7 +22,7 @@ def test_focus_gaussian_czt(focal_length, n_medium, NA, x_shift, y_shift):
     x_eval = np.linspace(-lambda_vac, lambda_vac, 10) + x_shift
     y_eval = np.linspace(-1.1 * lambda_vac, 1.1 * lambda_vac, 11) + y_shift
 
-    Ex_pw, Ey_pw, Ez_pw = focused_gauss(
+    Ex_pw, Ey_pw, Ez_pw = focus_gaussian_quad(
         objective,
         lambda_vac=lambda_vac,
         filling_factor=filling_factor,
