@@ -5,10 +5,7 @@ import numpy as np
 from deprecated.classic import deprecated
 from scipy.signal import CZT
 
-warnings.warn(
-    "the psf.fast module is deprecated. Use psf.czt instead",
-    FutureWarning,
-)
+warnings.warn("the psf.fast module is deprecated. Use psf.czt instead", FutureWarning, stacklevel=1)
 
 
 """

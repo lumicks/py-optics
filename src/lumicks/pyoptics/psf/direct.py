@@ -2,7 +2,9 @@ import warnings
 
 import numpy as np
 
-warnings.warn("the psf.direct module is deprecated. Use psf.quad instead", FutureWarning)
+warnings.warn(
+    "the psf.direct module is deprecated. Use psf.quad instead", FutureWarning, stacklevel=1
+)
 
 """
 Functions to calculate a point spread function of a focused wavefront by direct summation of plane
