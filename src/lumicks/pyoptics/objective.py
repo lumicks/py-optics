@@ -393,7 +393,7 @@ class Objective:
         max_x, max_y, max_z = [np.max(np.abs(ax)) for ax in coordinates]
         n_z = n_xy = 1
 
-        if (max_xy := max(max_x, max_y)) > 0:
+        if (max_xy := math.hypot(max_x, max_y)) > 0:
             n_xy = _min_order_xy()
 
         if max_z > 0:
