@@ -6,6 +6,7 @@ from scipy.special import roots_legendre
 
 from .lebedev_laikov import get_integration_locations as ll_get_integration_locations
 from .lebedev_laikov import get_nearest_order
+from .diskrule import get_takaki_rule
 
 
 def determine_integration_order(method: str, n_orders: int):
