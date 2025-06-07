@@ -2,6 +2,7 @@ import math
 from collections import namedtuple
 from collections.abc import Collection
 from dataclasses import astuple, dataclass
+from .mathutils.integration import annulus_rule
 
 import numpy as np
 
@@ -15,12 +16,11 @@ class BackFocalPlaneCoordinates:
     plane
     """
 
-    aperture: np.ndarray
+    weights: np.ndarray
     x_bfp: np.ndarray
     y_bfp: np.ndarray
     r_bfp: np.ndarray
     r_max: float
-    bfp_sampling_n: int
 
 
 BackFocalPlaneFields = namedtuple("BackFocalPlaneFields", ["Ex", "Ey"])
@@ -116,31 +116,48 @@ class Objective:
         sin_theta[bfp_sampling_n:] = _sin_theta[1:]
         return sin_theta
 
-    def sample_back_focal_plane(self, f_input_field, bfp_sampling_n: int):
+    def sample_back_focal_plane(self, f_input_field, order: int, method: str | None = None):
         """
         Sample `f_input_field` with `bfp_sampling_n` samples and return the
         coordinates in a BackFocalPlaneCoordinates object, and the fields as a
         named tuple BackFocalPlaneFields(Ex, Ey).
         """
 
-        sin_theta = self.sine_theta_range(bfp_sampling_n)
-        x_bfp, y_bfp = np.meshgrid(sin_theta, sin_theta, indexing="ij")
+        def _equidistant_coords():
+            sin_theta = self.sine_theta_range(order)
+            x_bfp, y_bfp = np.meshgrid(sin_theta, sin_theta, indexing="ij")
 
-        sin_theta = np.hypot(x_bfp, y_bfp)
-        x_bfp *= self.focal_length
-        y_bfp *= self.focal_length
+            sin_theta = np.hypot(x_bfp, y_bfp)
+            x_bfp *= self.focal_length
+            y_bfp *= self.focal_length
 
-        r_bfp = sin_theta * self.focal_length
-        r_max = self.sin_theta_max * self.focal_length
-        aperture = sin_theta <= self.sin_theta_max
-        bfp_coords = BackFocalPlaneCoordinates(
-            aperture=aperture,
-            x_bfp=x_bfp,
-            y_bfp=y_bfp,
-            r_bfp=r_bfp,
-            r_max=r_max,
-            bfp_sampling_n=bfp_sampling_n,
-        )
+            r_bfp = sin_theta * self.focal_length
+            weights = sin_theta <= self.sin_theta_max
+            return BackFocalPlaneCoordinates(
+                weights=weights,
+                x_bfp=x_bfp,
+                y_bfp=y_bfp,
+                r_bfp=r_bfp,
+                r_max=self.r_bfp_max,
+            )
+
+        def _peirce_coords():
+            x_bfp, y_bfp, w = annulus_rule(order, None, 0, self.r_bfp_max)
+            r_bfp = np.hypot(x_bfp, y_bfp)
+            return BackFocalPlaneCoordinates(
+                weights=w,
+                x_bfp=x_bfp,
+                y_bfp=y_bfp,
+                r_bfp=r_bfp,
+                r_max=self.r_bfp_max,
+            )
+
+        if method == "equidistant":
+            bfp_coords = _equidistant_coords()
+        elif method == "peirce":
+            bfp_coords = _peirce_coords()
+        else:
+            raise ValueError(f"Sampling method {method} is not supported.")
 
         Ex_bfp, Ey_bfp = (
             f_input_field(*astuple(bfp_coords)) if f_input_field is not None else (None, None)
@@ -160,11 +177,10 @@ class Objective:
         media before and after the reference surface. Returns an instance of
         the `FarfieldData` class.
         """
-        bfp_sampling_n = bfp_coords.bfp_sampling_n
         sin_theta_x = bfp_coords.x_bfp / self.focal_length
         sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length * bfp_coords.aperture
-        aperture = bfp_coords.aperture  # sin_theta <= self.sin_theta_max
+        sin_theta = bfp_coords.r_bfp / self.focal_length * (bfp_coords.weights > 0.0)
+        aperture = bfp_coords.weights > 0.0
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
 
@@ -177,9 +193,9 @@ class Objective:
 
         cos_phi[region] = sin_theta_x[region] / sin_theta[region]
 
-        cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+        cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1
         sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
+        sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0
         sin_phi[np.logical_not(aperture)] = 0
         cos_phi[np.logical_not(aperture)] = 1
 
@@ -188,10 +204,9 @@ class Objective:
         kx = -kp * cos_phi
         ky = -kp * sin_phi
 
-        # Transform the input wavefront to a spherical one, after refracting on
-        # the Gaussian reference sphere [2], Ch. 3. The field magnitude changes
-        # because of the different media, and because of the angle
-        # (preservation of power in a beamlet).
+        # Transform the input wavefront to a spherical one, after refracting on the Gaussian
+        # reference sphere [2], Ch. 3. The field magnitude changes because of the different media,
+        # and because of the angle (preservation of power in a beamlet).
         E_inf = []
         for bfp_field in bfp_fields:
             if bfp_field is not None:
@@ -218,7 +233,7 @@ class Objective:
             kp=kp,
             Einf_theta=Einf_theta,
             Einf_phi=Einf_phi,
-            aperture=bfp_coords.aperture,
+            weights=bfp_coords.weights,
         )
 
     def minimal_integration_order(

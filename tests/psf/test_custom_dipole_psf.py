@@ -59,7 +59,7 @@ def gen_dipole_psf(
         """A do-nothing function"""
         return (np.zeros_like(x_bfp), None)
 
-    coords, fields = obj.sample_back_focal_plane(dummy, bfp_sampling_n)
+    coords, fields = obj.sample_back_focal_plane(dummy, bfp_sampling_n, method="equidistant")
     ff = obj.back_focal_plane_to_farfield(
         coords, fields, 1.0  # wavelength doesn't matter as we don't use kx, ky, kz
     )

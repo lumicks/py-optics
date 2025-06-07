@@ -118,7 +118,7 @@ E0 = (I0 * 2 / (epsilon_0 * C * n_bfp)) ** 0.5  # [V/m]
 
 
 # Field distribution of the incoming laser beam. Polarization is purely in the x-direction.
-def gaussian_beam(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
+def gaussian_beam(_, x_bfp, y_bfp, *args):
     Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2).astype("complex128") * E0
     return (Ex, None)
 

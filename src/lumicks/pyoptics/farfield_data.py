@@ -19,7 +19,7 @@ class FarfieldData:
     kp: np.ndarray
     Einf_theta: np.ndarray
     Einf_phi: np.ndarray
-    aperture: np.ndarray
+    weights: np.ndarray
 
     def transform_to_xyz(self):
         """Transform a far field $E_\\theta$, $E_\\phi$ to cartesian components in x, y and z.

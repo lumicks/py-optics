@@ -12,11 +12,7 @@ from lumicks.pyoptics.psf.quad import focus_quad
 def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lambda_vac=1064e-9):
     objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
-    def dummy(_, x_bfp, *args):
-        """A do-nothing function"""
-        return (np.zeros_like(x_bfp), None)
-
-    coords, fields = objective.sample_back_focal_plane(dummy, bfp_sampling_n)
+    coords, fields = objective.sample_back_focal_plane(None, bfp_sampling_n, method="equidistant")
     farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
 
     k = 2 * np.pi * n_medium / lambda_vac
@@ -28,7 +24,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
 
     M = 2 * bfp_sampling_n - 1
     for pol, p, m in product(("theta", "phi"), range(M), range(M)):
-        if not farfield.aperture[p, m]:
+        if farfield.weights[p, m] == 0.0:
             continue
 
         def input_field(_, x_bfp, *args):

@@ -33,7 +33,7 @@ def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k
     return FarfieldData(
         Einf_theta=np.atleast_2d(polarization[0]) * kz,
         Einf_phi=np.atleast_2d(polarization[1]) * kz,
-        aperture=np.atleast_2d(True),
+        weights=np.atleast_2d(1.0),
         cos_theta=cos_theta,
         sin_theta=sin_theta,
         cos_phi=cos_phi,
