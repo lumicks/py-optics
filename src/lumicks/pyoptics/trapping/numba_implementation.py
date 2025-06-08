@@ -15,7 +15,7 @@ def external_coordinates_loop(
     krH,
     dkrH_dkr,
     k0r,
-    aperture,
+    weights,
     cos_theta,
     sin_theta,
     cos_phi,
@@ -45,7 +45,7 @@ def external_coordinates_loop(
     field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
     # Skip points outside aperture
-    rows, cols = np.nonzero(aperture)
+    rows, cols = np.nonzero(weights)
     if r.size > 0:
         for loop_idx in prange(rows.size):
             row, col = rows[loop_idx], cols[loop_idx]
@@ -173,7 +173,7 @@ def internal_coordinates_loop(
     sphBessel,
     jn_over_k1r,
     jn_1,
-    aperture,
+    weights,
     cos_theta,
     sin_theta,
     cos_phi,
@@ -205,7 +205,7 @@ def internal_coordinates_loop(
     field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
     # Skip points outside aperture
-    rows, cols = np.nonzero(aperture)
+    rows, cols = np.nonzero(weights)
     if r.size > 0:
         for loop_idx in prange(rows.size):
             row, col = rows[loop_idx], cols[loop_idx]

@@ -8,7 +8,7 @@ from scipy.constants import speed_of_light as _C
 
 from ..mathutils.integration import determine_integration_order, get_integration_locations
 from ..mathutils.lebedev_laikov import get_nearest_order
-from ..objective import Objective
+from ..objective import BackFocalPlaneCoordinates, Objective
 from .bead import Bead
 from .focused_field_calculation import focus_field_factory
 from .local_coordinates import LocalBeadCoordinates
@@ -118,8 +118,8 @@ def fields_focus_gaussian(
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
     E0 = (I0 * 2 / (EPS0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
-    def gaussian_beam(_, x_bfp, y_bfp, *args):
-        Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
+    def gaussian_beam(coordinates: BackFocalPlaneCoordinates, objective: Objective):
+        Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2) * E0
         return (Ex, None)
 
     return fields_focus(

@@ -28,10 +28,8 @@ def focus_field_factory(
     internal: bool,
 ):
 
-    n_orders = n_orders
-    bfp_sampling_n = bfp_sampling_n
     bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field=f_input_field, bfp_sampling_n=bfp_sampling_n
+        f_input_field=f_input_field, order=bfp_sampling_n, method="equidistant"
     )
 
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)

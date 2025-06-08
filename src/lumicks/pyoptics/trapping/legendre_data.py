@@ -15,7 +15,7 @@ from .local_coordinates import Coordinates
 def _loop_over_rotations(
     local_coords_stacked: np.ndarray,
     radii: np.ndarray,
-    aperture: np.ndarray,
+    weights: np.ndarray,
     cos_theta: np.ndarray,
     sin_theta: np.ndarray,
     cos_phi: np.ndarray,
@@ -27,11 +27,11 @@ def _loop_over_rotations(
     by the plane waves in the focus, and calculating cos(theta) for every coordinate and every
     rotation.
     """
-    rows, cols = np.nonzero(aperture)
+    rows, cols = np.nonzero(weights)
 
     # Weird construct to work around tuple unpacking bug in Numba
     # https://github.com/numba/numba/issues/8772
-    shape = (aperture.shape[0], aperture.shape[1], radii.size)
+    shape = (weights.shape[0], weights.shape[1], radii.size)
     local_cos_theta = np.zeros(shape)
 
     index = radii == 0
@@ -104,7 +104,7 @@ def calculate_legendre(
     farfield_args = {
         field.name: getattr(farfield_data, field.name)
         for field in fields(farfield_data)
-        if field.name in ("aperture", "cos_theta", "sin_theta", "cos_phi", "sin_phi")
+        if field.name in ("weights", "cos_theta", "sin_theta", "cos_phi", "sin_phi")
     }
     local_cos_theta = _loop_over_rotations(coordinates.xyz_stacked, coordinates.r, **farfield_args)
 
