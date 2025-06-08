@@ -119,3 +119,45 @@ def clenshaw_curtis_weights(integration_order: int):
     np.fft.ifft(gk + vk, out=w[:integration_order])
     w[-1] = w[0]
     return np.cos(np.arange(integration_order + 1) * np.pi / integration_order), w.real
+
+
+def annulus_rule(n_r: int, n_t: int | None = None, r_inner: float = 0.0, r_outer: float = 1.0):
+    """An integration rule for circular domains, based on _[1].
+
+    Parameters
+    ----------
+    n_r : int
+        Number of points / order in the radial direction
+    n_t : int | None, optional
+        Number of points in the angular direction, by default None. If None, the number of points is
+        `4 * n_r + 3`.
+    r_inner : float, optional
+        Inner radius of the circular domain, by default 0.0
+    r_outer : float, optional
+        Outer radius of the circular domain, by default 1.0
+
+    Returns
+    -------
+    tuple[np.array, np.array, np.array]
+        Tuple of Numpy arrays that contain the locations in x and y, and the weight factors for each
+        location, respectively. The weight factor sums up to the area of the domain of integration.
+
+    .. [1] William H. Peirce, "Numerical Integration Over the Planar Annulus,",  Journal of the
+        Society for Industrial and Applied Mathematics, Vol. 5, No. 2 (Jun., 1957), pp. 66-73
+    """
+    k = 4 * n_r + 3 if n_t is None else n_t
+    theta_i = 2 * np.pi / (k + 1) * np.arange(1, k + 2)
+
+    xi, wi = roots_legendre(n_r + 1)
+
+    # Adjust range
+    ri = ((r_inner**2 + r_outer**2) / 2.0 + (r_outer**2 - r_inner**2) / 2.0 * xi) ** 0.5
+    wi = 0.5 * wi / (k + 1) * np.pi * (r_outer + r_inner) * (r_outer - r_inner)
+
+    x = np.zeros(xi.size * theta_i.size)
+    y = np.zeros_like(x)
+    w = np.tile(wi, k + 1)
+    ri, theta_i = np.meshgrid(ri, theta_i)
+    x, y = (ri * np.cos(theta_i)).flatten(), (ri * np.sin(theta_i)).flatten()
+
+    return x, y, w
