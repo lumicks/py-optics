@@ -18,7 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import lumicks.pyoptics.psf as psf
+from lumicks.pyoptics.psf.czt import Objective, focus_czt, focus_gaussian_czt
 from lumicks.pyoptics.psf.reference import focused_gauss_ref
 
 # %% [markdown]
@@ -27,11 +27,28 @@ from lumicks.pyoptics.psf.reference import focused_gauss_ref
 # #### Reference:
 
 # %%
+# Properties of a high-NA water immersion objective:
+NA = 1.2
+n_medium = 1.33
+n_bfp = 1.0
+focal_length = 4.43e-3
+
+# Create an instance of the Objective class, used by the fft-based functions that calculate a focus
+objective = Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n_bfp=n_bfp)
+
+# %%
+# Number of points in the calculation, the range, and the location along the optical axis (z == 0
+# equals focal plane)
 numpoints = 81
 xy_range = (-5e-6, 5e-6)
-z = 0
+z = 0.0
 x_range = np.linspace(xy_range[0], xy_range[1], numpoints)
 
+# %% [markdown]
+# #### Reference calculation.
+# Accurate, but slow and not very flexible. Supports Gaussian beams only, with varying levels of (over)filling.
+
+# %%
 Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(
     lambda_vac=1064e-9,
     n_bfp=1.0,
@@ -49,13 +66,10 @@ Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(
 # Change `bfp_sampling_n` below to see aliasing (`bfp_sampling_n=5`), or to largely suppress it in this area (`bfp_sampling_n=30`)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = psf.fast_gauss(
+Ex, Ey, Ez, X, Y, Z = focus_gaussian_czt(
+    objective=objective,
     lambda_vac=1064e-9,
-    n_bfp=1.0,
-    n_medium=1.33,
-    focal_length=4.43e-3,
     filling_factor=0.9,
-    NA=1.2,
     x_range=xy_range,
     y_range=xy_range,
     z=z,
@@ -138,13 +152,10 @@ Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(
 # Change `bfp_sampling_n` from 5 to 50 to 125, and see how that drastically brings the result closer to the ground truth
 
 # %%
-Ex, Ey, Ez = psf.fast_gauss(
+Ex, Ey, Ez = focus_gaussian_czt(
+    objective,
     1064e-9,
-    1.0,
-    1.33,
-    4.43e-3,
     0.9,
-    1.2,
     x_range=x,
     numpoints_x=1,
     y_range=y,
@@ -201,31 +212,23 @@ numpoints = 81
 dim = (-2.5e-6, 2.5e-6)
 zrange = np.linspace(-5e-6, 5e-6, 81)
 filling_factor = 1.0
-NA = 1.2
-focal_length = 4.43e-3
-n_medium = 1.33
-w0 = filling_factor * focal_length * NA / n_medium
+w0 = filling_factor * objective.r_bfp_max
 
 
-def field_func_x(_, x_bfp, y_bfp, *args):
-    # The first argument is not used
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2)
+def field_func_x(coordinates, _):
+    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2)
     return (Ein, None)
 
 
-def field_func_y(_, x_bfp, y_bfp, *args):
-    # The first argument is not used
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2)
+def field_func_y(coordinates, _):
+    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2)
     return (None, Ein)
 
 
-Exc_x, Eyc_x, Ezc_x, Xx, Yx, Zx = psf.fast_psf(
+Exc_x, Eyc_x, Ezc_x, Xx, Yx, Zx = focus_czt(
     field_func_x,
+    objective,
     1064e-9,
-    1.0,
-    1.33,
-    4.43e-3,
-    1.2,
     x_range=dim,
     numpoints_x=numpoints,
     y_range=0,
@@ -234,13 +237,10 @@ Exc_x, Eyc_x, Ezc_x, Xx, Yx, Zx = psf.fast_psf(
     bfp_sampling_n=125,
     return_grid=True,
 )
-Exc_y, Eyc_y, Ezc_y, Xy, Yy, Zy = psf.fast_psf(
+Exc_y, Eyc_y, Ezc_y, Xy, Yy, Zy = focus_czt(
     field_func_y,
+    objective,
     1064e-9,
-    1.0,
-    1.33,
-    4.43e-3,
-    1.2,
     x_range=0,
     numpoints_x=1,
     y_range=dim,

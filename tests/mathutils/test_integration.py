@@ -77,3 +77,48 @@ def test_integration_result(method: str, order: int):
     # Simple check
     integrals = [(ax**2 * w).sum() for ax in (x, y, z)]
     np.testing.assert_allclose(integrals, [1.0 / 3.0] * 3)
+
+
+@pytest.mark.parametrize(
+    "r_inner, r_outer, result",
+    [(0.0, 1.0, np.pi / 2), (0.0, 2.0, 8 * np.pi), (1.0, 2.0, 15 * np.pi / 2)],
+)
+def test_annular_rule_exact(r_inner, r_outer, result):
+    x, y, w = integration.annulus_rule(2, r_inner=r_inner, r_outer=r_outer)
+    assert ((x**2 + y**2) * w).sum() == pytest.approx(result)
+
+
+def test_annular_rule_sin():
+    result = -0.0213167  # Wolfram Alpha
+    x, y, w = integration.annulus_rule(13, r_inner=0, r_outer=1)
+    assert ((x * np.sin(10 * np.pi * x)) * w).sum() == pytest.approx(result)
+    assert ((y * np.sin(10 * np.pi * y)) * w).sum() == pytest.approx(result)
+
+
+@pytest.mark.parametrize("r_inner, r_outer", [(0.0, 0.5), (0, 1), (1, 2), (np.exp(1), np.pi)])
+def test_annular_rule_cos(r_inner, r_outer):
+    def integral(r):
+        return (2 * np.pi) * (
+            r**2 / 4
+            + r * np.sin(4 * np.pi * r) / (8 * np.pi)
+            + np.cos(4 * np.pi * r) / (32 * np.pi**2)
+        )
+
+    x, y, w = integration.annulus_rule(8, r_inner=r_inner, r_outer=r_outer)
+    r = np.hypot(x, y)
+    assert (np.cos(2 * np.pi * r) ** 2 * w).sum() == pytest.approx(
+        integral(r_outer) - integral(r_inner)
+    )
+
+
+@pytest.mark.parametrize(
+    "r_inner, r_outer, result",
+    [
+        (0.0, 1.0, (np.exp(1) - 1) * np.pi / np.exp(1)),
+        (1.0, 2.0, (np.exp(3) - 1) * np.pi / np.exp(4)),
+        (0.0, np.exp(1.0), np.pi * (1 - np.exp(-np.exp(2)))),
+    ],
+)
+def test_annular_rule_exp(r_inner, r_outer, result):
+    x, y, w = integration.annulus_rule(6, r_inner=r_inner, r_outer=r_outer)
+    assert ((np.exp(-(x**2) - y**2)) * w).sum() == pytest.approx(result)

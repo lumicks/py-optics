@@ -1,11 +1,14 @@
+"""Test that the PSF as obtained by the trapping API is equivalent to a PSF obtained through the
+dedicated pyoptics.psf module"""
+
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
 from scipy.constants import speed_of_light as _C
 
-import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
-from lumicks.pyoptics.psf.direct import focused_gauss
+from lumicks.pyoptics.psf.czt import focus_gaussian_czt
+from lumicks.pyoptics.psf.quad import focus_gaussian_quad
 
 
 @pytest.mark.parametrize("focal_length", [4.43e-3, 6e-3])
@@ -24,7 +27,7 @@ def test_gaussian_input(focal_length, n_medium, NA):
     bfp_sampling = 31
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
-    # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
+    # Power to get E0 = 1 V/m, to compare with focus_gaussian_czt()
     P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
 
     Exm, Eym, Ezm = trp.fields_focus_gaussian(
@@ -42,13 +45,10 @@ def test_gaussian_input(focal_length, n_medium, NA):
         num_orders=bead.number_of_orders * 2,
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss(
+    Exf, Eyf, Ezf = focus_gaussian_czt(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x_range=(xy_eval[0], xy_eval[-1]),
         numpoints_x=num_pts,
         y_range=(xy_eval[0], xy_eval[-1]),
@@ -79,7 +79,7 @@ def test_gaussian_input_bead_shift(bead_center):
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
     bfp_sampling = 31
 
-    # Power to get E0 = 1 V/m, to compare with fast_gauss_psf()
+    # Power to get E0 = 1 V/m, to compare with focus_gaussian_czt()
     P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
 
     Exm, Eym, Ezm = trp.fields_focus_gaussian(
@@ -96,27 +96,22 @@ def test_gaussian_input_bead_shift(bead_center):
         verbose=False,
         num_orders=bead.number_of_orders * 2,
     )
-    Exr, Eyr, Ezr = focused_gauss(
+    Exr, Eyr, Ezr = focus_gaussian_quad(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x=xy_eval,
         y=xy_eval,
         z=z_eval,
-        bfp_sampling_n=bfp_sampling,
+        integration_order=bfp_sampling,
         return_grid=False,
+        method="equidistant",
     )
 
-    Exf, Eyf, Ezf = psf.fast_gauss(
+    Exf, Eyf, Ezf = focus_gaussian_czt(
+        objective,
         lambda_vac,
-        n_bfp=n_bfp,
-        n_medium=n_medium,
-        focal_length=focal_length,
         filling_factor=filling_factor,
-        NA=NA,
         x_range=(xy_eval[0], xy_eval[-1]),
         numpoints_x=num_pts,
         y_range=(xy_eval[0], xy_eval[-1]),

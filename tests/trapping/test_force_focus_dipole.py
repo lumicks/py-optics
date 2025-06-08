@@ -1,14 +1,15 @@
 """This pytest compares the forces in a focus of a laser, as obtained with the dipole approximation,
-with the full Mie solution"""
+with the full Mie solution. They should be equivalent if the bead is small enough."""
 
+from functools import partial
 from itertools import product
 
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
 
-import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
+from lumicks.pyoptics.psf.czt import Objective, focus_czt
 
 n_medium = 1.33
 n_bead = 5
@@ -26,12 +27,9 @@ bfp_sampling_n = 11
 w0 = filling_factor * focal_length * NA / n_medium
 objective = trp.Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n_bfp=n_bfp)
 bead = trp.Bead(bead_size, n_bead, n_medium, 1064e-9)
-keyword_args = {
+czt_keyword_args = {
     "lambda_vac": 1064e-9,
-    "n_bfp": 1.0,
-    "n_medium": n_medium,
-    "focal_length": 4.43e-3,
-    "NA": 1.2,
+    "objective": objective,
     "x_range": dim,
     "numpoints_x": numpoints,
     "y_range": dim,
@@ -48,65 +46,31 @@ a_s = (4 * np.pi * _EPS0 * n_medium**2 * (bead_size / 2) ** 3 * (n_bead**2 - n_m
 a = a_s + 1j * k**3 / (6 * np.pi * _EPS0 * n_medium**2) * a_s**2
 
 
-def get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n):
-    sin_theta = r_bfp / focal_length
-    cos_theta = np.ones_like(sin_theta)
-    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
-    region = sin_theta > 0
-    cos_phi = np.empty_like(sin_theta)
-    sin_phi = np.empty_like(sin_theta)
-    cos_phi[region] = x_bfp[region] / (focal_length * sin_theta[region])
-    cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
-    sin_phi[region] = y_bfp[region] / (focal_length * sin_theta[region])
-    sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
-    sin_phi[np.logical_not(aperture)] = 0
-    cos_phi[np.logical_not(aperture)] = 1
-    return cos_theta, sin_theta, cos_phi, sin_phi
-
-
-def field_func(_, x_bfp, y_bfp, *args):
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2)
-    return (Ein, None)
-
-
-def field_func_kx(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
-    # Takes the derivative of the fields to X
-    _, sin_theta, cos_phi, __ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2 * np.pi * n_medium / 1064e-9
-    Kp = k * sin_theta
-    Kx = -Kp * cos_phi
-
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Kx
-    return (Ein, None)
-
-
-def field_func_ky(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
-    # Takes the derivative of the fields to Y
-    _, sin_theta, __, sin_phi = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2 * np.pi * n_medium / 1064e-9
-    Kp = k * sin_theta
-    Ky = -Kp * sin_phi
-
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Ky
-    return (Ein, None)
-
-
-def field_func_kz(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
-    # Takes the derivative of the fields to Z
-    cos_theta, _, __, ___ = get_angles(aperture, x_bfp, y_bfp, r_bfp, bfp_sampling_n)
-    k = 2 * np.pi * n_medium / 1064e-9
-    Kz = k * cos_theta
-
-    Ein = np.exp(-((x_bfp) ** 2 + y_bfp**2) / w0**2) * 1j * Kz
+def field_func(coordinates, objective: Objective, derivative_axis: str | None = None):
+    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2) + 0.0j
+    if derivative_axis is not None:
+        ffd = objective.back_focal_plane_to_farfield(
+            coordinates, (None, None), czt_keyword_args["lambda_vac"]
+        )
+        k_ax = getattr(ffd, f"k{derivative_axis}")
+        Ein *= 1j * k_ax
     return (Ein, None)
 
 
 @pytest.mark.parametrize("z_pos", zrange)
 def test_force_focus(z_pos):
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(field_func, z=z_pos, return_grid=True, **keyword_args)
-    Exdx, Eydx, Ezdx = psf.fast_psf(field_func_kx, z=z_pos, return_grid=False, **keyword_args)
-    Exdy, Eydy, Ezdy = psf.fast_psf(field_func_ky, z=z_pos, return_grid=False, **keyword_args)
-    Exdz, Eydz, Ezdz = psf.fast_psf(field_func_kz, z=z_pos, return_grid=False, **keyword_args)
+    Ex, Ey, Ez, X, Y, Z = focus_czt(
+        partial(field_func, derivative_axis=None), z=z_pos, return_grid=True, **czt_keyword_args
+    )
+    Exdx, Eydx, Ezdx = focus_czt(
+        partial(field_func, derivative_axis="x"), z=z_pos, return_grid=False, **czt_keyword_args
+    )
+    Exdy, Eydy, Ezdy = focus_czt(
+        partial(field_func, derivative_axis="y"), z=z_pos, return_grid=False, **czt_keyword_args
+    )
+    Exdz, Eydz, Ezdz = focus_czt(
+        partial(field_func, derivative_axis="z"), z=z_pos, return_grid=False, **czt_keyword_args
+    )
 
     E_grad_E_x = np.conj(Ex) * Exdx + np.conj(Ey) * Eydx + np.conj(Ez) * Ezdx
     E_grad_E_y = np.conj(Ex) * Exdy + np.conj(Ey) * Eydy + np.conj(Ez) * Ezdy

@@ -1,3 +1,9 @@
+"""Test that a numerical implementation of the scattered and absorbed power by a bead are equivalent
+to the analytic expressions for scattering and absorption of a bead by a plane wave. Do this for
+various angles and polarizations of the plane wave."""
+
+from functools import partial
+
 import numpy as np
 import pytest
 from scipy.constants import epsilon_0 as _EPS0
@@ -19,10 +25,7 @@ def test_plane_wave_absorption_scattering(
     """
     objective = trp.Objective(focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
-    def dummy(_, x_bfp, *args):
-        return (np.zeros_like(x_bfp), None)
-
-    coords, fields = objective.sample_back_focal_plane(dummy, bfp_sampling_n)
+    coords, fields = objective.sample_back_focal_plane(None, bfp_sampling_n, method="equidistant")
     farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
 
     bead_size = 0.5e-6  # larger than dipole approximation is valid for
@@ -40,11 +43,11 @@ def test_plane_wave_absorption_scattering(
     ks = k * NA / n_medium
     dk = ks / (bfp_sampling_n - 1)
 
-    def input_field_Etheta(_, x_bfp, *args):
+    def input_field(coords, _, type: str):
         # Create an input field that is theta-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
-        Ex = np.zeros_like(x_bfp, dtype="complex128")
-        Ey = np.zeros_like(x_bfp, dtype="complex128")
+        Ex = np.zeros_like(coords.x_bfp, dtype="complex128")
+        Ey = np.zeros_like(coords.x_bfp, dtype="complex128")
 
         correction = (
             k
@@ -52,32 +55,12 @@ def test_plane_wave_absorption_scattering(
             * (n_medium / n_bfp) ** 0.5
             * farfield.cos_theta[p, m] ** -0.5
         )
-        Expoint = farfield.cos_phi[p, m] * E0
-        Eypoint = farfield.sin_phi[p, m] * E0
-
-        Ex[p, m] = (Expoint * correction * 2 * np.pi) / (
-            -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
-        )
-        Ey[p, m] = (Eypoint * correction * 2 * np.pi) / (
-            -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
-        )
-
-        return (Ex, Ey)
-
-    def input_field_Ephi(_, x_bfp, *args):
-        # Create an input field that is phi-polarized with 1 V/m after
-        # refraction by the lens and propagation to the focal plane
-        Ex = np.zeros_like(x_bfp, dtype="complex128")
-        Ey = np.zeros_like(x_bfp, dtype="complex128")
-
-        correction = (
-            k
-            * farfield.cos_theta[p, m]
-            * (n_medium / n_bfp) ** 0.5
-            * farfield.cos_theta[p, m] ** -0.5
-        )
-        Expoint = -farfield.sin_phi[p, m] * E0
-        Eypoint = farfield.cos_phi[p, m] * E0
+        if type == "theta":
+            Expoint = farfield.cos_phi[p, m] * E0
+            Eypoint = farfield.sin_phi[p, m] * E0
+        else:
+            Expoint = -farfield.sin_phi[p, m] * E0
+            Eypoint = farfield.cos_phi[p, m] * E0
         Ex[p, m] = (Expoint * correction * 2 * np.pi) / (
             -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
         )
@@ -89,10 +72,10 @@ def test_plane_wave_absorption_scattering(
 
     for p in range(coords.x_bfp.shape[0]):
         for m in range(coords.x_bfp.shape[0]):
-            if not coords.aperture[p, m]:
+            if coords.weights[p, m] == 0.0:
                 continue
             Psca = trp.scattered_power_focus(
-                input_field_Etheta,
+                partial(input_field, type="theta"),
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
@@ -101,7 +84,7 @@ def test_plane_wave_absorption_scattering(
             )
 
             Pabs = trp.absorbed_power_focus(
-                input_field_Etheta,
+                partial(input_field, type="theta"),
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
@@ -115,7 +98,7 @@ def test_plane_wave_absorption_scattering(
             np.testing.assert_allclose(Pabs, Pabs_theory, rtol=1e-8, atol=1e-4)
 
             Psca = trp.scattered_power_focus(
-                input_field_Ephi,
+                partial(input_field, type="phi"),
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
@@ -124,7 +107,7 @@ def test_plane_wave_absorption_scattering(
             )
 
             Pabs = trp.absorbed_power_focus(
-                input_field_Ephi,
+                partial(input_field, type="phi"),
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),

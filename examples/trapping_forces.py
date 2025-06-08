@@ -17,6 +17,8 @@
 # # Calculating forces on a trapped bead
 
 # %%
+from functools import partial
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import epsilon_0
@@ -92,14 +94,15 @@ power_percentage = 25  # [%]
 
 # %%
 filling_factor = 0.9  # [-]
-w0 = filling_factor * focal_length * NA / n_medium  # [m]
 P = Pmax * power_percentage / 100.0  # [W]
-I0 = 2 * P / (np.pi * w0**2)  # [W/m^2]
-E0 = (I0 * 2 / (epsilon_0 * C * n_bfp)) ** 0.5  # [V/m]
 
 
-def gaussian_beam(_, x_bfp, y_bfp, *args):
-    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2) * E0
+def gaussian_beam(coordinates, objective, *, power, filling_factor):
+    w0 = filling_factor * objective.r_bfp_max  # [m]
+    I0 = 2 * power / (np.pi * w0**2)  # [W/m^2]
+    E0 = (I0 * 2 / (epsilon_0 * C * n_bfp)) ** 0.5  # [V/m]
+
+    Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2) * E0
     return (Ex, None)
 
 
@@ -113,7 +116,12 @@ def gaussian_beam(_, x_bfp, y_bfp, *args):
 z = np.linspace(0, 1e-6, 201)
 
 # Obtain a function that returns the force on a bead at a certain coordinate when called.
-force_func = trp.force_factory(gaussian_beam, objective, bead, bfp_sampling_n=bfp_sampling_n)
+force_func = trp.force_factory(
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
+    objective,
+    bead,
+    bfp_sampling_n=bfp_sampling_n,
+)
 
 # %%
 bead_center = [(0, 0, zz) for zz in z]
@@ -167,7 +175,7 @@ plt.show()
 
 # %%
 Fz1 = trp.forces_focus(
-    gaussian_beam,
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     bead=bead,
     bfp_sampling_n=bfp_sampling_n,
@@ -176,7 +184,7 @@ Fz1 = trp.forces_focus(
     integration_order=None,
 )[:, 2]
 Fz2 = trp.forces_focus(
-    gaussian_beam,
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     bead=bead,
     bfp_sampling_n=bfp_sampling_n * 2,

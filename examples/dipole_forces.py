@@ -35,13 +35,15 @@
 # [<sup id="#bh_def">1</sup>](#bh_def_rev) Note that Ref. [2] defines $\mathbf{p}$ as $\mathbf{p} = \varepsilon_m \alpha \mathbf{E}$, and therefore the definition of $\alpha$ there is slightly modified compared to below</span>
 
 # %%
+from functools import partial
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import epsilon_0
 from scipy.constants import speed_of_light as C
 
-import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.trapping as trp
+from lumicks.pyoptics.psf.czt import BackFocalPlaneCoordinates, Objective, focus_czt
 
 # %% [markdown]
 # ## Case 1: small bead, approximation valid
@@ -109,17 +111,19 @@ bfp_sampling_n = 9
 # %%
 Pmax = 1.75  # [W]
 power_percentage = 5  # [%]
-
 filling_factor = 0.9  # [-]
-w0 = filling_factor * focal_length * NA / n_medium  # [m]
 P = Pmax * power_percentage / 100.0  # [W]
-I0 = 2 * P / (np.pi * w0**2)  # [W/m^2]
-E0 = (I0 * 2 / (epsilon_0 * C * n_bfp)) ** 0.5  # [V/m]
 
 
 # Field distribution of the incoming laser beam. Polarization is purely in the x-direction.
-def gaussian_beam(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n):
-    Ex = np.exp(-(x_bfp**2 + y_bfp**2) / w0**2).astype("complex128") * E0
+def gaussian_beam(
+    coordinates: BackFocalPlaneCoordinates, objective: Objective, *, power, filling_factor
+):
+    w0 = filling_factor * objective.r_bfp_max  # [m]
+    I0 = 2 * power / (np.pi * w0**2)  # [W/m^2]
+    E0 = (I0 * 2 / (epsilon_0 * C * objective.n_bfp)) ** 0.5  # [V/m]
+
+    Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2).astype("complex128") * E0
     return (Ex, None)
 
 
@@ -137,13 +141,10 @@ y = np.linspace(-half_dim_xy, half_dim_xy, numpoints)
 # Let's visualize the focus of the laser beam that will exert a force on our particle
 
 # %%
-Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-    gaussian_beam,
+Ex, Ey, Ez, X, Y, Z = focus_czt(
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
+    objective,
     lambda_vac,
-    objective.n_bfp,
-    objective.n_medium,
-    objective.focal_length,
-    objective.NA,
     x_range=(-half_dim_xy, half_dim_xy),
     numpoints_x=numpoints,
     y_range=(-half_dim_xy, half_dim_xy),
@@ -181,40 +182,17 @@ plt.show()
 
 
 # %%
-def get_kx_ky_kz(focal_length, k, aperture, x_bfp, y_bfp, r_bfp, r_max):
-    """Calculate the values of kx, ky and kz, properties of plane waves that make up the focus"""
-    bfp_sampling_n = (x_bfp.shape[0] + 1) // 2
-    sin_theta = r_bfp / focal_length
-    cos_theta = np.ones_like(sin_theta)
-    cos_theta[aperture] = (1 - sin_theta[aperture] ** 2) ** 0.5
-    region = sin_theta > 0
-    cos_phi = np.empty_like(sin_theta)
-    sin_phi = np.empty_like(sin_theta)
-    cos_phi[region] = x_bfp[region] / (focal_length * sin_theta[region])
-    cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
-    sin_phi[region] = y_bfp[region] / (focal_length * sin_theta[region])
-    sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
-    sin_phi[np.logical_not(aperture)] = 0
-    cos_phi[np.logical_not(aperture)] = 1
-    kz = k * cos_theta
-    kp = k * sin_theta
-    kx = -kp * cos_phi
-    ky = -kp * sin_phi
-    return kx, ky, kz
-
-
-def dEd_(field_func, focal_length, k, coordinate):
+def derivative(field_func, lambda_vac, axis):
     """Wrap a `field_func` such that we get the derivative of the fields to `coordinate` in the focus"""
 
-    def field_derivative(*args):
+    def field_derivative(coordinates: BackFocalPlaneCoordinates, objective: Objective):
         # Takes the derivative of the fields to x, y or z in the focus
-        kx, ky, kz = get_kx_ky_kz(focal_length, k, *args[:-1])
-        Ex, Ey = field_func(*args)
-        _k = {"x": kx, "y": ky, "z": kz}
+        ffd = objective.back_focal_plane_to_farfield(coordinates, (None, None), lambda_vac)
+        Ex, Ey = field_func(coordinates, objective)
 
         for E in (Ex, Ey):
             if E is not None:
-                E *= 1j * _k[coordinate]
+                E = E * 1j * getattr(ffd, f"k{axis}")
         return (Ex, Ey)
 
     return field_derivative
@@ -223,35 +201,35 @@ def dEd_(field_func, focal_length, k, coordinate):
 def dipole_force(alpha, z_pos, dim, numpoints):
     """Calculate the force on a dipole with polarizability `alpha`"""
     # Field functions to get the gradient of the electric field
-    dEdx = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "x")
-    dEdy = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "y")
-    dEdz = dEd_(gaussian_beam, focal_length, 2 * np.pi * n_medium / lambda_vac, "z")
+    dEdx = derivative(
+        partial(gaussian_beam, power=P, filling_factor=filling_factor), lambda_vac, "x"
+    )
+    dEdy = derivative(
+        partial(gaussian_beam, power=P, filling_factor=filling_factor), lambda_vac, "y"
+    )
+    dEdz = derivative(
+        partial(gaussian_beam, power=P, filling_factor=filling_factor), lambda_vac, "z"
+    )
 
     # Actual PSF
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
-        gaussian_beam,
+    Ex, Ey, Ez = focus_czt(
+        partial(gaussian_beam, power=P, filling_factor=filling_factor),
+        objective,
         1064e-9,
-        1.0,
-        n_medium,
-        4.43e-3,
-        1.2,
         x_range=(-dim / 2, dim / 2),
         numpoints_x=numpoints,
         y_range=(-dim / 2, dim / 2),
         numpoints_y=numpoints,
         z=z_pos,
         bfp_sampling_n=bfp_sampling_n,
-        return_grid=True,
+        return_grid=False,
     )
     # Gradients at sampling points. Edx is [Exdx, Eydx, Ezdx]. Edy is [Exdy, Eydy, Ezdy] etc..
     Edx, Edy, Edz = [
-        psf.fast_psf(
-            dEd_,
+        focus_czt(
+            dEd_axis,
+            objective,
             1064e-9,
-            1.0,
-            n_medium,
-            4.43e-3,
-            1.2,
             x_range=(-dim / 2, dim / 2),
             numpoints_x=numpoints,
             y_range=(-dim / 2, dim / 2),
@@ -260,7 +238,7 @@ def dipole_force(alpha, z_pos, dim, numpoints):
             bfp_sampling_n=bfp_sampling_n,
             return_grid=False,
         )
-        for dEd_ in (dEdx, dEdy, dEdz)
+        for dEd_axis in (dEdx, dEdy, dEdz)
     ]
 
     # Ei* \nabla Ei
@@ -288,7 +266,7 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 
 # %%
 force_function = trp.force_factory(
-    gaussian_beam,
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     small_bead,
     bfp_sampling_n=bfp_sampling_n,
@@ -400,7 +378,7 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 
 # %%
 force_function = trp.force_factory(
-    gaussian_beam,
+    partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     medium_bead,
     bfp_sampling_n=bfp_sampling_n,

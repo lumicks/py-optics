@@ -1,11 +1,13 @@
+"""Test a CZT-based implementation of focusing the field of a dipole with an objective/tube lens
+combination against a reference implementation"""
+
 import numpy as np
 import pytest
 
 import lumicks.pyoptics.farfield_transform as tf
 import lumicks.pyoptics.field_distributions as fd
-import lumicks.pyoptics.psf as psf
 import lumicks.pyoptics.psf.reference as ref
-from lumicks.pyoptics.objective import Objective
+from lumicks.pyoptics.psf.czt import BackFocalPlaneCoordinates, Objective, focus_czt
 
 
 def gen_dipole_psf(
@@ -43,28 +45,23 @@ def gen_dipole_psf(
     f_ = f_tube_lens * n_image_plane
     f = f_tube_lens / magnification * n_medium
     NA_tube = n_image_plane * NA_objective / n_medium * f / f_
-
-    xy_range = 2 * lambda_em
-    dim_xy = (-xy_range / 2, xy_range / 2)
-    z = np.linspace(dim_xy[0], dim_xy[1], numpoints)
-
-    def dummy(_, x_bfp, *args):
-        """A do-nothing function"""
-        return (np.zeros_like(x_bfp), None)
-
     obj = Objective(
         NA=NA_objective,
         focal_length=f,
         n_bfp=1.0,
         n_medium=n_medium,
     )
-    coords, fields = obj.sample_back_focal_plane(dummy, bfp_sampling_n)
-    ff = obj.back_focal_plane_to_farfield(
-        coords, fields, 1.0  # wavelength doesn't matter as we don't use kx, ky, kz
-    )
-    ff.kx = ff.ky = ff.kz = 0  # make that explicit
+    tubelens = Objective(NA=NA_tube, focal_length=f_, n_bfp=1.0, n_medium=n_image_plane)
 
-    def field_func(aperture, x_bfp, y_bfp, r_bfp, r_max, _):
+    xy_range = 2 * lambda_em
+    dim_xy = (-xy_range / 2, xy_range / 2)
+    z = np.linspace(dim_xy[0], dim_xy[1], numpoints)
+
+    def field_func(coords: BackFocalPlaneCoordinates, tube_lens: Objective):
+        # Get the angles that correspond to the back focal plane:
+        ff = obj.back_focal_plane_to_farfield(
+            coords, (None, None), 1.0  # wavelength doesn't matter as we don't use kx, ky, kz
+        )
         Ex, Ey, Ez = fd.dipole.electric_dipole_farfield_angle(
             dipole_moment,
             n_medium,
@@ -81,13 +78,10 @@ def gen_dipole_psf(
 
         return (Ex_bfp, Ey_bfp)
 
-    Ex, Ey, Ez, X, Y, Z = psf.fast_psf(
+    Ex, Ey, Ez, X, Y, Z = focus_czt(
         field_func,
+        tubelens,
         lambda_em,
-        1.0,
-        n_image_plane,
-        f_,
-        NA_tube,
         x_range=dim_xy,
         numpoints_x=numpoints,
         y_range=dim_xy,
