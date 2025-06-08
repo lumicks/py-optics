@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.special as sp
+from numpy.typing import ArrayLike
 from scipy.constants import epsilon_0 as EPS0
 from scipy.integrate import quad
 
@@ -14,9 +15,9 @@ def focused_gauss_ref(
     focal_length: float,
     filling_factor: float,
     NA: float,
-    x: np.array,
-    y: np.array,
-    z: np.array,
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
     Gaussian beam, using the angular spectrum of plane waves method, see [1]_, chapter 3.
@@ -156,9 +157,9 @@ def focused_dipole_ref(
     focal_length: float,
     NA: float,
     focal_length_tube: float,
-    x: np.array,
-    y: np.array,
-    z: np.array,
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
     return_grid=False,
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a
@@ -315,7 +316,7 @@ def focused_dipole_paraxial_xy(
     focal_length: float,
     NA: float,
     focal_length_tube: float,
-    r: np.array,
+    r: ArrayLike,
 ):
     """Calculate the point spread function of a focused dipole in the xy-plane,
     in the paraxial approximation. In that case, the point spread function for x- and y-oriented
@@ -346,7 +347,7 @@ def focused_dipole_paraxial_xy(
         The squared magnitude of the electric field in [V^2/m^2], for dipoles oriented in the plane.
     """
     M = focal_length_tube / focal_length * n_medium / n_image
-    r_ = NA * r / (M * lambda_vac) * 2 * np.pi
+    r_ = NA * np.asarray(r) / (M * lambda_vac) * 2 * np.pi
 
     with np.errstate(divide="ignore", invalid="ignore"):
         squared_electric_field = (2 * sp.jv(1, r_) / r_) ** 2
@@ -366,7 +367,7 @@ def focused_dipole_paraxial_z(
     focal_length: float,
     NA: float,
     focal_length_tube: float,
-    r: np.array,
+    r: ArrayLike,
 ):
     """Calculate the point spread function of a focused dipole oriented along the z-axis,
     in the paraxial approximation.
@@ -396,7 +397,7 @@ def focused_dipole_paraxial_z(
         The squared magnitude of the electric field [V^2/m^2]
     """
     M = focal_length_tube / focal_length * n_medium / n_bfp
-    r_ = NA * r / (M * lambda_vac) * 2 * np.pi
+    r_ = NA * np.asarray(r) / (M * lambda_vac) * 2 * np.pi
 
     with np.errstate(divide="ignore", invalid="ignore"):
         squared_electric_field = (2 * sp.jv(2, r_) / r_) ** 2
@@ -415,9 +416,9 @@ def reflected_focused_gaussian(
     tube_lens_focal_length: float,
     filling_factor: float,
     NA: float,
-    x: np.array,
-    y: np.array,
-    z: np.array,
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
 ):
     x, y, z = np.atleast_1d(x, y, z)
     X, Y = np.meshgrid(x, y, indexing="ij")
