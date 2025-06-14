@@ -32,7 +32,7 @@ def test_focus_gaussian_czt(focal_length, n_medium, NA, x_shift, y_shift):
         z=z_eval,
         integration_order=bfp_sampling_n,
         return_grid=False,
-        method="equidistant",
+        integration_method="equidistant",
     )
 
     Ex_czt, Ey_czt, Ez_czt = focus_gaussian_czt(

@@ -62,7 +62,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
             z=z_eval,
             integration_order=bfp_sampling_n,
             return_grid=True,
-            method="equidistant",
+            integration_method="equidistant",
         )
 
         kz = k * farfield.cos_theta[p, m]
