@@ -36,4 +36,4 @@ def test_throw_on_wrong_medium(function) -> None:
         ValueError,
         match=re.escape("The immersion medium of the bead and the objective have to be the same"),
     ):
-        function(dummy, objective=objective, bead=bead)
+        function(dummy, objective=objective, bead=bead, integration_order_bfp=2)

@@ -39,10 +39,11 @@ def test_gaussian_input(focal_length, n_medium, NA):
         y=xy_eval,
         z=z_eval,
         bead_center=(0, 0, 0),
-        bfp_sampling_n=bfp_sampling,
+        integration_order_bfp=bfp_sampling,
+        integration_method_bfp="equidistant",
         return_grid=False,
         verbose=True,
-        num_orders=bead.number_of_orders * 2,
+        num_spherical_modes=bead.number_of_modes * 2,
     )
 
     Exf, Eyf, Ezf = focus_gaussian_czt(
@@ -91,10 +92,11 @@ def test_gaussian_input_bead_shift(bead_center):
         y=xy_eval,
         z=z_eval,
         bead_center=(0, 0, 0),
-        bfp_sampling_n=bfp_sampling,
+        integration_order_bfp=bfp_sampling,
+        integration_method_bfp="equidistant",
         return_grid=False,
         verbose=False,
-        num_orders=bead.number_of_orders * 2,
+        num_spherical_modes=bead.number_of_modes * 2,
     )
     Exr, Eyr, Ezr = focus_gaussian_quad(
         objective,
@@ -105,7 +107,7 @@ def test_gaussian_input_bead_shift(bead_center):
         z=z_eval,
         integration_order=bfp_sampling,
         return_grid=False,
-        method="equidistant",
+        integration_method="equidistant",
     )
 
     Exf, Eyf, Ezf = focus_gaussian_czt(

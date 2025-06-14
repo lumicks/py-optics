@@ -193,8 +193,8 @@ class Objective:
         """
         sin_theta_x = bfp_coords.x_bfp / self.focal_length
         sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length * (bfp_coords.weights > 0.0)
         aperture = bfp_coords.weights > 0.0
+        sin_theta = bfp_coords.r_bfp / self.focal_length * aperture
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
 

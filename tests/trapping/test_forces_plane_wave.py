@@ -30,7 +30,7 @@ def test_plane_wave_forces_bfp(
     bead_size = 1e-6  # larger than dipole approximation is valid for
     E0 = 2.2
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
-    num_orders = int(0.8 * bead.number_of_orders)  # Speed up testing a bit
+    num_orders = int(0.8 * bead.number_of_modes)  # Speed up testing a bit
     Fpr = (
         bead.pressure_eff(num_orders)  # Qpr
         * (np.pi * bead.bead_diameter**2 / 4)  # Area
@@ -80,9 +80,9 @@ def test_plane_wave_forces_bfp(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
-                method=method,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
 
             # direction of the plane wave, hence direction of the force
@@ -104,9 +104,9 @@ def test_plane_wave_forces_bfp(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
-                method=method,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
             Fn = np.squeeze(F / np.linalg.norm(F))
 

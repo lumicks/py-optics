@@ -177,7 +177,8 @@ def test_plane_wave_bfp(
                 x=xy_eval,
                 y=0,
                 z=z_eval,
-                bfp_sampling_n=bfp_sampling_n,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
                 return_grid=True,
                 verbose=False,
             )
@@ -205,7 +206,8 @@ def test_plane_wave_bfp(
                 x=xy_eval,
                 y=0,
                 z=z_eval,
-                bfp_sampling_n=bfp_sampling_n,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
                 return_grid=True,
                 verbose=False,
             )

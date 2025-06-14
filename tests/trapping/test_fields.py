@@ -37,7 +37,7 @@ def test_mie_nearfield(dataset: int):
         n_medium = data["n_medium"]
         bead_diam = data["bead_diam"]
         lambda_vac = data["lambda_vac"]
-        num_orders = data["num_orders"]
+        num_spherical_modes = data["num_orders"]
     finally:
         data.close()
 
@@ -47,7 +47,7 @@ def test_mie_nearfield(dataset: int):
         x,
         y,
         z,
-        num_orders=num_orders,
+        num_spherical_modes=num_spherical_modes,
         return_grid=False,
         magnetic_field=True,
         total_field=False,

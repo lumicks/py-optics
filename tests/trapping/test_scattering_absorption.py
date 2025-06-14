@@ -32,7 +32,7 @@ def test_plane_wave_absorption_scattering(
     E0 = 2.2
     intensity = 0.5 * E0**2 * _EPS0 * _C * n_medium
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
-    num_orders = None  # int(bead.number_of_orders * 1.5)
+    num_orders = None
 
     Csca = bead.scattering_eff() * np.pi * bead.bead_diameter**2 / 4
     Cabs = (bead.extinction_eff() - bead.scattering_eff()) * np.pi * bead.bead_diameter**2 / 4
@@ -79,8 +79,9 @@ def test_plane_wave_absorption_scattering(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
 
             Pabs = trp.absorbed_power_focus(
@@ -88,8 +89,9 @@ def test_plane_wave_absorption_scattering(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
 
             # check that the magnitude is the same as predicted for Mie
@@ -102,8 +104,9 @@ def test_plane_wave_absorption_scattering(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
 
             Pabs = trp.absorbed_power_focus(
@@ -111,8 +114,9 @@ def test_plane_wave_absorption_scattering(
                 objective=objective,
                 bead=bead,
                 bead_center=(0, 0, 0),
-                bfp_sampling_n=bfp_sampling_n,
-                num_orders=num_orders,
+                integration_order_bfp=bfp_sampling_n,
+                integration_method_bfp="equidistant",
+                num_spherical_modes=num_orders,
             )
 
             # check that the magnitude is the same as predicted for Mie

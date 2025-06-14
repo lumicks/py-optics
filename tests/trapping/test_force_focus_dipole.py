@@ -87,9 +87,9 @@ def test_force_focus(z_pos):
         field_func,
         objective,
         bead=bead,
-        bfp_sampling_n=bfp_sampling_n,
-        num_orders=None,
-        integration_order=None,
+        integration_order_bfp=bfp_sampling_n,
+        integration_method_bfp="equidistant",
+        num_spherical_modes=None,
     )
     for p in range(numpoints):
         for m in range(numpoints):
@@ -111,9 +111,9 @@ def test_force_focus(z_pos):
         objective,
         bead=bead,
         bead_center=bead_positions,
-        bfp_sampling_n=bfp_sampling_n,
-        num_orders=None,
-        integration_order=None,
+        integration_order_bfp=bfp_sampling_n,
+        integration_method_bfp="equidistant",
+        num_spherical_modes=None,
     )
     Fx_mie, Fy_mie, Fz_mie = [F[:, idx].reshape(numpoints, numpoints) for idx in range(3)]
     [
