@@ -27,15 +27,15 @@ def _loop_over_rotations(
     by the plane waves in the focus, and calculating cos(theta) for every coordinate and every
     rotation.
     """
-    rows, cols = np.nonzero(weights)
+    (items,) = np.nonzero(weights)
 
     # Weird construct to work around tuple unpacking bug in Numba
     # https://github.com/numba/numba/issues/8772
-    shape = (weights.shape[0], weights.shape[1], radii.size)
+    shape = (weights.size, radii.size)
     local_cos_theta = np.zeros(shape)
 
     index = radii == 0
-    for r, c in zip(rows, cols):
+    for item in items:
         # Rotate the coordinate system such that the x-polarization on the
         # bead coincides with theta polarization in global space
         # however, cos(theta) is the same for phi polarization!
@@ -46,17 +46,17 @@ def _loop_over_rotations(
 
         # The following line is equal to z = coords[2, :] after doing the transform with A
         z = (
-            local_coords_stacked[2, :] * cos_theta[r, c]
+            local_coords_stacked[2, :] * cos_theta[item]
             - (
-                local_coords_stacked[0, :] * cos_phi[r, c]
-                + local_coords_stacked[1, :] * sin_phi[r, c]
+                local_coords_stacked[0, :] * cos_phi[item]
+                + local_coords_stacked[1, :] * sin_phi[item]
             )
-            * sin_theta[r, c]
+            * sin_theta[item]
         )
 
         # Retrieve an array of all values of cos(theta)
-        local_cos_theta[r, c, :] = z / radii  # cos(theta)
-        local_cos_theta[r, c, index] = 1
+        local_cos_theta[item, :] = z / radii  # cos(theta)
+        local_cos_theta[item, index] = 1
 
     return local_cos_theta
 
@@ -65,7 +65,7 @@ def _loop_over_rotations(
 def _alp_sin_theta_with_parity(
     unique_abs_cos_theta: np.ndarray,
     sign_inv: np.ndarray,
-    max_negative_index: int,
+    max_negative_index: int | None,
     n_orders: int,
 ):
     """
@@ -99,24 +99,20 @@ def calculate_legendre(
     the unique values of cos(theta). These values are found by rotating all local coordinates (x, y,
     z) over all possible angles, as defined by the plane waves coming from the back focal plane.
     """
-
-    # Unpack data class members to a dict for Numba
+    # Unpack data class members to a dict for Numba, and reshape to 1D vector
     farfield_args = {
-        field.name: getattr(farfield_data, field.name)
+        field.name: getattr(farfield_data, field.name).reshape(-1)
         for field in fields(farfield_data)
         if field.name in ("weights", "cos_theta", "sin_theta", "cos_phi", "sin_phi")
     }
     local_cos_theta = _loop_over_rotations(coordinates.xyz_stacked, coordinates.r, **farfield_args)
 
-    shape = local_cos_theta.shape
-    local_cos_theta = np.reshape(local_cos_theta, local_cos_theta.size)
     # rounding errors may make cos(theta) > 1 or < -1. Fix it to [-1..1]
-    local_cos_theta[local_cos_theta > 1] = 1
-    local_cos_theta[local_cos_theta < -1] = -1
+    np.clip(local_cos_theta, a_min=-1, a_max=1, out=local_cos_theta)
 
     # Get the unique values of cos(theta) in the array
-    unique_cos_theta, inverse = np.unique(local_cos_theta, return_inverse=True)
-    inverse = np.reshape(inverse, shape)
+    unique_cos_theta, inverse = np.unique(local_cos_theta.reshape(-1), return_inverse=True)
+    inverse = np.reshape(inverse, local_cos_theta.shape)
 
     # Get the signs of the cosines, and use parity to reduce the computational
     # load

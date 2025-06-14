@@ -57,7 +57,7 @@ class Bead:
     def __init__(
         self,
         bead_diameter: float = 1e-6,
-        n_bead: float = 1.57,
+        n_bead: float | complex = 1.57,
         n_medium: float = 1.33,
         lambda_vac: float = 1064e-9,
     ):
@@ -139,39 +139,44 @@ class Bead:
         return np.pi * self.n_medium * self.bead_diameter / self.lambda_vac
 
     @property
-    def nrel(self) -> Union[float, complex]:
+    def nrel(self) -> float | complex:
         """
         Return the relative refractive index n_bead/n_medium
         """
         return self.n_bead / self.n_medium
 
     @property
+    @deprecated(reason="Renamed to `number_of_modes", version="0.7.0")
     def number_of_orders(self) -> int:
+        return self.number_of_modes
+
+    @property
+    def number_of_modes(self) -> int:
         """
-        Return the number of orders required to 'properly' approximate the fields scattered by the
+        Return the number of modes required to 'properly' approximate the fields scattered by the
         bead. The criterion is the closest integer to :math:`x + 4 x^{1/3} + 2`, where `x` is the
-        size parameter of the bead [1]_.
+        size parameter of the bead [1]_. See also :py:meth:`size_param`.
 
         Returns
         -------
         int
             number of orders
 
-        ..  [1] "Absorption and Scattering of Light by Small Particles",
-                Craig F. Bohren & Donald R. Huffman, p. 477
+        ..  [1] "Absorption and Scattering of Light by Small Particles", Craig F. Bohren & Donald R.
+            Huffman, p. 477
         """
 
         size_param = self.size_param
         return int(np.round(size_param + 4 * size_param ** (1 / 3) + 2.0))
 
-    def ab_coeffs(self, num_orders=None):
+    def ab_coeffs(self, num_modes=None):
         """Return the scattering coefficients for plane wave excitation of the bead.
 
         Parameters
         ----------
-        num_orders : int, optional
-            Determines the number of orders returned. If `num_orders` is `None` (default), the
-            number of orders returned is determined by the property `number_of_orders`
+        num_modes : int, optional
+            Determines the number of modes returned. If `num_modes` is `None` (default), the
+            number of orders returned is determined by the property `number_of_modes`
 
         Returns
         -------
@@ -185,10 +190,10 @@ class Bead:
         size_param = self.size_param
         y = nrel * size_param
 
-        if num_orders is None:
-            n_coeffs = self.number_of_orders
+        if num_modes is None:
+            n_coeffs = self.number_of_modes
         else:
-            n_coeffs = int(np.max((np.abs(num_orders), 1)))
+            n_coeffs = int(np.max((np.abs(num_modes), 1)))
 
         # Downward recurrence for psi_n(x)'/psi_n(x) (logarithmic derivative)
         # See Bohren & Huffman, p. 127
@@ -217,15 +222,15 @@ class Bead:
 
         return an, bn
 
-    def cd_coeffs(self, num_orders=None):
+    def cd_coeffs(self, num_modes=None):
         """
         Return the coefficients for the internal field of the bead.
 
         Parameters
         ----------
-        num_orders : int, optional
-            Determines the number of orders returned. If num_orders is `None` (default), the number
-            of orders returned is determined by the property `number_of_orders`
+        num_modes : int, optional
+            Determines the number of orders returned. If num_modes is `None` (default), the number
+            of orders returned is determined by the property `number_of_modes`
 
         Returns
         -------
@@ -238,10 +243,10 @@ class Bead:
         size_param = self.size_param
         y = nrel * size_param
 
-        if num_orders is None:
-            n_coeffs = self.number_of_orders
+        if num_modes is None:
+            n_coeffs = self.number_of_modes
         else:
-            n_coeffs = int(np.max((np.abs(num_orders), 1)))
+            n_coeffs = int(np.max((np.abs(num_modes), 1)))
 
         n = np.arange(1, n_coeffs + 1)
 
@@ -267,16 +272,16 @@ class Bead:
 
         return cn, dn
 
-    def extinction_eff(self, num_orders=None):
+    def extinction_eff(self, num_modes=None):
         """Return the extinction efficiency `Qext` (for plane wave excitation), defined as
         :math:`Q_{ext} = C_{ext}/(\\pi r^2)`, where :math:`C_{ext}` is the exctinction cross section
         and :math:`r` is the bead radius.
 
         Parameters
         ----------
-        num_orders : int, optional,
-            Determines the number of orders returned. If num_orders is `None` (default), the number
-            of orders returned is determined by the property `number_of_orders`
+        num_modes : int, optional,
+            Determines the number of orders returned. If num_modes is `None` (default), the number
+            of orders returned is determined by the property `number_of_modes`
 
         Returns
         -------
@@ -284,20 +289,20 @@ class Bead:
             Extinction efficiency
         """
 
-        an, bn = self.ab_coeffs(num_orders=num_orders)
+        an, bn = self.ab_coeffs(num_modes=num_modes)
         C = 2 * (1 + np.arange(an.size)) + 1
         return 2 * self.size_param**-2 * np.sum(C * (an + bn).real)
 
-    def scattering_eff(self, num_orders=None):
+    def scattering_eff(self, num_modes=None):
         """Return the scattering efficiency `Qsca` (for plane wave excitation),
         defined as :math:`Q_{sca} = C_{sca}/(\\pi r^2)`, where :math:`C_{sca}` is the scattering
         cross section and :math:`r` is the bead radius.
 
         Parameters
         ----------
-        num_orders : int, optional
-            Determines the number of orders returned. If num_orders is `None` (default), the number
-            of orders returned is determined by the property `number_of_orders`
+        num_modes : int, optional
+            Determines the number of orders returned. If num_modes is `None` (default), the number
+            of orders returned is determined by the property `number_of_modes`
 
         Returns
         -------
@@ -305,11 +310,11 @@ class Bead:
             Scattering efficiency
         """
 
-        an, bn = self.ab_coeffs(num_orders=num_orders)
+        an, bn = self.ab_coeffs(num_modes=num_modes)
         C = 2 * (1 + np.arange(an.size)) + 1
         return 2 * self.size_param**-2 * np.sum(C * (np.abs(an) ** 2 + np.abs(bn) ** 2))
 
-    def pressure_eff(self, num_orders=None):
+    def pressure_eff(self, num_modes=None):
         """
         Return the pressure efficiency `Qpr` (for plane wave excitation), defined as :math:`Q_{pr} =
         Q_{ext} - Q_{sca} <\\cos(\\theta)>`, where :math:`<\\cos(\\theta)>` is the mean scattering
@@ -317,10 +322,10 @@ class Bead:
 
         Parameters
         ----------
-        num_orders : int, optional
-            Determines the number of orders returned. If num_orders is
+        num_modes : int, optional
+            Determines the number of orders returned. If num_modes is
             `None` (default), the number of orders returned is determined by the property
-            `number_of_orders`
+            `number_of_modes`
 
         Returns
         -------
@@ -329,7 +334,7 @@ class Bead:
 
         """
 
-        an, bn = self.ab_coeffs(num_orders=num_orders)
+        an, bn = self.ab_coeffs(num_modes=num_modes)
         n = 1 + np.arange(an.size)
         C = 2 * n + 1
         C1 = n * (n + 2) / (n + 1)
@@ -339,7 +344,7 @@ class Bead:
         an_1[0:-2] = an[1:-1]
         bn_1[0:-2] = bn[1:-1]
 
-        return self.extinction_eff(num_orders) - (
+        return self.extinction_eff(num_modes) - (
             4
             * self.size_param**-2
             * np.sum(

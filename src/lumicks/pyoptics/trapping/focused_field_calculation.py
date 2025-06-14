@@ -1,5 +1,5 @@
 from dataclasses import fields
-from typing import Optional, Tuple
+from typing import Callable
 
 import numpy as np
 from numba.core.config import NUMBA_NUM_THREADS
@@ -21,20 +21,22 @@ from .thread_limiter import thread_limiter
 def focus_field_factory(
     objective: Objective,
     bead: Bead,
-    n_orders: int,
-    bfp_sampling_n: int,
-    f_input_field: callable,
+    f_input_field: Callable,
     local_coordinates: LocalBeadCoordinates,
+    *,
     internal: bool,
+    num_spherical_modes: int,
+    integration_order_bfp: int,
+    integration_method_bfp: str,
 ):
 
     bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field=f_input_field, order=bfp_sampling_n, method="equidistant"
+        f_input_field=f_input_field, order=integration_order_bfp, method=integration_method_bfp
     )
 
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)
     farfield_as_dict = {
-        f.name: getattr(farfield_data, f.name)
+        f.name: getattr(farfield_data, f.name).reshape(-1)
         for f in fields(farfield_data)
         if f.name not in ("kp")
     }
@@ -45,31 +47,31 @@ def focus_field_factory(
     )
     r = local_coordinates.r
     radial_data = (
-        calculate_internal_radial_data(bead.k1, r, n_orders)
+        calculate_internal_radial_data(bead.k1, r, num_spherical_modes)
         if internal
-        else calculate_external_radial_data(bead.k, r, n_orders)
+        else calculate_external_radial_data(bead.k, r, num_spherical_modes)
     )
     radial_as_dict = {f.name: getattr(radial_data, f.name) for f in fields(radial_data)}
 
     legendre_data, legendre_data_dtheta = calculate_legendre(
-        local_coordinates, farfield_data, n_orders
+        local_coordinates, farfield_data, num_spherical_modes
     )
-    coeffs = bead.cd_coeffs(n_orders) if internal else bead.ab_coeffs(n_orders)
+    coeffs = (
+        bead.cd_coeffs(num_spherical_modes) if internal else bead.ab_coeffs(num_spherical_modes)
+    )
     n_bead = bead.n_bead
     n_medium = bead.n_medium
 
-    ks = bead.k * objective.NA / bead.n_medium
-    dk = ks / (bfp_sampling_n - 1)
     phase_correction_factor = (-1j * objective.focal_length) * (
-        np.exp(-1j * bead.k * objective.focal_length) * dk**2 / (2 * np.pi)
+        np.exp(-1j * bead.k * objective.focal_length) / (2 * np.pi)
     )
 
     def calculate_field(
-        bead_center: Tuple[float, float, float],
+        bead_center: tuple[float, float, float],
         calculate_electric_field: bool = True,
         calculate_magnetic_field: bool = False,
         calculate_total_field: bool = True,
-        num_threads: Optional[int] = None,
+        num_threads: int | None = None,
     ):
         local_coords = local_coordinates.xyz_stacked
         region = np.reshape(local_coordinates.region, local_coordinates.coordinate_shape)

@@ -1,5 +1,4 @@
 from dataclasses import fields
-from typing import Tuple
 
 import numpy as np
 
@@ -17,23 +16,25 @@ from .radial_data import calculate_internal as calculate_internal_radial_data
 from .thread_limiter import thread_limiter
 
 
-def _set_farfield(theta: float, phi: float, polarization: Tuple[float, float], k: float):
+def _set_farfield(
+    theta: float, phi: float, polarization: tuple[float | complex, float | complex], k: float
+):
     """Create a FarFieldData object that contains a single pixel (= single
     plane wave) with angles `theta` and `phi`, and with amplitude and polarization (E_theta, E_phi)
     given by `polarization`"""
-    cos_theta = np.atleast_2d(np.cos(theta))
-    sin_theta = np.atleast_2d(np.sin(theta))
-    cos_phi = np.atleast_2d(np.cos(phi))
-    sin_phi = np.atleast_2d(np.sin(phi))
+    cos_theta = np.atleast_1d(np.cos(theta))
+    sin_theta = np.atleast_1d(np.sin(theta))
+    cos_phi = np.atleast_1d(np.cos(phi))
+    sin_phi = np.atleast_1d(np.sin(phi))
     kz = k * cos_theta
     kp = k * sin_theta
     ky = -kp * sin_phi
     kx = -kp * cos_phi
 
     return FarfieldData(
-        Einf_theta=np.atleast_2d(polarization[0]) * kz,
-        Einf_phi=np.atleast_2d(polarization[1]) * kz,
-        weights=np.atleast_2d(1.0),
+        Einf_theta=np.atleast_1d(polarization[0]) * kz,
+        Einf_phi=np.atleast_1d(polarization[1]) * kz,
+        weights=np.atleast_1d(1.0),
         cos_theta=cos_theta,
         sin_theta=sin_theta,
         cos_phi=cos_phi,
@@ -75,7 +76,7 @@ def plane_wave_field_factory(
     n_medium = bead.n_medium
 
     def calculate_field(
-        polarization: Tuple[float, float],
+        polarization: tuple[float | complex, float | complex],
         calculate_electric_field: bool = True,
         calculate_magnetic_field: bool = False,
         calculate_total_field: bool = True,

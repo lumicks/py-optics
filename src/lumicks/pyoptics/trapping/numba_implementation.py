@@ -44,24 +44,25 @@ def external_coordinates_loop(
     )
     field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
-    # Skip points outside aperture
-    rows, cols = np.nonzero(weights)
+    # Skip points with weights of zero, e.g., outside aperture
+    (items,) = np.nonzero(weights)
+
     if r.size > 0:
-        for loop_idx in prange(rows.size):
-            row, col = rows[loop_idx], cols[loop_idx]
+        for item_idx in prange(items.size):
+            item = items[item_idx]
             t_id = get_thread_id()
             matrices = [
                 _R_th_R_phi(
-                    cos_theta[row, col],
-                    sin_theta[row, col],
-                    cos_phi[row, col],
-                    -sin_phi[row, col],
+                    cos_theta[item],
+                    sin_theta[item],
+                    cos_phi[item],
+                    -sin_phi[item],
                 ),
                 _R_pol_R_th_R_phi(
-                    cos_theta[row, col],
-                    sin_theta[row, col],
-                    cos_phi[row, col],
-                    -sin_phi[row, col],
+                    cos_theta[item],
+                    sin_theta[item],
+                    cos_phi[item],
+                    -sin_phi[item],
                 ),
             ]
             local_cos_theta = np.empty(r.size)
@@ -70,7 +71,7 @@ def external_coordinates_loop(
             alp_expanded = np.empty_like(alp_sin_expanded)
             alp_deriv_expanded = np.empty_like(alp_sin_expanded)
 
-            E0 = [Einf_theta[row, col], Einf_phi[row, col]]
+            E0 = [Einf_theta[item], Einf_phi[item]]
 
             for polarization in range(2):
                 A = matrices[polarization]
@@ -84,10 +85,10 @@ def external_coordinates_loop(
 
                     # Expand the legendre derivatives from the unique version of cos(theta)
                     local_sin_theta[:] = ((1 + local_cos_theta) * (1 - local_cos_theta)) ** 0.5
-                    indices = legendre_data[1][row, col]
+                    indices = legendre_data[1][item]
                     alp_sin_expanded[:] = legendre_data[0][:, indices]
                     alp_expanded[:] = alp_sin_expanded * local_sin_theta
-                    indices = legendre_data_dtheta[1][row, col]
+                    indices = legendre_data_dtheta[1][item]
                     alp_deriv_expanded[:] = legendre_data_dtheta[0][:, indices]
 
                 rho_l = np.hypot(x, y)
@@ -122,12 +123,13 @@ def external_coordinates_loop(
                             * np.exp(
                                 1j
                                 * (
-                                    kx[row, col] * bead_center[idx][0]
-                                    + ky[row, col] * bead_center[idx][1]
-                                    + kz[row, col] * bead_center[idx][2]
+                                    kx[item] * bead_center[idx][0]
+                                    + ky[item] * bead_center[idx][1]
+                                    + kz[item] * bead_center[idx][2]
                                 )
                             )
-                            / kz[row, col]
+                            / kz[item]
+                            * weights[item]
                         )
 
                 if calculate_magnetic:
@@ -154,12 +156,13 @@ def external_coordinates_loop(
                             * np.exp(
                                 1j
                                 * (
-                                    kx[row, col] * bead_center[idx][0]
-                                    + ky[row, col] * bead_center[idx][1]
-                                    + kz[row, col] * bead_center[idx][2]
+                                    kx[item] * bead_center[idx][0]
+                                    + ky[item] * bead_center[idx][1]
+                                    + kz[item] * bead_center[idx][2]
                                 )
                             )
-                            / kz[row, col]
+                            / kz[item]
+                            * weights[item]
                         )
 
     return np.sum(field_storage_E, axis=0), np.sum(field_storage_H, axis=0)
@@ -205,23 +208,24 @@ def internal_coordinates_loop(
     field_storage_H = np.zeros_like(field_storage_E) if calculate_magnetic else dummy
 
     # Skip points outside aperture
-    rows, cols = np.nonzero(weights)
+    (items,) = np.nonzero(weights)
+
     if r.size > 0:
-        for loop_idx in prange(rows.size):
-            row, col = rows[loop_idx], cols[loop_idx]
+        for item_idx in prange(items.size):
+            item = items[item_idx]
             t_id = get_thread_id()
             matrices = [
                 _R_th_R_phi(
-                    cos_theta[row, col],
-                    sin_theta[row, col],
-                    cos_phi[row, col],
-                    -sin_phi[row, col],
+                    cos_theta[item],
+                    sin_theta[item],
+                    cos_phi[item],
+                    -sin_phi[item],
                 ),
                 _R_pol_R_th_R_phi(
-                    cos_theta[row, col],
-                    sin_theta[row, col],
-                    cos_phi[row, col],
-                    -sin_phi[row, col],
+                    cos_theta[item],
+                    sin_theta[item],
+                    cos_phi[item],
+                    -sin_phi[item],
                 ),
             ]
             local_cos_theta = np.empty(r.size)
@@ -230,7 +234,7 @@ def internal_coordinates_loop(
             alp_expanded = np.empty_like(alp_sin_expanded)
             alp_deriv_expanded = np.empty_like(alp_sin_expanded)
 
-            E0 = [Einf_theta[row, col], Einf_phi[row, col]]
+            E0 = [Einf_theta[item], Einf_phi[item]]
 
             for polarization in range(2):
                 A = matrices[polarization]
@@ -245,10 +249,10 @@ def internal_coordinates_loop(
 
                     # Expand the legendre derivatives from the unique version of cos(theta)
                     local_sin_theta[:] = ((1 + local_cos_theta) * (1 - local_cos_theta)) ** 0.5
-                    indices = legendre_data[1][row, col]
+                    indices = legendre_data[1][item]
                     alp_sin_expanded[:] = legendre_data[0][:, indices]
                     alp_expanded[:] = alp_sin_expanded * local_sin_theta
-                    indices = legendre_data_dtheta[1][row, col]
+                    indices = legendre_data_dtheta[1][item]
                     alp_deriv_expanded[:] = legendre_data_dtheta[0][:, indices]
 
                 rho_l = np.hypot(x, y)
@@ -281,12 +285,13 @@ def internal_coordinates_loop(
                             * np.exp(
                                 1j
                                 * (
-                                    kx[row, col] * bead_center[idx][0]
-                                    + ky[row, col] * bead_center[idx][1]
-                                    + kz[row, col] * bead_center[idx][2]
+                                    kx[item] * bead_center[idx][0]
+                                    + ky[item] * bead_center[idx][1]
+                                    + kz[item] * bead_center[idx][2]
                                 )
                             )
-                            / kz[row, col]
+                            / kz[item]
+                            * weights[item]
                         )
 
                 if calculate_magnetic:
@@ -312,12 +317,13 @@ def internal_coordinates_loop(
                             * np.exp(
                                 1j
                                 * (
-                                    kx[row, col] * bead_center[idx][0]
-                                    + ky[row, col] * bead_center[idx][1]
-                                    + kz[row, col] * bead_center[idx][2]
+                                    kx[item] * bead_center[idx][0]
+                                    + ky[item] * bead_center[idx][1]
+                                    + kz[item] * bead_center[idx][2]
                                 )
                             )
-                            / kz[row, col]
+                            / kz[item]
+                            * weights[item]
                         )
 
     return np.sum(field_storage_E, axis=0), np.sum(field_storage_H, axis=0)

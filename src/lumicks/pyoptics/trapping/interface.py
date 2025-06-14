@@ -1,7 +1,9 @@
 import logging
-from typing import Optional, Tuple
+import math
+from collections.abc import Callable
 
 import numpy as np
+from numpy.typing import ArrayLike
 from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as _C
@@ -16,20 +18,22 @@ from .plane_wave_field_calculation import plane_wave_field_factory
 
 def fields_focus_gaussian(
     beam_power: float,
-    filling_factor,
+    filling_factor: float,
     objective: Objective,
     bead: Bead,
-    bead_center=(0, 0, 0),
-    x=0,
-    y=0,
-    z=0,
-    bfp_sampling_n=31,
-    num_orders=None,
-    return_grid=False,
-    total_field=True,
-    magnetic_field=False,
-    verbose=False,
-    grid=True,
+    bead_center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    x: float | ArrayLike = 0.0,
+    y: float | ArrayLike = 0.0,
+    z: float | ArrayLike = 0.0,
+    *,
+    return_grid: bool = False,
+    total_field: bool = True,
+    magnetic_field: bool = False,
+    verbose: bool = False,
+    grid: bool = True,
+    num_spherical_modes: int | None = None,
+    integration_order_bfp: int | None = None,
+    integration_method_bfp: str = "peirce",
 ):
     """
     Calculate the three-dimensional electromagnetic field of a bead the focus of a of a Gaussian
@@ -50,30 +54,25 @@ def fields_focus_gaussian(
         Instance of the Objective class.
     bead: Bead
         Instance of the Bead class
-    x : np.ndarray
+    x : float | ArrayLike
         array of x locations for evaluation, in meters
-    y : np.ndarray
+    y : float | ArrayLike
         array of y locations for evaluation, in meters
-    z : np.ndarray
+    z : float | ArrayLike
         array of z locations for evaluation, in meters
-    bead_center : tuple
+    bead_center : tuple[float, float, float]
         A tuple of three floating point numbers determining the x, y and z position of the bead
         center in 3D space, in meters
-    bfp_sampling_n : (Default value = 31) Number of discrete steps with
-        which the back focal plane is sampled, from the center to the edge. The total number of
-        plane waves scales with the square of bfp_sampling_n
-    num_orders : number of order that should be included in the
-        calculation the Mie solution. If it is `None` (default), the code will use the
-        `number_of_orders()` method to calculate a sufficient number.
     return_grid: bool, optional
-        return the sampling grid in the matrices X, Y and Z. Default value = False
+        Return the sampling grid (the result of np.meshgrid) in the matrices X, Y and Z. Default
+        is False
     total_field : bool, optional
-        If True, return the total field of incident and scattered electromagnetic field (default).
-        If False, then only return the scattered field outside the bead. Inside the bead, the full
-        field is always returned.
+        If True, return the total field (sum) of incident and scattered electromagnetic field
+        (default). If False, then only return the scattered field outside the bead. Inside the bead,
+        the full field is always returned.
     magnetic_field : bool, optional
-        If True, return the magnetic fields as well. If false (default), do not return the magnetic
-        fields.
+        If True, return the magnetic fields and the electric fields. If false (default), do not
+        return the magnetic fields, but only the electric fields.
     verbose : bool, optional
         If True, print statements on the progress of the calculation. Default is False
     grid: bool, optional
@@ -82,6 +81,20 @@ def fields_focus_gaussian(
         the numpy.meshgrid output. If False, interpret the x, y and z vectors as the exact locations
         where the field needs to be evaluated. In that case, all vectors need to be of the same
         length.
+    num_spherical_modes : int, optional
+        Number of order that should be included in the calculation the Mie solution. If it is `None`
+        (default), the code will use the :py:method:`Bead.number_of_modes()` method to calculate a
+        sufficient number.
+    integration_order_bfp : int | None
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence expands. If
+        `None`, the function tries to figure out a reasonable default value for the integration
+        methods "peirce" (default, see below) and "equidistant". For other integration methods the
+        order has to be set by hand.
+    integration_method_bfp : str, optional
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
 
     Returns
     -------
@@ -113,7 +126,7 @@ def fields_focus_gaussian(
             Light by Small Particles. WILEY‐VCH Verlag GmbH & Co. KGaA.
             doi:10.1002/9783527618156
     """
-    w0 = filling_factor * objective.focal_length * objective.NA / bead.n_medium  # [m]
+    w0 = filling_factor * objective.r_bfp_max  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
     E0 = (I0 * 2 / (EPS0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
@@ -129,31 +142,34 @@ def fields_focus_gaussian(
         y=y,
         z=z,
         bead_center=bead_center,
-        bfp_sampling_n=bfp_sampling_n,
-        num_orders=num_orders,
+        num_spherical_modes=num_spherical_modes,
         return_grid=return_grid,
         total_field=total_field,
         magnetic_field=magnetic_field,
         verbose=verbose,
         grid=grid,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
     )
 
 
 def fields_focus(
-    f_input_field,
+    f_input_field: Callable,
     objective: Objective,
     bead: Bead,
-    bead_center=(0.0, 0.0, 0.0),
-    x=0.0,
-    y=0.0,
-    z=0.0,
-    bfp_sampling_n=31,
-    num_orders=None,
-    return_grid=False,
-    total_field=True,
-    magnetic_field=False,
-    verbose=False,
-    grid=True,
+    bead_center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    x: float | ArrayLike = 0.0,
+    y: float | ArrayLike = 0.0,
+    z: float | ArrayLike = 0.0,
+    *,
+    return_grid: bool = False,
+    total_field: bool = True,
+    magnetic_field: bool = False,
+    verbose: bool = False,
+    grid: bool = True,
+    num_spherical_modes: int | None = None,
+    integration_order_bfp: int | None = None,
+    integration_method_bfp: str = "peirce",
 ):
     """
     Calculate the three-dimensional electromagnetic field of a bead in the focus of an arbitrary
@@ -166,66 +182,65 @@ def fields_focus(
 
     Parameters
     ----------
-    f_input_field : callable
-        function with signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`, where
-        `x_bfp` is a grid of x locations in the back focal plane, determined by the focal length and
-        NA of the objective. `y_bfp` is the corresponding grid of y locations, and `r_bfp` is the
-        radial distance from the center of the back focal plane. r_max is the largest distance that
-        falls inside the NA, but r_bfp will contain larger numbers as the back focal plane is
-        sampled with a square grid. The function must return a tuple (Ex, Ey), which are the
-        electric fields in the x- and y- direction, respectively, at the sample locations in the
-        back focal plane. The fields may be complex, so a phase difference between x and y is
+    f_input_field : Callable
+        function with signature `f(coordinates: BackFocalPlaneCoordinates, objective: Objective)`,
+        see :py:class:`pyoptics.objective.BackFocalPlaneCoordinates` and
+        :py:class:`pyoptics.objective.Objective`. The function must return a tuple (Ex, Ey), which
+        are the electric fields in the x- and y- direction, respectively, at the sample locations in
+        the back focal plane. The fields may be complex, so a phase difference between x and y is
         possible. If only one polarization is used, the other return value must be None, e.g., y
         polarization would return (None, Ey). The fields are post-processed such that any part that
-        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
-        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
-        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
-        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
-        the edge of the NA, and is given for convenience or potential caching. This will be the
-        number as passed below to `fields_focus()`
+        falls outside of the NA is set to zero.
     objective : Objective
         Instance of the Objective class
     bead : Bead
         Instance of the Bead class
-    x : np.ndarray
-        Array of x locations for evaluation, in meters
-    y : np.ndarray
-        Array of y locations for evaluation, in meters
-    z : np.ndarray
-        Array of z locations for evaluation, in meters
-    bead_center : Tuple[float, float, float]
-        Tuple of three floating point numbers determining the x, y and z position of the bead center
-        in 3D space, in meters
-    bfp_sampling_n : int
-        Number of discrete steps with which the back focal plane is sampled, from the center to the
-        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
-        31.
-    num_orders: int
-        Number of orders that should be included in the calculation the Mie solution. If it is None
-        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
-        number.
-    return_grid : bool
-        Return the sampling grid in the matrices X, Y and Z, by default False
-    total_field : bool
-        If True, return the total field of incident and scattered electromagnetic field (default).
-        If False, then only return the scattered field outside the bead. Inside the bead, the full
-        field is always returned.
-    magnetic_field: bool
-        If True, return the magnetic fields as well. If false (default), do not return the magnetic
-        fields.
-    verbose: bool
+    x : float | ArrayLike
+        array of x locations for evaluation, in meters
+    y : float | ArrayLike
+        array of y locations for evaluation, in meters
+    z : float | ArrayLike
+        array of z locations for evaluation, in meters
+    bead_center : tuple[float, float, float]
+        A tuple of three floating point numbers determining the x, y and z position of the bead
+        center in 3D space, in meters
+    return_grid: bool, optional
+        Return the sampling grid (the result of np.meshgrid) in the matrices X, Y and Z. Default
+        is False
+    total_field : bool, optional
+        If True, return the total field (sum) of incident and scattered electromagnetic field
+        (default). If False, then only return the scattered field outside the bead. Inside the bead,
+        the full field is always returned.
+    magnetic_field : bool, optional
+        If True, return the magnetic fields and the electric fields. If false (default), do not
+        return the magnetic fields, but only the electric fields.
+    verbose : bool, optional
         If True, print statements on the progress of the calculation. Default is False
-    grid: bool
+    grid: bool, optional
         If True (default), interpret the vectors or scalars x, y and z as the input for the
         numpy.meshgrid function, and calculate the fields at the locations that are the result of
         the numpy.meshgrid output. If False, interpret the x, y and z vectors as the exact locations
         where the field needs to be evaluated. In that case, all vectors need to be of the same
         length.
+    num_spherical_modes : int
+        Number of order that should be included in the calculation the Mie solution. If it is `None`
+        (default), the code will use the :py:method:`Bead.number_of_modes()` method to calculate a
+        sufficient number.
+    integration_order_bfp : int | None
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence of the area
+        around the focus expands. If `None`, the function tries to figure out a reasonable default
+        value for the integration methods "peirce" (default, see below) and "equidistant". For other
+        integration methods the order has to be set by hand.
+    integration_method_bfp : str
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
 
     Raises
     ------
-    ValueError: raised when the immersion medium of the bead does not match the medium of the
-    objective.
+    ValueError:
+        Raised when the immersion medium of the bead does not match the medium of the objective.
 
     Returns
     -------
@@ -258,21 +273,25 @@ def fields_focus(
 
     # Enforce floats to ensure Numba has all floats when doing @ / np.matmul
     x, y, z = [np.atleast_1d(coord).astype(np.float64) for coord in (x, y, z)]
-    # TODO: warning criteria for undersampling/aliasing
-    # M = int(np.max((31, 2 * NA**2 * np.max(np.abs(z)) /
-    #        (np.sqrt(self.n_medium**2 - NA**2) * self.lambda_vac))))
-    # if M > bfp_sampling_n:
-    #    print('bfp_sampling_n lower than recommendation for convergence')
 
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+    num_spherical_modes = (
+        bead.number_of_modes if num_spherical_modes is None else max(int(num_spherical_modes), 1)
+    )
+    logging.info(f"Using {num_spherical_modes} spherical modes")
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, bead_center, grid=grid)
+
+    if integration_order_bfp is None:
+        integration_order_bfp = objective.minimal_integration_order(
+            [x, y, z], lambda_vac=bead.lambda_vac, method=integration_method_bfp
+        )
 
     logging.info("Calculating auxiliary data for external fields")
     field_fun = focus_field_factory(
         objective=objective,
         bead=bead,
-        n_orders=n_orders,
-        bfp_sampling_n=bfp_sampling_n,
+        num_spherical_modes=num_spherical_modes,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
         f_input_field=f_input_field,
         local_coordinates=local_coordinates,
         internal=False,
@@ -284,8 +303,9 @@ def fields_focus(
     field_fun = focus_field_factory(
         objective=objective,
         bead=bead,
-        n_orders=n_orders,
-        bfp_sampling_n=bfp_sampling_n,
+        num_spherical_modes=num_spherical_modes,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
         f_input_field=f_input_field,
         local_coordinates=local_coordinates,
         internal=True,
@@ -301,8 +321,7 @@ def fields_focus(
     logging.getLogger().setLevel(loglevel)
 
     if return_grid:
-        grid = np.meshgrid(x, y, z, indexing="ij")
-        X, Y, Z = (np.squeeze(axis) for axis in grid)
+        X, Y, Z = (np.squeeze(axis) for axis in np.meshgrid(x, y, z, indexing="ij"))
         ret += (X, Y, Z)
 
     return ret
@@ -310,54 +329,59 @@ def fields_focus(
 
 def fields_plane_wave(
     bead: Bead,
-    x,
-    y,
-    z,
-    theta=0,
-    phi=0,
-    polarization=(1, 0),
-    num_orders=None,
-    return_grid=False,
-    total_field=True,
-    magnetic_field=False,
-    verbose=False,
-    grid=True,
+    x: float | ArrayLike,
+    y: float | ArrayLike,
+    z: float | ArrayLike,
+    theta: float = 0.0,
+    phi: float = 0.0,
+    polarization: tuple[float | complex, float | complex] = (1.0, 0.0),
+    num_spherical_modes: int | None = None,
+    return_grid: bool = False,
+    total_field: bool = True,
+    magnetic_field: bool = False,
+    verbose: bool = False,
+    grid: bool = True,
 ):
     """
-    Calculate the electromagnetic field of a bead, subject to excitation
-    by a plane wave. The plane wave can be at an angle theta and phi, and
-    have a polarization state that is the combination of the (complex)
-    amplitudes of a theta-polarization state and phi-polarized state. If
-    theta == 0 and phi == 0, the theta polarization points along +x axis and
-    the wave travels into the +z direction.
+    Calculate the electromagnetic field of a bead, subject to excitation by a plane wave. The plane
+    wave can be at an angle theta and phi, and have a polarization state that is the combination of
+    the (complex) amplitudes of a theta-polarization state and phi-polarized state. If theta == 0
+    and phi == 0, the theta polarization points along +x axis and the wave travels into the +z
+    direction.
 
     Parameters
     ----------
-    bead: instance of the Bead class
-    x : array of x locations for evaluation, in meters
-    y : array of y locations for evaluation, in meters
-    z : array of z locations for evaluation, in meters
-    theta : angle with the negative optical axis (-z)
-    phi : angle with the positive x axis
-    num_orders : number of order that should be included in the calculation
-            the Mie solution. If it is None (default), the code will use the
-            number_of_orders() method to calculate a sufficient number.
-    return_grid : (Default value = False) return the sampling grid in the
-        matrices X, Y and Z
-    total_field : If True, return the total field of incident and scattered
-        electromagnetic field (default). If False, then only return the
-        scattered field outside the bead. Inside the bead, the full field is
-        always returned.
-    magnetic_field : If True, return the magnetic fields as well. If false
-        (default), do not return the magnetic fields.
-    verbose : If True, print statements on the progress of the calculation.
-        Default is False
-    grid : If True (default), interpret the vectors or scalars x, y and z as
-        the input for the numpy.meshgrid function, and calculate the fields
-        at the locations that are the result of the numpy.meshgrid output.
-        If False, interpret the x, y and z vectors as the exact locations
-        where the field needs to be evaluated. In that case, all vectors
-        need to be of the same length.
+    bead: Bead
+        Instance of the Bead class
+    x : float | ArrayLike
+        Array of x locations for evaluation, in meters
+    y : float | ArrayLike
+        Array of y locations for evaluation, in meters
+    z : float | ArrayLike
+        Array of z locations for evaluation, in meters
+    theta : float
+        Angle with the negative optical axis (-z), radians
+    phi : float
+        Angle with the positive x axis, radians
+    num_spherical_modes : int
+        Number of order that should be included in the calculation the Mie solution. If it is None
+        (default), the code will use the number_of_modes() method to calculate a sufficient number.
+    return_grid : bool
+        Return the sampling grid in the matrices X, Y and Z, default = False
+    total_field : bool
+        If True, return the total field of incident and scattered electromagnetic field (default).
+        If False, then only return the scattered field outside the bead. Inside the bead, the full
+        field is always returned.
+    magnetic_field : bool
+        If True, return the magnetic fields as well. If false (default), do not return the magnetic
+        fields. verbose : If True, print statements on the progress of the calculation. Default is
+        False
+    grid : bool
+        If True (default), interpret the vectors or scalars x, y and z as the input for the
+        numpy.meshgrid function, and calculate the fields at the locations that are the result of
+        the numpy.meshgrid output. If False, interpret the x, y and z vectors as the exact locations
+        where the field needs to be evaluated. In that case, all vectors need to be of the same
+        length.
 
     Returns
     -------
@@ -380,7 +404,9 @@ def fields_plane_wave(
     # Enforce floats to ensure Numba gets the same type in @ / np.matmul
     x, y, z = [np.atleast_1d(c).astype(np.float64) for c in (x, y, z)]
 
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+    n_orders = (
+        bead.number_of_modes if num_spherical_modes is None else max(int(num_spherical_modes), 1)
+    )
     local_coordinates = LocalBeadCoordinates(x, y, z, bead.bead_diameter, grid=grid)
 
     logging.info("Calculating auxiliary data for external fields")
@@ -424,14 +450,16 @@ def fields_plane_wave(
 
 
 def force_factory(
-    f_input_field,
+    f_input_field: Callable,
     objective: Objective,
     bead: Bead,
-    bfp_sampling_n: int = 31,
-    num_orders: Optional[int] = None,
-    integration_order: Optional[int] = None,
-    method: str = "lebedev-laikov",
-):
+    integration_order_bfp: int,
+    *,
+    integration_method_bfp: str = "peirce",
+    num_spherical_modes: int | None = None,
+    spherical_integration_order: int | None = None,
+    spherical_integration_method: str = "lebedev-laikov",
+) -> Callable:
     """Create and return a function suitable to calculate the force on a bead. Items that can be
     precalculated are stored for rapid subsequent calculations of the force on the bead for
     different positions.
@@ -439,44 +467,43 @@ def force_factory(
     Parameters
     ----------
     f_input_field : callable
-        A callable with the signature `f(aperture, x_bfp, y_bfp, r_bfp, r_max, bfp_sampling_n)`,
-        where `x_bfp` is a grid of x locations in the back focal plane, determined by the focal
-        length and NA of the objective. `y_bfp` is the corresponding grid of y locations, and
-        `r_bfp` is the radial distance from the center of the back focal plane. r_max is the largest
-        distance that falls inside the NA, but r_bfp will contain larger numbers as the back focal
-        plane is sampled with a square grid. The function must return a tuple (Ex, Ey), which are
-        the electric fields in the x- and y- direction, respectively, at the sample locations in the
-        back focal plane. The fields may be complex, so a phase difference between x and y is
+        function with signature `f(coordinates: BackFocalPlaneCoordinates, objective: Objective)`,
+        see :py:class:`pyoptics.objective.BackFocalPlaneCoordinates` and
+        :py:class:`pyoptics.objective.Objective`. The function must return a tuple (Ex, Ey), which
+        are the electric fields in the x- and y- direction, respectively, at the sample locations in
+        the back focal plane. The fields may be complex, so a phase difference between x and y is
         possible. If only one polarization is used, the other return value must be None, e.g., y
         polarization would return (None, Ey). The fields are post-processed such that any part that
-        falls outside of the NA is set to zero. This region is indicated by the variable `aperture`,
-        which has the same shape as `x_bfp`, `y_bfp` and `r_bfp`, and for every location indicates
-        whether it is inside the NA of the objective with `True` or outside the NA with `False`. The
-        integer `bfp_sampling_n` is the number of samples of the back focal plane from the center to
-        the edge of the NA, and is given for convenience or potential caching. This will be the
-        number as passed below to `fields_focus()`
+        falls outside of the NA is set to zero.
     objective : Objective
         instance of the Objective class
     bead : Bead
         instance of the Bead class
-    bfp_sampling_n : int, optional
-        Number of discrete steps with which the back focal plane is sampled, from the center to the
-        edge. The total number of plane waves scales with the square of bfp_sampling_n, by default
-        31
-    num_orders : int, optional
+    integration_order_bfp : int
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence of the area
+        around the focus expands. The order has to be provided, but if the region of interest is
+        known in advance, the :py:method:`Objective.minimal_integration_order` method can help to
+        determine a reasonable starting value, though it only supports the integration methods
+        "peirce" and "equidistant" (see below).
+    integration_method_bfp : str
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
+    num_spherical_modes : int
         Number of orders that should be included in the calculation the Mie solution. If it is None
-        (default), the code will use the Bead.number_of_orders() method to calculate a sufficient
+        (default), the code will use the Bead.number_of_modes() method to calculate a sufficient
         number.
-    integration_order : int, optional
+    spherical_integration_order : int, optional
         The order of the integration. If no order is given, the code will determine an order based
         on the number of orders in the Mie solution. If the integration order is provided, that
         order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
         the nearest higher order is used when the provided order does not match one of the available
         orders. The automatic determination of the integration order sets `integration_order` to
-        `num_orders + 1` for Gauss-Legendre integration, and to `2 * num_orders` for Lebedev-Laikov
-        and Clenshaw-Curtis integration. This typically leads to sufficiently accurate forces, but a
-        convergence check is recommended.
-    method : string, optional
+        `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
+        for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
+        accurate forces, but a convergence check is recommended.
+    spherical_integration_method : string, optional
         Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
         "clenshaw-curtis". With automatic determination of the integration order (`integration_order
         = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
@@ -486,15 +513,16 @@ def force_factory(
 
     Returns
     -------
-    callable
-        Returns a callable with the signature `f(bead_center: Tuple[float, float, float],
-        num_threads: int) -> Tuple[float, float, float]`. The parameter `bead_center` is the bead
-        location in space, for the x-, y-, and z-axis respectively, and is specified in meters. The
-        parameter `num_threads` is the number of threads to use for the calculation. It is limited
-        by `numba.config.NUMBA_NUM_THREADS`.
+    Callable
+        Returns a callable with the signature `f(bead_center: tuple[float, float,
+        float]|list[tuple[float, float, float]], num_threads: int) -> tuple[float, float,
+        float]|list[tuple[float, float, float]]`. The parameter `bead_center` is the bead location
+        in space, for the x-, y-, and z-axis respectively, and is specified in meters. The parameter
+        `num_threads` is the number of threads to use for the calculation. The upper limit is set by
+        `numba.config.NUMBA_NUM_THREADS`.
 
-        The return value of a function call is the force on the bead at the specifed location, in
-        Newton, in the x-, y- and z-direction.
+        The return value of a function call is (a list of) the force on the bead at the specifed
+        location, in Newton, in the x-, y- and z-direction.
 
     Raises
     ------
@@ -505,17 +533,26 @@ def force_factory(
     if bead.n_medium != objective.n_medium:
         raise ValueError("The immersion medium of the bead and the objective have to be the same")
 
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
+    n_orders = (
+        bead.number_of_modes
+        if num_spherical_modes is None
+        else max(math.floor(num_spherical_modes), 1)
+    )
 
-    if integration_order is not None:
+    if spherical_integration_order is not None:
         # Use user's integration order
-        integration_order = np.max((2, int(integration_order)))
-        if method == "lebedev-laikov":
-            # Find nearest integration order that is equal or greater than the user's
-            integration_order = get_nearest_order(integration_order)
+        spherical_integration_order = np.max((2, int(spherical_integration_order)))
+        # Find nearest integration order that is equal or greater than the user's
+        spherical_integration_order = get_nearest_order(
+            spherical_integration_order, spherical_integration_method
+        )
     else:
-        integration_order = determine_integration_order(method, n_orders)
-    x, y, z, w = get_integration_locations(integration_order, method)
+        spherical_integration_order = _determine_integration_order(
+            spherical_integration_method, n_orders
+        )
+    x, y, z, w = get_integration_locations(
+        spherical_integration_order, spherical_integration_method
+    )
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
     local_coordinates = LocalBeadCoordinates(
@@ -524,11 +561,12 @@ def force_factory(
     external_fields_func = focus_field_factory(
         objective,
         bead,
-        n_orders,
-        bfp_sampling_n,
-        f_input_field,
-        local_coordinates,
-        False,
+        f_input_field=f_input_field,
+        local_coordinates=local_coordinates,
+        num_spherical_modes=n_orders,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
+        internal=False,
     )
     _eps = EPS0 * bead.n_medium**2
     _mu = MU0
@@ -536,7 +574,7 @@ def force_factory(
     # Normal vectors with weight factor incorporated
     nw = w[:, np.newaxis] * np.concatenate([np.atleast_2d(ax) for ax in (x, y, z)], axis=0).T
 
-    def force_on_bead(bead_center: Tuple[float, float, float], num_threads: Optional[int] = None):
+    def force_on_bead(bead_center: tuple[float, float, float], num_threads: int | None = None):
         bead_center = np.atleast_2d(bead_center)
         Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, True, num_threads)
 
@@ -582,146 +620,121 @@ def force_factory(
 
 
 def forces_focus(
-    f_input_field,
-    objective,
-    bead,
-    bead_center=(0, 0, 0),
-    bfp_sampling_n=31,
-    num_orders=None,
-    integration_order=None,
-    method="lebedev-laikov",
+    f_input_field: Callable,
+    objective: Objective,
+    bead: Bead,
+    bead_center: tuple[float, float, float] | list[tuple[float, float, float]] = (0.0, 0.0, 0.0),
+    *,
+    num_spherical_modes: int | None = None,
+    integration_order_bfp: int | None = None,
+    integration_method_bfp: str = "peirce",
+    spherical_integration_order: int | None = None,
+    spherical_integration_method: str = "lebedev-laikov",
 ):
     """
-    Calculate the forces on a bead in the focus of an arbitrary input
-    beam, going through an objective with a certain NA and focal length.
-    Implemented with the angular spectrum of plane waves and Mie theory.
+    Calculate the forces on a bead in the focus of an arbitrary input beam, going through an
+    objective with a certain NA and focal length. Implemented with the angular spectrum of plane
+    waves and Mie theory.
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes
-    electric fields in the x, y, and z directions. The input can be a
-    combination of x- and y-polarized light of complex amplitudes.
+    This function correctly incorporates the polarized nature of light in a focus. In other words,
+    the polarization state at the focus includes electric fields in the x, y, and z directions. The
+    input can be a combination of x- and y-polarized light of complex amplitudes.
 
     Parameters
     ----------
-    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
-        cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
-        the back focal plane, determined by the focal length and NA of the
-        objective. Y_BFP is the corresponding grid of y locations, and R is
-        the radial distance from the center of the back focal plane. Rmax is
-        the largest distance that falls inside the NA, but R will contain
-        larger numbers as the back focal plane is sampled with a square
-        grid. Theta is defined as the angle with the negative optical axis
-        (-z), and cosTheta is the cosine of this angle. Phi is defined as
-        the angle between the x and y axis, and cosPhi and sinPhi are its
-        cosine and sine, respectively. The function must return a tuple
-        (E_BFP_x, E_BFP_y), which are the electric fields in the x- and y-
-        direction, respectively, at the sample locations in the back focal
-        plane. The fields may be complex, so a phase difference between x
-        and y is possible. If only one polarization is used, the other
-        return value must be None, e.g., y polarization would return (None,
-        E_BFP_y). The fields are post-processed such that any part that
+    f_input_field : Callable
+        function with signature `f(coordinates: BackFocalPlaneCoordinates, objective: Objective)`,
+        see :py:class:`pyoptics.objective.BackFocalPlaneCoordinates` and
+        :py:class:`pyoptics.objective.Objective`. The function must return a tuple (Ex, Ey), which
+        are the electric fields in the x- and y- direction, respectively, at the sample locations in
+        the back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
         falls outside of the NA is set to zero.
-    objective : instance of the Objective class
-    bead : instance of the Bead class
-    bead_center : tuple of three floating point numbers determining the
-        x, y and z position of the bead center in 3D space, in meters
-    bfp_sampling_n : (Default value = 31) Number of discrete steps with
-        which the back focal plane is sampled, from the center to the edge.
-        The total number of plane waves scales with the square of
-        bfp_sampling_n num_orders: number of order that should be included
-        in the calculation the Mie solution. If it is None (default), the
-        code will use the number_of_orders() method to calculate a
+    objective : Objective
+        Instance of the Objective class
+    bead : Bead
+        Instance of the Bead class
+    bead_center : list[tuple[float, float, float]] | tuple[float, float, float]
+        (List of) three floating point numbers determining the x, y and z position of the bead
+        center in 3D space, in meters.
+    num_spherical_modes : int
+        Number of order that should be included in the calculation the Mie solution. If it is `None`
+        (default), the code will use the :py:method:`Bead.number_of_modes()` method to calculate a
         sufficient number.
+    integration_order_bfp : int | None
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence of the area
+        around the focus expands. If `None`, the function tries to figure out a reasonable default
+        value for the integration methods "peirce" (default, see below) and "equidistant". For other
+        integration methods the order has to be set by hand.
+    integration_method_bfp : str
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
+    spherical_integration_order : int, optional
+        The order of the integration. If no order is given, the code will determine an order based
+        on the number of orders in the Mie solution. If the integration order is provided, that
+        order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
+        the nearest higher order is used when the provided order does not match one of the available
+        orders. The automatic determination of the integration order sets `integration_order` to
+        `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
+        for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
+        accurate forces, but a convergence check is recommended.
+    spherical_integration_method : string, optional
+        Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
+        "clenshaw-curtis". With automatic determination of the integration order (`integration_order
+        = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
+        faster for similar precision. However, the order is limited to 131. The Gauss-Legendre
+        integration scheme is the next most efficient, but may have issues at a very high
+        integration order. In that case, the Clenshaw-Curtis method may be used.
+
 
     Returns
     -------
     F : an array with the force on the bead in the x direction F[0], in the
-        y direction F[1] and in the z direction F[2]. The force is in [N].
+        y direction F[1] and in the z direction F[2]. If a list of bead positions is passed, then
+        the forces are like F[ax, :] with ax = 0..2. The force is in [N].
     """
     force_fun = force_factory(
         f_input_field=f_input_field,
         objective=objective,
         bead=bead,
-        bfp_sampling_n=bfp_sampling_n,
-        num_orders=num_orders,
-        integration_order=integration_order,
-        method=method,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
+        num_spherical_modes=num_spherical_modes,
+        spherical_integration_order=spherical_integration_order,
+        spherical_integration_method=spherical_integration_method,
     )
     return force_fun(bead_center)
 
 
-def absorbed_power_focus(
+def _scattered_absorbed_power_focus(
     f_input_field,
     objective,
     bead: Bead,
-    bead_center=(0, 0, 0),
-    bfp_sampling_n=31,
-    num_orders=None,
-    integration_order=None,
-    method="lebedev-laikov",
+    bead_center,
+    integration_order_bfp,
+    integration_method_bfp,
+    num_spherical_modes,
+    spherical_integration_order,
+    spherical_integration_method,
+    absorbed: bool,
 ):
-    """
-    Calculate the dissipated power in a bead in the focus of an arbitrary
-    input beam, going through an objective with a certain NA and focal
-    length. Implemented with the angular spectrum of plane waves and Mie
-    theory.
+    n_orders = (
+        bead.number_of_modes if num_spherical_modes is None else max(int(num_spherical_modes), 1)
+    )
 
-    This function correctly incorporates the polarized nature of light in a
-    focus. In other words, the polarization state at the focus includes
-    electric fields in the x, y, and z directions. The input can be a
-    combination of x- and y-polarized light of complex amplitudes.
-
-    Parameters
-    ----------
-    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
-        cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in
-        the back focal plane, determined by the focal length and NA of the
-        objective. Y_BFP is the corresponding grid of y locations, and R is
-        the radial distance from the center of the back focal plane. Rmax
-        is the largest distance that falls inside the NA, but R will
-        contain larger numbers as the back focal plane is sampled with a
-        square grid. Theta is defined as the angle with the negative
-        optical axis (-z), and cosTheta is the cosine of this angle. Phi is
-        defined as the angle between the x and y axis, and cosPhi and
-        sinPhi are its cosine and sine, respectively. The function must
-        return a tuple (E_BFP_x, E_BFP_y), which are the electric fields in
-        the x- and y- direction, respectively, at the sample locations in
-        the back focal plane. The fields may be complex, so a phase
-        difference between x and y is possible. If only one polarization is
-        used, the other return value must be None, e.g., y polarization
-        would return (None, E_BFP_y). The fields are post-processed such
-        that any part that falls outside of the NA is set to zero.
-    n_bfp : refractive index at the back focal plane of the objective
-        focused focal_length: focal length of the objective, in meters
-    focal_length : focal length of the objective, in meters
-    NA : Numerical Aperture n_medium * sin(theta_max) of the objective
-    bead_center : tuple
-    of three floating point numbers determining the
-        x, y and z position of the bead center in 3D space, in meters
-    bfp_sampling_n : (Default value = 31) Number of discrete steps with
-        which the back focal plane is sampled, from the center to the edge.
-        The total number of plane waves scales with the square of
-        bfp_sampling_n num_orders: number of order that should be included
-        in the calculation the Mie solution. If it is None (default), the
-        code will use the number_of_orders() method to calculate a
-        sufficient number.
-
-    Returns
-    -------
-    Pabs : the absorbed power in Watts.
-    """
-
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
-
-    if integration_order is not None:
+    if spherical_integration_order is not None:
         # Use user's integration order
-        integration_order = np.max((2, int(integration_order)))
-        if method == "lebedev-laikov":
-            # Find nearest integration order that is equal or greater than the user's
-            integration_order = get_nearest_order(integration_order)
+        spherical_integration_order = np.max((2, int(spherical_integration_order)))
+        # Find nearest integration order that is equal or greater than the user's
+        spherical_integration_order = get_nearest_order(
+            spherical_integration_order, spherical_integration_method
+        )
     else:
-        integration_order = determine_integration_order(method, n_orders)
-    x, y, z, w = get_integration_locations(integration_order, method)
+        integration_order = _determine_integration_order(spherical_integration_method, n_orders)
+    x, y, z, w = get_integration_locations(integration_order, spherical_integration_method)
     xb, yb, zb = [
         ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
     ]
@@ -734,10 +747,11 @@ def absorbed_power_focus(
         xb,
         yb,
         zb,
-        bfp_sampling_n,
-        num_orders,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
+        num_spherical_modes=num_spherical_modes,
         return_grid=False,
-        total_field=True,
+        total_field=absorbed,
         magnetic_field=True,
         verbose=False,
         grid=False,
@@ -754,15 +768,109 @@ def absorbed_power_focus(
     return Pabs * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
 
 
+def absorbed_power_focus(
+    f_input_field,
+    objective,
+    bead: Bead,
+    bead_center: tuple[float, float, float] | list[tuple[float, float, float]] = (0.0, 0.0, 0.0),
+    integration_order_bfp=None,
+    integration_method_bfp="peirce",
+    num_spherical_modes=None,
+    spherical_integration_order=None,
+    spherical_integration_method="lebedev-laikov",
+):
+    """
+    Calculate the dissipated power in a bead in the focus of an arbitrary
+    input beam, going through an objective with a certain NA and focal
+    length. Implemented with the angular spectrum of plane waves and Mie
+    theory.
+
+    This function correctly incorporates the polarized nature of light in a
+    focus. In other words, the polarization state at the focus includes
+    electric fields in the x, y, and z directions. The input can be a
+    combination of x- and y-polarized light of complex amplitudes.
+
+    Parameters
+    ----------
+    f_input_field : Callable
+        function with signature `f(coordinates: BackFocalPlaneCoordinates, objective: Objective)`,
+        see :py:class:`pyoptics.objective.BackFocalPlaneCoordinates` and
+        :py:class:`pyoptics.objective.Objective`. The function must return a tuple (Ex, Ey), which
+        are the electric fields in the x- and y- direction, respectively, at the sample locations in
+        the back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
+        falls outside of the NA is set to zero.
+    n_bfp : float
+        Refractive index at the back focal plane of the objective focused
+    focal_length : float
+        focal length of the objective, in meters
+    NA : float
+        Numerical Aperture n_medium * sin(theta_max) of the objective
+    bead_center : list[tuple[float, float, float]] | tuple[float, float, float]
+        (List of) three floating point numbers determining the x, y and z position of the bead
+        center in 3D space, in meters.
+    num_spherical_modes : int
+        Number of order that should be included in the calculation the Mie solution. If it is `None`
+        (default), the code will use the :py:method:`Bead.number_of_modes()` method to calculate a
+        sufficient number.
+    integration_order_bfp : int | None
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence of the area
+        around the focus expands. If `None`, the function tries to figure out a reasonable default
+        value for the integration methods "peirce" (default, see below) and "equidistant". For other
+        integration methods the order has to be set by hand.
+    integration_method_bfp : str
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
+    spherical_integration_order : int, optional
+        The order of the integration. If no order is given, the code will determine an order based
+        on the number of orders in the Mie solution. If the integration order is provided, that
+        order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
+        the nearest higher order is used when the provided order does not match one of the available
+        orders. The automatic determination of the integration order sets `integration_order` to
+        `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
+        for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
+        accurate forces, but a convergence check is recommended.
+    spherical_integration_method : string, optional
+        Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
+        "clenshaw-curtis". With automatic determination of the integration order (`integration_order
+        = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
+        faster for similar precision. However, the order is limited to 131. The Gauss-Legendre
+        integration scheme is the next most efficient, but may have issues at a very high
+        integration order. In that case, the Clenshaw-Curtis method may be used.
+
+    Returns
+    -------
+    float | list[float]
+        The absorbed power in Watts, as a list if multiple positions were given.
+    """
+
+    return _scattered_absorbed_power_focus(
+        f_input_field,
+        objective,
+        bead,
+        bead_center,
+        integration_order_bfp,
+        integration_method_bfp,
+        num_spherical_modes,
+        spherical_integration_order,
+        spherical_integration_method,
+        True,
+    )
+
+
 def scattered_power_focus(
     f_input_field,
     objective: Objective,
     bead: Bead,
     bead_center=(0, 0, 0),
-    bfp_sampling_n=31,
-    num_orders=None,
-    integration_order=None,
-    method="lebedev-laikov",
+    integration_order_bfp=None,
+    integration_method_bfp="peirce",
+    num_spherical_modes=None,
+    spherical_integration_order=None,
+    spherical_integration_method="lebedev-laikov",
 ):
     """
     Calculate the scattered power by a bead in the focus of an arbitrary
@@ -776,82 +884,68 @@ def scattered_power_focus(
 
     Parameters
     ----------
-    f_input_field : function with signature f(X_BFP, Y_BFP, R, Rmax,
-        cosTheta, cosPhi, sinPhi), where X_BFP is a grid of x locations in the
-        back focal plane, determined by the focal length and NA of the
-        objective. Y_BFP is the corresponding grid of y locations, and R is the
-        radial distance from the center of the back focal plane. Rmax is the
-        largest distance that falls inside the NA, but R will contain larger
-        numbers as the back focal plane is sampled with a square grid. Theta is
-        defined as the angle with the negative optical axis (-z), and cosTheta
-        is the cosine of this angle. Phi is defined as the angle between the x
-        and y axis, and cosPhi and sinPhi are its cosine and sine,
-        respectively. The function must return a tuple (E_BFP_x, E_BFP_y),
-        which are the electric fields in the x- and y- direction, respectively,
-        at the sample locations in the back focal plane. The fields may be
-        complex, so a phase difference between x and y is possible. If only one
-        polarization is used, the other return value must be None, e.g., y
-        polarization would return (None, E_BFP_y). The fields are
-        post-processed such that any part that falls outside of the NA is set
-        to zero.
-    n_bfp : refractive index at the back focal plane of the objective
-        focused focal_length: focal length of the objective, in meters
-    focal_length : focal length of the objective, in meters NA : Numerical
-    Aperture n_medium * sin(theta_max) of the objective bead_center : tuple of
-    three floating point numbers determining the
-        x, y and z position of the bead center in 3D space, in meters
-    bfp_sampling_n : (Default value = 31) Number of discrete steps with
-        which the back focal plane is sampled, from the center to the edge. The
-        total number of plane waves scales with the square of bfp_sampling_n
-        num_orders: number of order that should be included in the calculation
-        the Mie solution. If it is None (default), the code will use the
-        number_of_orders() method to calculate a sufficient number.
+    f_input_field : Callable
+        function with signature `f(coordinates: BackFocalPlaneCoordinates, objective: Objective)`,
+        see :py:class:`pyoptics.objective.BackFocalPlaneCoordinates` and
+        :py:class:`pyoptics.objective.Objective`. The function must return a tuple (Ex, Ey), which
+        are the electric fields in the x- and y- direction, respectively, at the sample locations in
+        the back focal plane. The fields may be complex, so a phase difference between x and y is
+        possible. If only one polarization is used, the other return value must be None, e.g., y
+        polarization would return (None, Ey). The fields are post-processed such that any part that
+        falls outside of the NA is set to zero.
+    objective : Objective
+        Instance of the Objective class
+    bead : Bead
+        Instance of the Bead class
+    bead_center : list[tuple[float, float, float]] | tuple[float, float, float]
+        (List of) three floating point numbers determining the x, y and z position of the bead
+        center in 3D space, in meters.
+    num_spherical_modes : int
+        Number of order that should be included in the calculation the Mie solution. If it is `None`
+        (default), the code will use the :py:method:`Bead.number_of_modes()` method to calculate a
+        sufficient number.
+    integration_order_bfp : int | None
+        Order of the method to integrate over the back focal plane of the objective. Typically, the
+        higher the order, the more accurate the result, or the region of convergence of the area
+        around the focus expands. If `None`, the function tries to figure out a reasonable default
+        value for the integration methods "peirce" (default, see below) and "equidistant". For other
+        integration methods the order has to be set by hand.
+    integration_method_bfp : str
+        The method of integrating over the back focal plane. The default is "peirce", which is a
+        Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
+        "takaki", see notes below.
+    spherical_integration_order : int, optional
+        The order of the integration. If no order is given, the code will determine an order based
+        on the number of orders in the Mie solution. If the integration order is provided, that
+        order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
+        the nearest higher order is used when the provided order does not match one of the available
+        orders. The automatic determination of the integration order sets `integration_order` to
+        `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
+        for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
+        accurate forces, but a convergence check is recommended.
+    spherical_integration_method : string, optional
+        Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
+        "clenshaw-curtis". With automatic determination of the integration order (`integration_order
+        = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
+        faster for similar precision. However, the order is limited to 131. The Gauss-Legendre
+        integration scheme is the next most efficient, but may have issues at a very high
+        integration order. In that case, the Clenshaw-Curtis method may be used.
 
     Returns
     -------
-    Psca : the scattered power in Watts.
+    float | list[float]
+        The scattered power in Watts, as a list if multiple positions were given.
     """
 
-    n_orders = bead.number_of_orders if num_orders is None else max(int(num_orders), 1)
-
-    if integration_order is not None:
-        # Use user's integration order
-        integration_order = np.max((2, int(integration_order)))
-        if method == "lebedev-laikov":
-            # Find nearest integration order that is equal or greater than the user's
-            integration_order = get_nearest_order(integration_order)
-    else:
-        integration_order = determine_integration_order(method, n_orders)
-
-    x, y, z, w = get_integration_locations(integration_order, method)
-
-    xb, yb, zb = [
-        ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
-    ]
-
-    Ex, Ey, Ez, Hx, Hy, Hz = fields_focus(
+    return _scattered_absorbed_power_focus(
         f_input_field,
         objective,
         bead,
         bead_center,
-        xb,
-        yb,
-        zb,
-        bfp_sampling_n,
-        num_orders,
-        return_grid=False,
-        total_field=False,
-        magnetic_field=True,
-        verbose=False,
-        grid=False,
+        integration_order_bfp,
+        integration_method_bfp,
+        num_spherical_modes,
+        spherical_integration_order,
+        spherical_integration_method,
+        False,
     )
-
-    # Note: factor 1/2 incorporated later as 2 pi instead of 4 pi
-    Px = (np.conj(Hz) * Ey - np.conj(Hy) * Ez).real
-    Py = (np.conj(Hx) * Ez - np.conj(Hz) * Ex).real
-    Pz = (np.conj(Hy) * Ex - np.conj(Hx) * Ey).real
-
-    # integral of dot(P, n) over spherical surface:
-    Psca = np.sum((Px * x + Py * y + Pz * z) * w)
-
-    return Psca * (bead.bead_diameter * 0.51) ** 2 * 2 * np.pi
