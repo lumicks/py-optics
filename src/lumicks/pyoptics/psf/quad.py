@@ -26,7 +26,7 @@ def focus_gaussian_quad(
     z: ArrayLike,
     integration_order=None,
     return_grid=False,
-    method="peirce",
+    integration_method="peirce",
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of a Gaussian beam, using the
     angular spectrum of plane waves method and two-dimensional quadrature. See [1], chapter 3.
@@ -89,10 +89,18 @@ def focus_gaussian_quad(
 
     def field_func(coords: BackFocalPlaneCoordinates, objective: Objective):
         Ein = np.exp(-(coords.x_bfp**2 + coords.y_bfp**2) / w0**2)
-        return (Ein, None)
+        return Ein, None
 
     return focus_quad(
-        field_func, objective, lambda_vac, x, y, z, integration_order, return_grid, method
+        field_func,
+        objective,
+        lambda_vac,
+        x,
+        y,
+        z,
+        integration_order,
+        return_grid,
+        integration_method,
     )
 
 
@@ -105,7 +113,7 @@ def focus_quad(
     z: ArrayLike,
     integration_order=None,
     return_grid=False,
-    method="peirce",
+    integration_method="peirce",
 ):
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
     arbitrary input field, using the angular spectrum of plane waves method, see [1], chapter 3.
@@ -183,30 +191,37 @@ def focus_quad(
     X, Y, Z = np.meshgrid(np.atleast_1d(x), np.atleast_1d(y), np.atleast_1d(z), indexing="ij")
 
     k = 2 * np.pi * objective.n_medium / lambda_vac
-    if method == "equidistant":
+    if integration_method == "equidistant":
         if integration_order is None:
             integration_order = (
                 objective.minimal_integration_order([x, y, z], lambda_vac, "equidistant") * 5
             )  # 5 times oversampling to stay consistent with psf.czt.focus_czt
 
-    elif method == "peirce":
+    elif integration_method == "peirce":
         if integration_order is None:
             integration_order = objective.minimal_integration_order(
                 [x, y, z], lambda_vac=lambda_vac, method="peirce"
             )
+    elif integration_method in ["lether", "takaki"]:
+        if integration_order is None:
+            raise RuntimeError(
+                "integration_order=None is not supported for methods 'takaki' and 'lether'"
+            )
     else:
-        raise ValueError("The argument `method` needs to be one of 'peirce' or 'equidistant'")
+        raise ValueError(
+            "The argument `method` needs to be one of 'peirce', 'lether', 'takaki' or 'equidistant'"
+        )
     bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field, integration_order, method
+        f_input_field, integration_order, integration_method
     )
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()
     # Calculate properties of the plane waves
-    # As they come from the negative z-direction, a point at infinity with a
-    # negative x coordinate leads to a positive value for kx (as the wave is
-    # traveling towards point (0,0,0)). Similarly, a negative y coordinate also
-    # leads to a positive value for ky
+    #
+    # As they come from the negative z-direction, a point at infinity with a negative x coordinate
+    # leads to a positive value for kx (as the wave is traveling towards point (0,0,0)). Similarly,
+    # a negative y coordinate also leads to a positive value for ky
     kx = farfield_data.kx
     ky = farfield_data.ky
     kz = farfield_data.kz
