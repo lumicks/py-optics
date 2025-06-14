@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.7
+#       jupytext_version: 1.16.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -106,7 +106,7 @@ print(objective)
 # %%
 # Approximation of the focus, higher is better and slower (scales with N**2)
 # Regardless, the approximate focus is a valid solution of the Maxwell Equations.
-bfp_sampling_n = 9
+bfp_sampling_n = 50
 
 # %%
 Pmax = 1.75  # [W]
@@ -157,15 +157,15 @@ Ex, Ey, Ez, X, Y, Z = focus_czt(
 # Calculate the intensity, which is proportional to |E|^2
 I = np.abs(Ex) ** 2 + np.abs(Ey) ** 2 + np.abs(Ez) ** 2
 
-slice = (numpoints - 1) // 2
+sliced = (numpoints - 1) // 2
 fig, ax = plt.subplots(1, 2)
 ax[0].set_aspect("equal", adjustable="box")
-ax[0].pcolormesh(Z[:, slice, :] * 1e6, X[:, slice, :] * 1e6, I[:, slice, :])
+ax[0].pcolormesh(Z[:, sliced, :] * 1e6, X[:, sliced, :] * 1e6, I[:, sliced, :])
 ax[0].set_xlabel("z [μm]")
 ax[0].set_ylabel("x [μm]")
 ax[0].set_title("Slice at y = 0")
 ax[1].set_aspect("equal", adjustable="box")
-ax[1].pcolormesh(Z[slice, :, :] * 1e6, Y[slice, :, :] * 1e6, I[slice, :, :])
+ax[1].pcolormesh(Z[sliced, :, :] * 1e6, Y[sliced, :, :] * 1e6, I[sliced, :, :])
 ax[1].set_xlabel("z [μm]")
 ax[1].set_ylabel("y [μm]")
 ax[1].set_title("Slice at x = 0")
@@ -188,12 +188,11 @@ def derivative(field_func, lambda_vac, axis):
     def field_derivative(coordinates: BackFocalPlaneCoordinates, objective: Objective):
         # Takes the derivative of the fields to x, y or z in the focus
         ffd = objective.back_focal_plane_to_farfield(coordinates, (None, None), lambda_vac)
-        Ex, Ey = field_func(coordinates, objective)
-
-        for E in (Ex, Ey):
-            if E is not None:
-                E = E * 1j * getattr(ffd, f"k{axis}")
-        return (Ex, Ey)
+        Ex, Ey = [
+            E.astype("complex128") * 1j * getattr(ffd, f"k{axis}") if E is not None else E
+            for E in field_func(coordinates, objective)
+        ]
+        return Ex, Ey
 
     return field_derivative
 
@@ -262,16 +261,27 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 
 # %% [markdown]
 # ## Forces in the $z$ direction
-# We now calculate the force on the bead with the full electromagnetic treatment.
+# We now calculate the force on the bead with the full electromagnetic treatment. For proper
+# convergence, we need to specify the order of integration. A helper method we can use comes with
+# the `Objective` class. It uses the extreme coordinates that occur during the calculation, which
+# includes those on the outer shell of the bead, while the bead is displaced.
+
 
 # %%
+def max_coordinates(coordinates, bead_diameter):
+    abs_min = [abs(min(_c) - bead_diameter / 2) for _c in coordinates]
+    abs_max = [abs(max(_c) + bead_diameter / 2) for _c in coordinates]
+    return [max(_amin, _amax) for _amin, _amax in zip(abs_min, abs_max)]
+
+
+integration_order = objective.minimal_integration_order(
+    max_coordinates([x, y, z], bead_diameter), lambda_vac, method="peirce"
+)
 force_function = trp.force_factory(
     partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     small_bead,
-    bfp_sampling_n=bfp_sampling_n,
-    num_orders=None,
-    integration_order=None,
+    integration_order_bfp=integration_order,
 )
 
 Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
@@ -377,13 +387,14 @@ Fx_dipole, Fy_dipole, Fz_dipole = dipole_force(alpha, z, 4e-6, numpoints)
 # We now calculate the force on the bead with the full electromagnetic treatment. Since this calculation is orders of magnitude slower, we will only calculate 81 points along the $z$-axis to find the equilibrium position
 
 # %%
+integration_order = objective.minimal_integration_order(
+    max_coordinates([x, y, z], bead_diameter), method="peirce", lambda_vac=lambda_vac
+)
 force_function = trp.force_factory(
     partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     medium_bead,
-    bfp_sampling_n=bfp_sampling_n,
-    num_orders=None,
-    integration_order=None,
+    integration_order_bfp=integration_order,
 )
 Fz_mie = force_function(bead_center=[(0, 0, zz) for zz in z])[:, 2]
 

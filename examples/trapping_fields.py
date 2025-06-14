@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.7
+#       jupytext_version: 1.16.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -55,39 +55,27 @@ bead = trp.Bead(
 # </div>
 
 # %%
+# This describes a water-immersion objective used for trapping quite well:
 focal_length = 4.43e-3  # [m]
 NA = 1.2  # [-]
 n_bfp = 1.0  # [-]
 objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 # %% [markdown]
-# ## Properties of the input beam
-#
-# The continuous field distribution at the back focal plane (the input beam, left figure) is discretized with $N$ samples, counting from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples you have, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $N^2$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large.
-# <figure>
-#     <img src="images/aperture_inf.png" width=400 align="left">
-#     <img src="images/aperture_discretized.png" width=400>
-#     <figcaption>Fig. 3: Left - continuous field distribution of the laser beam. Right - discretized approximation</figcaption>
-# </figure>
-#
-# The parameter `bfp_sampling_n` determines the number of samples $N$ in the back focal plane.
+# ## Calculate the fields around the bead
+# Set up the area to calculate around the focus (coordinates (0, 0, 0)), the number of points to calculate, and where the bead is
 
 # %%
-bfp_sampling_n = 9
-
-# %%
-num_pts = 101
-half_extent = bead_diameter
-# np.linspace can return asymmetric values for negative and positive sides of an axis.
-# The code below ensures that the negative values of x are the same
-# as the positive values of x, except for the sign. This helps to reduce the number
-# of points to calculate by taking advantage of symmetry.
-x = np.zeros(num_pts * 2 - 1)
-_x = np.linspace(0, half_extent, num_pts)
-x[0:num_pts] = -_x[::-1]
-x[num_pts:] = _x[1:]
+# Number of points, area to show:
+num_pts = 201
+extent = 2 * bead_diameter
+x = np.arange(num_pts) * extent / (num_pts - 1) - extent / 2
 z = x
+
+# Bead location relative to the focus:
 bead_center = (0, 0, 0)  # [m]
+
+# Calculate:
 Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     1,
     filling_factor=0.9,
@@ -97,7 +85,6 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     y=0,
     z=z,
     bead_center=bead_center,
-    bfp_sampling_n=9,
     return_grid=True,
     verbose=True,
 )
@@ -150,7 +137,6 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     y=y,
     z=z,
     bead_center=(0, 2.9e-6, 0),
-    bfp_sampling_n=9,
     return_grid=True,
     verbose=True,
 )
@@ -216,7 +202,6 @@ Ex_UV, Ey_UV, Ez_UV, X, Y, Z = trp.fields_focus_gaussian(
     y=0,
     z=z,
     bead_center=(0, 0, 0),
-    bfp_sampling_n=9,
     return_grid=True,
     verbose=True,
 )
@@ -231,7 +216,6 @@ Ex_IR, Ey_IR, Ez_IR, X, Y, Z = trp.fields_focus_gaussian(
     y=0,
     z=z,
     bead_center=(0, 0, 0),
-    bfp_sampling_n=9,
     return_grid=True,
     verbose=True,
 )
@@ -294,11 +278,13 @@ z = np.linspace(-1 * bead_size, 1 * bead_size, num_pts)
 bead = trp.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac)
 
 # %% [markdown]
-# Limit the number of orders to 1 (dipole) by using the `num_orders` argument. Note the incorrect representation of the fields.
-# Change `num_orders` to `None` or remove it to restore default behavior, which is to use the recommended number of orders from literature
+# Limit the number of orders to 1 (dipole) by using the `num_spherical_modes` argument. Note the incorrect representation of the fields.
+# Change `num_spherical_modes` to `None` or remove it to restore default behavior, which is to use the recommended number of orders from literature
 
 # %%
-Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(bead, x=x, y=0, z=z, num_orders=1, return_grid=True)
+Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
+    bead, x=x, y=0, z=z, num_spherical_modes=1, return_grid=True
+)
 
 # %%
 plt.figure(figsize=(10, 8))
@@ -315,10 +301,10 @@ plt.show()
 # Ask how many orders are necessary according to the literature, then use half
 
 # %%
-num_ord = bead.number_of_orders
-print(f"Number of orders is {num_ord}")
+num_modes = bead.number_of_modes
+print(f"Number of modes is {num_modes}")
 Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
-    bead, x=x, y=0, z=z, num_orders=np.max((num_ord // 2, 1)), return_grid=True
+    bead, x=x, y=0, z=z, num_spherical_modes=np.max((num_modes // 2, 1)), return_grid=True
 )
 
 # %%
@@ -362,7 +348,7 @@ bead = trp.Bead(bead_diameter=bead_size, n_bead=n_bead, n_medium=n_medium, lambd
 
 # %%
 Ex, Ey, Ez, X, Y, Z = trp.fields_plane_wave(
-    bead=bead, x=x, y=0, z=z, num_orders=None, total_field=False, return_grid=True
+    bead=bead, x=x, y=0, z=z, num_spherical_modes=None, total_field=False, return_grid=True
 )
 
 # %%
@@ -379,3 +365,5 @@ plt.title("|E| (scattered)")
 plt.xlabel("Z [µm]")
 plt.ylabel("X [µm]")
 plt.show()
+
+# %%

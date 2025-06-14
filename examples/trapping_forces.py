@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.4
+#       jupytext_version: 1.16.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -51,7 +51,7 @@ bead = trp.Bead(
     bead_diameter=bead_diameter, n_bead=n_bead, n_medium=n_medium, lambda_vac=lambda_vac
 )
 # Tell use how many scattering orders are used according to the formula in literature:
-print(f"Number of scattering orders used by default: {bead.number_of_orders}")
+print(f"Number of scattering orders used by default: {bead.number_of_modes}")
 
 # %% [markdown]
 # ## Properties of the objective
@@ -73,23 +73,22 @@ objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_mediu
 # %% [markdown]
 # ## Properties of the input beam
 #
-# The continuous field distribution at the back focal plane (the input beam, left figure) is discretized with $(2N-1) \times (2N-1)$ samples, counting $N$ sampels from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples you have, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $O(N^2)$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large. *Do* check for convergence, however, for real applications (see below).
+# The continuous field distribution at the back focal plane (the input beam, left figure) is numerically integrated. This numerical integration uses discrete samples. Shown here on the right is the case of equidistant sampling, with $(2N-1) \times (2N-1)$ samples, counting $N$ from the center to the extremes of the $x$ and $y$ axes (right figure, here $N=9$). The more samples, the more accurate the resulting point spread function will represent the continuous distribution. But, the calculation time will increase with $O(N^2)$. You can get away with relatively small numbers as long as the distance between the bead and the focus is not too large. *Do* check for convergence, however, for real applications (see below).
 # <figure>
 #     <img src="images/aperture_inf.png" width=400 align="left">
 #     <img src="images/aperture_discretized.png" width=400>
 #     <figcaption>Fig. 3: Left - continuous field distribution of the laser beam. Right - discretized approximation</figcaption>
 # </figure>
-#
-# The parameter `bfp_sampling_n` ($=N$) determines the number of samples in the back focal plane. As an approximation of the focus, a higher number of samples is better but quadratically slower. A too low number causes copies of the point spread function to appear. It is therefore best to check for these artifacts by plotting the fields. In this example, the number here is relatively low ($N=9$) for demonstration purposes.
-#
-# **In general, a convergence check is required to verify the computed results**
-#
 
-# %%
-bfp_sampling_n = 9
+# %% [markdown]
+# # Beam type and power
+#
+# In order to calculate the force on a bead, the total power in the beam needs to be set, and the type or profile of beam. The beam profile is typically approximated with a Gaussian distribution, which is also the approach taken here.
 
-# 100% is 1.75W into a single trapping beam before the objective, at trap split = 50%
+# %% Set the maximum power at 1.75W for a single trapping beam, where the power is valid before any
+# clipping by the objective.
 Pmax = 1.75  # [W]
+# Reduce the power to a more typical one used during experiments:
 power_percentage = 25  # [%]
 
 # %%
@@ -97,6 +96,8 @@ filling_factor = 0.9  # [-]
 P = Pmax * power_percentage / 100.0  # [W]
 
 
+# Determine the electric field distribution at the back focal plane, for a given power and filling
+# factor
 def gaussian_beam(coordinates, objective, *, power, filling_factor):
     w0 = filling_factor * objective.r_bfp_max  # [m]
     I0 = 2 * power / (np.pi * w0**2)  # [W/m^2]
@@ -109,18 +110,40 @@ def gaussian_beam(coordinates, objective, *, power, filling_factor):
 # %% [markdown]
 # ## Forces in the $z$ direction - find the equilibrium
 # Set the range in z to calculate the forces at. We expect the force on the bead in the z-direction to be zero for the interval of $[0, \inf)$
-# Start with a range of $0\ldots 1 \mu m$. We will retrieve a function from `force_factory` that we can reuse to calculate the force on a bead at arbitrary locations.
+# Start with a range of $0\ldots 1 \mu m$. We will retrieve a function from `force_factory` that we can reuse to calculate the force on a bead at arbitrary locations. To set up the correct order of integration, we'll use the `Objective.minimal_integration_order()` method to help.
 
 # %%
-# Calculate the force at 50 nm intervals
-z = np.linspace(0, 1e-6, 201)
+# Set up the coordinate system. We'll calculate the force along the optical axis at 50 nm intervals
+num_pts = 201
+z = np.linspace(0, 1e-6, num_pts)
 
+# Later we'll calculate along x and y as well, and to set up the return value of
+# `trapping.force_factory` to converge for these bead center locations, we'll pass those coordinates
+# as well
+x = np.linspace(-500e-9, 0, num_pts)
+y = np.linspace(-500e-9, 0, num_pts)
+
+
+def max_coordinates(coordinates, bead_diameter):
+    abs_min = [abs(min(_c) - bead_diameter / 2) for _c in coordinates]
+    abs_max = [abs(max(_c) + bead_diameter / 2) for _c in coordinates]
+    return [max(_amin, _amax) for _amin, _amax in zip(abs_min, abs_max)]
+
+
+# Obtain the integration order, we'll use the default "peirce" method, which performs a
+# Gaussian-Legendre-like numerical integration over the back focal plane. Note that we need to
+# include the bead radius, as the fields need to converge at the edge of the bead.
+integration_order = objective.minimal_integration_order(
+    max_coordinates([x, y, z], bead_diameter), method="peirce", lambda_vac=lambda_vac
+)
+print(f"integration order: {integration_order}")
 # Obtain a function that returns the force on a bead at a certain coordinate when called.
 force_func = trp.force_factory(
     partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     bead,
-    bfp_sampling_n=bfp_sampling_n,
+    integration_order_bfp=integration_order,
+    integration_method_bfp="peirce",
 )
 
 # %%
@@ -142,15 +165,16 @@ print(f"Force in z zero near z = {(z_eval*1e9):.1f} nm")
 
 # %% [markdown]
 # ## Forces in $x$ and $y$ directions
-# Calculate the forces in the $x$ and $y$ direction at the location where the force in the $z$ direction is (nearly) zero
+# Calculate the forces in the $x$ and $y$ direction at the location where the force in the $z$
+# direction is (nearly) zero
 
 # %%
-x = np.linspace(-500e-9, 0, 501)
+x = np.linspace(-500e-9, 0, 201)
 bead_center = [(xx, 0, z_eval) for xx in x]
 Fx = force_func(bead_center)[:, 0]
 
 # %%
-y = np.linspace(-500e-9, 0, 501)
+y = np.linspace(-500e-9, 0, 201)
 bead_center = [(0, yy, z_eval) for yy in y]
 Fy = force_func(bead_center)[:, 1]
 
@@ -174,36 +198,27 @@ plt.show()
 # 1. Increase the number of Mie scattering orders and check the difference between the old and newly calculated forces
 
 # %%
-Fz1 = trp.forces_focus(
+lower_integration_order = integration_order - 7
+Fz_less_precise = trp.forces_focus(
     partial(gaussian_beam, power=P, filling_factor=filling_factor),
     objective,
     bead=bead,
-    bfp_sampling_n=bfp_sampling_n,
+    integration_order_bfp=lower_integration_order,
     bead_center=[(0, 0, zz) for zz in z],
-    num_orders=None,
-    integration_order=None,
 )[:, 2]
-Fz2 = trp.forces_focus(
-    partial(gaussian_beam, power=P, filling_factor=filling_factor),
-    objective,
-    bead=bead,
-    bfp_sampling_n=bfp_sampling_n * 2,
-    bead_center=[(0, 0, zz) for zz in z],
-    num_orders=None,
-    integration_order=None,
-)[:, 2]
+
 
 # %%
 plt.figure(figsize=(12, 4))
 plt.subplot(1, 2, 1)
-plt.plot(z * 1e9, Fz1 * 1e12, label=f"bfp_sampling = {bfp_sampling_n}")
-plt.plot(z * 1e9, Fz2 * 1e12, label=f"bfp_sampling = {bfp_sampling_n * 2}")
+plt.plot(z * 1e9, Fz_less_precise * 1e12, label=f"Integration order = {lower_integration_order}")
+plt.plot(z * 1e9, Fz * 1e12, label=f"Integration order = {integration_order}")
 plt.xlabel("z [nm]")
 plt.ylabel("F [pN]")
 plt.legend()
-plt.title(f"{bead_diameter * 1e6} um bead, $F_z$ at X = Y = 0")
+plt.title(f"{bead_diameter * 1e6} µm bead, $F_z$ at X = Y = 0")
 plt.subplot(1, 2, 2)
-plt.plot(z * 1e9, (Fz1 - Fz2) * 1e12)
+plt.plot(z * 1e9, (Fz - Fz_less_precise) * 1e12)
 plt.xlabel("z [nm]")
 plt.ylabel("difference [pN]")
 plt.title("difference between calculations")
@@ -211,9 +226,9 @@ plt.show()
 
 # %% [markdown]
 # ### Gaining some speed
-# 1. *Decrease* the number of spherical harmonics `num_orders` and check the difference between the old and newly calculated forces.
+# 1. *Decrease* the number of spherical harmonics `num_spherical_modes` and check the difference between the old and newly calculated forces.
 #     1. It may help to plot the absolute values of the Mie scattering coefficients on a logarithmic y axis to decide the initial cutoff.
-# 1. *Decrease* the number of plane waves in the back focal plane, and check the difference between the old and newly calculated forces.
+# 1. *Decrease* the integration order, as done above, and check the difference between the previously and newly calculated forces.
 
 # %%
 an, bn = bead.ab_coeffs()
