@@ -6,10 +6,9 @@ from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as _C
 
-from ..mathutils.integration import determine_integration_order, get_integration_locations
-from ..mathutils.lebedev_laikov import get_nearest_order
+from ..mathutils.integration.sphere import get_integration_locations, get_nearest_order
 from ..objective import BackFocalPlaneCoordinates, Objective
-from .bead import Bead
+from .bead import Bead, _determine_integration_order
 from .focused_field_calculation import focus_field_factory
 from .local_coordinates import LocalBeadCoordinates
 from .plane_wave_field_calculation import plane_wave_field_factory

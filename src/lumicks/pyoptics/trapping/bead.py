@@ -1,7 +1,56 @@
-from typing import Union
+import math
 
 import numpy as np
 import scipy.special as sp
+from deprecated import deprecated
+
+from lumicks.pyoptics.mathutils.integration.sphere import get_nearest_order
+
+
+def _determine_integration_order(method: str, n_orders: int):
+    """Helper function to generate reasonable defaults for the integration order
+    for different integration methods, based on the number of Mie scattering orders. The presumption
+    is that some kind of entity that is based on the squared field strength is being integrated.
+
+    Parameters
+    ----------
+    method : str
+        Integration method, one of "lebedev-laikov", "gauss-legendre" or
+        "clenshaw-curtis".
+    n_orders : int
+        Number of Mie scattering orders in the Mie solution
+
+    Returns
+    -------
+    int
+        Integration order based on the integration method and number of Mie
+        scattering orders. Must be > 0
+
+    Raises
+    ------
+    ValueError
+        Raised if an invalid integration method is passed
+        Raised if `n_orders <= 0`
+    """
+
+    if (n := math.ceil(n_orders)) <= 0:
+        raise ValueError(f"Invalid value for n_orders. Must be > 0, got {n_orders}")
+
+    # Determine reasonable defaults for integrating over a certain bead size
+    # Guesstimate based on P^1_n ** 2 ~ (1 - x ** 2) * (x ** (n - 1)) ** 2 ~ x ** 2n
+    if method == "gauss-legendre":  # integration order m is accurate to x ** (2 * m - 1)
+        integration_order = n + 1
+    elif method == "clenshaw-curtis":  # integration order m is accurate to x ** m
+        integration_order = 2 * n
+    # lebedev-laikov
+    elif method == "lebedev-laikov":
+        # Get an integration order that is one level higher than the one matching 2 * n_orders
+        # if no integration order is specified
+        integration_order = get_nearest_order(2 * n, "lebedev-laikov")
+    else:
+        raise ValueError(f"Wrong type of integration method specified: {method}")
+
+    return integration_order
 
 
 class Bead:

@@ -8,7 +8,10 @@ from lumicks.pyoptics.field_distributions.dipole import (
     magnetic_dipole,
     magnetic_dipole_z,
 )
-from lumicks.pyoptics.mathutils.integration import get_integration_locations, get_nearest_order
+from lumicks.pyoptics.mathutils.integration.sphere import (
+    get_integration_locations,
+    get_nearest_order,
+)
 from lumicks.pyoptics.mathutils.vector import outer_product
 
 
@@ -66,7 +69,9 @@ def test_magnetic_dipole_z(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     mz = 3.3
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     n = [x, y, z]
     x, y, z = scale_coords((x, y, z), radius)
     fields1 = magnetic_dipole([0.0, 0.0, mz], n_medium, lambda_vac, x, y, z, farfield=False)
@@ -91,7 +96,9 @@ def test_magnetic_dipole(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     mz = 3.3
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     n = (x, y, z)
     x, y, z = scale_coords((x, y, z), radius)
     # dipole in z is benchmarked above, use result to benchmark dipole in x- and y-direction

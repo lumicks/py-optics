@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .farfield_data import FarfieldData
-from .mathutils.integration import annulus_rule
+from .mathutils.integration.disk import get_integration_locations
 
 
 @dataclass
@@ -151,8 +151,11 @@ class Objective:
                 r_bfp=r_bfp,
             )
 
-        def _peirce_coords():
-            x_bfp, y_bfp, w = annulus_rule(order, None, 0, self.r_bfp_max)
+        def _disk_coords(method: str):
+            x_bfp, y_bfp, w = get_integration_locations(order, method=method)
+            w *= self.r_bfp_max**2
+            x_bfp *= self.r_bfp_max
+            y_bfp *= self.r_bfp_max
             r_bfp = np.hypot(x_bfp, y_bfp)
             return BackFocalPlaneCoordinates(
                 weights=w,
@@ -163,8 +166,8 @@ class Objective:
 
         if method == "equidistant":
             bfp_coords = _equidistant_coords()
-        elif method == "peirce":
-            bfp_coords = _peirce_coords()
+        elif method in ["peirce", "lether", "takaki"]:
+            bfp_coords = _disk_coords(method)
         else:
             raise ValueError(f"Sampling method {method} is not supported.")
 

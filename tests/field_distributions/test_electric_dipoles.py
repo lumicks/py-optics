@@ -11,7 +11,10 @@ from lumicks.pyoptics.field_distributions.dipole import (
     electric_dipole_z,
     emitted_power_electric_dipole,
 )
-from lumicks.pyoptics.mathutils.integration import get_integration_locations, get_nearest_order
+from lumicks.pyoptics.mathutils.integration.sphere import (
+    get_integration_locations,
+    get_nearest_order,
+)
 from lumicks.pyoptics.mathutils.vector import outer_product
 
 
@@ -68,7 +71,9 @@ def test_electric_dipole(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     pz = 3.3
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     normals = (x, y, z)
     x, y, z = scale_coords((x, y, z), radius)
     # Check x-dipole is the same as z dipole, after appropriate coordinate transformations
@@ -102,7 +107,9 @@ def test_electric_dipole_x(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     px = 3.3
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     n = [x, y, z]
     x, y, z = scale_coords((x, y, z), radius)
     fields1 = electric_dipole([px, 0.0, 0.0], n_medium, lambda_vac, x, y, z)
@@ -126,7 +133,9 @@ def test_electric_dipole_y(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     py = np.exp(1)
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     n = [x, y, z]
     x, y, z = scale_coords((x, y, z), radius)
     fields1 = electric_dipole([0.0, py, 0.0], n_medium, lambda_vac, x, y, z)
@@ -150,7 +159,9 @@ def test_electric_dipole_z(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     pz = 2.2
-    x, y, z, w = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, w = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     n = [x, y, z]
     x, y, z = scale_coords((x, y, z), radius)
     fields1 = electric_dipole([0.0, 0.0, pz], n_medium, lambda_vac, x, y, z)
@@ -176,7 +187,9 @@ def test_electric_dipole_ff(order: int, n_medium: float, radius: float):
     """
     lambda_vac = 1064e-9
     p = np.random.standard_normal(3)
-    x, y, z, _ = get_integration_locations(get_nearest_order(order), "lebedev-laikov")
+    x, y, z, _ = get_integration_locations(
+        get_nearest_order(order, "lebedev-laikov"), "lebedev-laikov"
+    )
     x, y, z = scale_coords((x, y, z), radius)
     reference_fields = electric_dipole(p, n_medium, lambda_vac, x, y, z, farfield=True)
     dipole_fields = electric_dipole_farfield_position(p, n_medium, lambda_vac, x, y, z)
