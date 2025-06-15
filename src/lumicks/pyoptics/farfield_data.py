@@ -1,6 +1,12 @@
 from dataclasses import dataclass
+from enum import Enum, auto
 
 import numpy as np
+
+
+class PropagationDirection(Enum):
+    TO_ORIGIN = auto()
+    FROM_ORIGIN = auto()
 
 
 @dataclass
@@ -16,7 +22,6 @@ class FarfieldData:
     kx: np.ndarray
     ky: np.ndarray
     kz: np.ndarray
-    kp: np.ndarray
     Einf_theta: np.ndarray
     Einf_phi: np.ndarray
     weights: np.ndarray
@@ -38,3 +43,53 @@ class FarfieldData:
         Ez = self.Einf_theta * self.sin_theta
 
         return Ex, Ey, Ez
+
+    def get_unit_vectors(
+        self: "FarfieldData",
+    ) -> tuple[float | np.ndarray, float | np.ndarray, float | np.ndarray]:
+        """Returns the unit vector (sx, sy, sz) corresponding to FarfieldData.cos_phi,
+        FarfieldData.sin_phi, FarfieldData.cos_theta and FarfieldData.sin_theta.
+
+        Returns
+        -------
+        tuple[float | np.ndarray, float | np.ndarray, float | np.ndarray]
+            The return values sx, sy, sz
+        """
+        sz = self.cos_theta
+        sx = self.sin_theta * self.cos_phi
+        sy = self.sin_theta * self.sin_phi
+        return sx, sy, sz
+
+
+def get_k_vectors_from_unit_vectors(
+    unit_vectors: tuple[np.ndarray, np.ndarray, np.ndarray],
+    k: float,
+    direction: PropagationDirection,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    # Calculate properties of the plane waves. As they come from the negative z-direction, a point
+    # at infinity with a negative x coordinate leads to a positive value for kx (as the wave is
+    # traveling towards point (0,0,0)). Similarly, a negative y coordinate also leads to a positive
+    # value for ky
+    sx, sy, sz = unit_vectors
+    sign = -1 if direction == PropagationDirection.TO_ORIGIN else 1
+
+    kz = k * sz
+    kx, ky = [sign * k * s for s in (sx, sy)]
+    return kx, ky, kz
+
+
+def get_k_vectors_from_cosines(
+    cos_theta: np.ndarray,
+    sin_theta: np.ndarray,
+    cos_phi: np.ndarray,
+    sin_phi: np.ndarray,
+    k: float,
+    direction: PropagationDirection,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    # Calculate properties of the plane waves. As they come from the negative z-direction, a point
+    # at infinity with a negative x coordinate leads to a positive value for kx (as the wave is
+    # traveling towards point (0,0,0)). Similarly, a negative y coordinate also leads to a positive
+    # value for ky
+    sign = -1 if direction == PropagationDirection.TO_ORIGIN else 1
+    kx, ky, kz = [sign * k * cos_phi * sin_theta, sign * k * sin_phi * sin_theta, k * cos_theta]
+    return kx, ky, kz
