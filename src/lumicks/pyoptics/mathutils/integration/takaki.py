@@ -526,7 +526,12 @@ def get_disk_rule(order: int):
         ax[1:] = np.tile(segment_coords[1:, n], 6)
         return ax
 
-    segment_coords = np.asarray(_ORDER[order])
+    try:
+        segment_coords = np.asarray(_ORDER[order])
+    except KeyError as e:
+        raise ValueError(
+            f"Order {order} is not supported. Valid values are {[k for k in _ORDER.keys()]}."
+        ) from e
     r, theta, w = [_expand(n) for n in range(3)]
 
     theta[1:] += np.pi / 3 * np.arange(0, 6).repeat(segment_coords.shape[0] - 1)
@@ -535,4 +540,6 @@ def get_disk_rule(order: int):
 
 
 def get_nearest_order(order: int):
+    if order > 77:
+        raise ValueError("Orders higher than 77 are not supported")
     return min(filter(lambda x: x >= order, _ORDER.keys()))

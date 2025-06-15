@@ -3,6 +3,9 @@ import pytest
 
 import lumicks.pyoptics.mathutils.integration.disk as disk
 import lumicks.pyoptics.mathutils.integration.sphere as sphere
+from lumicks.pyoptics.mathutils.integration.takaki import (
+    get_nearest_order as get_nearest_order_takaki,
+)
 
 
 @pytest.mark.parametrize(
@@ -139,3 +142,17 @@ def test_annular_rule_cos(r_inner, r_outer):
 def test_annular_rule_exp(r_inner, r_outer, result):
     x, y, w = disk.annulus_rule_peirce(7, r_inner=r_inner, r_outer=r_outer)
     assert ((np.exp(-(x**2) - y**2)) * w).sum() == pytest.approx(result)
+
+
+def test_takaki_raises():
+    with pytest.raises(ValueError, match="Order 14 is not supported"):
+        disk.disk_rule_takaki(14)
+
+
+def test_takaki_get_nearest_order():
+    orders = np.asarray([17, 21, 37, 41, 53, 65, 77])
+    for order in range(78):
+        assert get_nearest_order_takaki(order) == np.min(orders[orders >= order])
+
+    with pytest.raises(ValueError, match="Orders higher than 77 are not supported"):
+        get_nearest_order_takaki(78)
