@@ -2,7 +2,7 @@ from dataclasses import fields
 
 import numpy as np
 
-from ..farfield_data import FarfieldData
+from ..farfield import FarfieldData
 from .bead import Bead
 from .legendre_data import calculate_legendre
 from .local_coordinates import (

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .farfield_data import FarfieldData
+from .farfield import FarfieldData
 from .mathutils.integration.disk import get_integration_locations
 
 
