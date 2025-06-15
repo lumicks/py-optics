@@ -10,6 +10,8 @@
     3. Nick Takaki, G. W. Forbes, and Jannick P. Rolland, "Schemes for cubature over the unit disk found via numerical optimization,", Journal of Computational and Applied Mathematics
 * Added the ability to use new cylindrical integration schemes with the `trapping` module.
 * Added Gauss-Legendre and Clenshaw-Curtis spherical integration methods for force calculations (in case orders higher than those supported by Lebedev-Laikov are required)
+    1. Jörg Waldvogel, "Fast Construction of the Fejér and Clenshaw–Curtis Quadrature Rules," BIT Numer. Math. 46, 195–202 (2006)
+    2. Kendall Atkinson, "Numerical integration on the sphere," The Journal of the Australian Mathematical Society Series B Applied Mathematics. 1982;23(3):332-347
 * Added a method to automatically determine the minimal integration order to `objective.Objective`
     * Supported methods are `"peirce"` (new) and `"equidistant"` (only option until v0.7.0)
 * Changed the default spherical integration order to twice the number of Mie modes for the Lebedev-Laikov integration scheme when no integration order is given. That is, `spherical_integration_order = Bead.number_of_modes * 2`
