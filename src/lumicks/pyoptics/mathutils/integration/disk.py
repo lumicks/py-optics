@@ -1,22 +1,34 @@
 import numpy as np
 from scipy.special import roots_legendre
 
-from .takaki import get_disk_rule as tk_get_disk_rule
+from .takaki import get_disk_rule as disk_rule_takaki
 
 
 def get_integration_locations(integration_order: int | tuple[int, int], method: str):
+    if isinstance(integration_order, tuple):
+        if method != "peirce":
+            raise ValueError("Only the method 'peirce' support a tuple for integration_order")
+        if len(integration_order) != 2:
+            raise RuntimeError("If integration_order is a tuple, it must have two elements")
+        if not all([isinstance(el, int) for el in integration_order]):
+            raise RuntimeError(
+                "Expected all elements in the tuple integration_order to be of the integer type"
+            )
+    elif not isinstance(integration_order, int):
+        raise RuntimeError("Expected an integer or tuple[int, int] for integration_order")
     if method == "peirce":
         order = (
             integration_order if isinstance(integration_order, tuple) else (integration_order, None)
         )
-        return annulus_rule(order[0], order[1], r_inner=0, r_outer=1.0)
-    if method == "takaki":
-        return tk_get_disk_rule(integration_order)
-    if method == "lether":
-        return disk_rule_lether(integration_order)
+        return annulus_rule_peirce(order[0], order[1], r_inner=0, r_outer=1.0)
+
+    integration_methods = {"takaki": disk_rule_takaki, "lether": disk_rule_lether}
+    return integration_methods[method](integration_order)
 
 
-def annulus_rule(n_r: int, n_t: int | None = None, r_inner: float = 0.0, r_outer: float = 1.0):
+def annulus_rule_peirce(
+    n_r: int, n_t: int | None = None, r_inner: float = 0.0, r_outer: float = 1.0
+):
     """An integration rule for circular domains, based on _[1].
 
     Parameters

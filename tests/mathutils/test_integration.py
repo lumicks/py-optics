@@ -9,7 +9,7 @@ import lumicks.pyoptics.mathutils.integration.sphere as sphere
     "integration_order", ([3 + n * 2 for n in range(15)] + [35 + n * 6 for n in range(17)])
 )
 @pytest.mark.parametrize("method", ("lebedev-laikov", "gauss-legendre", "clenshaw-curtis"))
-def test_get_integration_locations(integration_order: int, method: str):
+def test_get_integration_locations_sphere(integration_order: int, method: str):
     x, y, z, w = sphere.get_integration_locations(integration_order, method)
     R = np.hypot(np.hypot(x, y), z)
     np.testing.assert_allclose(R, np.ones(R.shape))
@@ -42,7 +42,7 @@ def test_clenshaw_curtis_weights_raises(integration_order: int):
 
 @pytest.mark.parametrize("method", ("lebedev-laikov", "gauss-legendre", "clenshaw-curtis"))
 @pytest.mark.parametrize("order", (7, 11))
-def test_integration_result(method: str, order: int):
+def test_integration_result_sphere(method: str, order: int):
     x, y, z, w = sphere.get_integration_locations(order, method)
 
     # Fornberg, B., Martel, J.M. On spherical harmonics based numerical quadrature over the surface
@@ -58,20 +58,58 @@ def test_integration_result(method: str, order: int):
     np.testing.assert_allclose(integrals, [1.0 / 3.0] * 3)
 
 
+@pytest.mark.parametrize("method", ["equidistant", "lether", "takaki"])
+def test_get_integration_locations_disk_tuple_raises_method(method):
+    with pytest.raises(
+        ValueError, match="Only the method 'peirce' support a tuple for integration_order"
+    ):
+        disk.get_integration_locations((0, 0), method)
+
+
+def test_get_integration_locations_disk_tuple_raises():
+    with pytest.raises(
+        RuntimeError, match="If integration_order is a tuple, it must have two elements"
+    ):
+        disk.get_integration_locations((0, 0, 0), "peirce")  # type: ignore
+
+    with pytest.raises(
+        RuntimeError,
+        match="Expected all elements in the tuple integration_order to be of the integer type",
+    ):
+        disk.get_integration_locations((0, 0.0), "peirce")  # type: ignore
+
+
+def test_get_integration_locations_disk_float_order_raises():
+    with pytest.raises(
+        RuntimeError, match="Expected an integer or tuple\\[int, int\\] for integration_order"
+    ):
+        disk.get_integration_locations(0.0, "peirce")  # type: ignore
+
+
 @pytest.mark.parametrize(
     "r_inner, r_outer, result",
     [(0.0, 1.0, np.pi / 2), (0.0, 2.0, 8 * np.pi), (1.0, 2.0, 15 * np.pi / 2)],
 )
 def test_annular_rule_exact(r_inner, r_outer, result):
-    x, y, w = disk.annulus_rule(2, r_inner=r_inner, r_outer=r_outer)
+    x, y, w = disk.annulus_rule_peirce(2, r_inner=r_inner, r_outer=r_outer)
     assert ((x**2 + y**2) * w).sum() == pytest.approx(result)
 
 
-def test_annular_rule_sin():
+@pytest.mark.parametrize("order,method", [(14, "peirce"), (28, "lether"), (53, "takaki")])
+def test_disk_rule_sin(order: int, method: str):
     result = -0.0213167  # Wolfram Alpha
-    x, y, w = disk.annulus_rule(14, r_inner=0, r_outer=1)
+    x, y, w = disk.get_integration_locations(order, method)
     assert ((x * np.sin(10 * np.pi * x)) * w).sum() == pytest.approx(result)
     assert ((y * np.sin(10 * np.pi * y)) * w).sum() == pytest.approx(result)
+
+
+@pytest.mark.parametrize("order,method", [(3, "peirce"), (3, "lether"), (17, "takaki")])
+def test_disk_rule_zernike(order: int, method: str):
+    def spherical(x, y):
+        return 5**0.5 * (6 * (x**2 + y**2) ** 2 - 6 * (x**2 + y**2) + 1)
+
+    x, y, w = disk.get_integration_locations(order, method)
+    assert (spherical(x, y) * w).sum() == pytest.approx(0.0)
 
 
 @pytest.mark.parametrize("r_inner, r_outer", [(0.0, 0.5), (0, 1), (1, 2), (np.exp(1), np.pi)])
@@ -83,7 +121,7 @@ def test_annular_rule_cos(r_inner, r_outer):
             + np.cos(4 * np.pi * r) / (32 * np.pi**2)
         )
 
-    x, y, w = disk.annulus_rule(9, r_inner=r_inner, r_outer=r_outer)
+    x, y, w = disk.annulus_rule_peirce(9, r_inner=r_inner, r_outer=r_outer)
     r = np.hypot(x, y)
     assert (np.cos(2 * np.pi * r) ** 2 * w).sum() == pytest.approx(
         integral(r_outer) - integral(r_inner)
@@ -99,5 +137,5 @@ def test_annular_rule_cos(r_inner, r_outer):
     ],
 )
 def test_annular_rule_exp(r_inner, r_outer, result):
-    x, y, w = disk.annulus_rule(7, r_inner=r_inner, r_outer=r_outer)
+    x, y, w = disk.annulus_rule_peirce(7, r_inner=r_inner, r_outer=r_outer)
     assert ((np.exp(-(x**2) - y**2)) * w).sum() == pytest.approx(result)
