@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.0 | TBD
+
+### Improvements
+* Added the function `mathutils.zernike.zernike`, which returns the radial part of Zernike polynomials of degree `n` and azimuthal frequency `m`, evaluated at the locations `r`. To get the full Zernike polynomial, multiply by `cos(m * theta)` and/or `sin(m * theta)`.
+
 ## v0.7.0 | 2025-06-17
 
 ### Improvements
