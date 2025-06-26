@@ -53,12 +53,7 @@ class Objective:
             Raised if `NA` > `n_medium`, if `n_medium < 0` or `n_bp < 0`, if `focal_length < 0` or
             if `NA < 0`.
         """
-        if (
-            isinstance(n_medium, complex)
-            or isinstance(n_bfp, complex)
-            or n_medium <= 0
-            or n_bfp <= 0
-        ):
+        if n_medium.imag != 0.0 or n_bfp.imag != 0.0 or n_medium.real <= 0.0 or n_bfp.real <= 0.0:
             raise ValueError(
                 "Only positive and real refractive indices are supported for n_bfp and n_medium"
             )
@@ -68,7 +63,7 @@ class Objective:
         if focal_length <= 0:
             raise ValueError("focal_length needs to be strictly positive")
 
-        if NA <= 0 or isinstance(NA, complex):
+        if NA <= 0 or NA.imag != 0.0:
             raise ValueError("NA needs to be strictly positive and real")
 
         self.NA = NA
