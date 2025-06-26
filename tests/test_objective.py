@@ -13,7 +13,7 @@ from lumicks.pyoptics.objective import Objective
         (
             -1.9,
             4.43e-3,
-            -1.0,
+            np.float64(-1.0),
             1.0,
             "Only positive and real refractive indices are supported for n_bfp and n_medium",
         ),
@@ -35,7 +35,7 @@ from lumicks.pyoptics.objective import Objective
             0.9,
             4.43e-3,
             1.0,
-            1.0 + 0.1j,
+            np.complex128(1.0 + 0.1j),
             "Only positive and real refractive indices are supported for n_bfp and n_medium",
         ),
         (1.0, 0.0, 1.0, 1.0, "focal_length needs to be strictly positive"),
