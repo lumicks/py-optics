@@ -79,14 +79,14 @@ def test_get_integration_locations_disk_tuple_raises():
         RuntimeError,
         match="Expected all elements in the tuple integration_order to be of the integer type",
     ):
-        disk.get_integration_locations((0, 0.0), "peirce")  # type: ignore
+        disk.get_integration_locations((0, 0.5), "peirce")  # type: ignore
 
 
 def test_get_integration_locations_disk_float_order_raises():
     with pytest.raises(
         RuntimeError, match="Expected an integer or tuple\\[int, int\\] for integration_order"
     ):
-        disk.get_integration_locations(0.0, "peirce")  # type: ignore
+        disk.get_integration_locations(0.5, "peirce")  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -147,6 +147,9 @@ def test_annular_rule_exp(r_inner, r_outer, result):
 def test_takaki_raises():
     with pytest.raises(ValueError, match="Order 14 is not supported"):
         disk.disk_rule_takaki(14)
+
+    with pytest.raises(ValueError, match="The order has to be an integer value"):
+        disk.disk_rule_takaki(14.5)  # type: ignore
 
 
 def test_takaki_get_nearest_order():

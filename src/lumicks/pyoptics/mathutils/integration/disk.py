@@ -10,17 +10,19 @@ def get_integration_locations(integration_order: int | tuple[int, int], method: 
             raise ValueError("Only the method 'peirce' support a tuple for integration_order")
         if len(integration_order) != 2:
             raise RuntimeError("If integration_order is a tuple, it must have two elements")
-        if not all([isinstance(el, int) for el in integration_order]):
+        # TODO: simplify when 3.11 is dropped
+        if not all([(isinstance(el, int) or el.is_integer()) for el in integration_order]):
             raise RuntimeError(
                 "Expected all elements in the tuple integration_order to be of the integer type"
             )
-    elif not isinstance(integration_order, int):
+    # TODO: simplify when 3.11 is dropped
+    elif not (isinstance(integration_order, int) or integration_order.is_integer()):
         raise RuntimeError("Expected an integer or tuple[int, int] for integration_order")
     if method == "peirce":
         order = (
             integration_order if isinstance(integration_order, tuple) else (integration_order, None)
         )
-        return annulus_rule_peirce(order[0], order[1], r_inner=0, r_outer=1.0)
+        return annulus_rule_peirce(*order, r_inner=0.0, r_outer=1.0)
 
     integration_methods = {"takaki": disk_rule_takaki, "lether": disk_rule_lether}
     return integration_methods[method](integration_order)

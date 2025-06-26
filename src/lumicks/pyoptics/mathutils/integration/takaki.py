@@ -520,6 +520,9 @@ _ORDER = {17: T17, 21: T21, 37: T37, 41: T41, 53: T53, 65: T65, 77: T77}
 
 
 def get_disk_rule(order: int):
+    if not (isinstance(order, int) or order.is_integer()):  # TODO: simplify when 3.11 is dropped
+        raise ValueError("The order has to be an integer value")
+
     def _expand(n):
         ax = np.empty(segment_coords.shape[0] * 6 - 5)
         ax[0] = segment_coords[0, n]
@@ -527,7 +530,7 @@ def get_disk_rule(order: int):
         return ax
 
     try:
-        segment_coords = np.asarray(_ORDER[order])
+        segment_coords = np.asarray(_ORDER[int(order)])
     except KeyError as e:
         raise ValueError(
             f"Order {order} is not supported. Valid values are {[k for k in _ORDER.keys()]}."
