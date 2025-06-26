@@ -335,7 +335,7 @@ class Objective:
         if method == "peirce":
             return self._minimal_integration_order_peirce(coordinates, lambda_vac)
 
-    def _minimal_integration_order_equidistant(self, coordinates, lambda_vac):
+    def _minimal_integration_order_equidistant(self, coordinates, lambda_vac) -> int:
 
         def N_z():
             if max_z == 0.0:  # sampling not affected by z coordinate
@@ -360,7 +360,7 @@ class Objective:
 
     def _minimal_integration_order_peirce(
         self, coordinates: Collection, lambda_vac: float, max_iterations: int = 400
-    ):
+    ) -> int:
         def _min_order_xy(max_iterations=max_iterations):
             def cost(a, b, n, x):
                 # Cost function based on A&S 25.4.30. Uses Stirling's approximation to n!, and works in
@@ -410,7 +410,7 @@ class Objective:
                 return np.sum(g(xi) * w)
 
             y = integral_g(max(1, n_xy - 1))
-            for n in np.arange(max(2, n_xy), max_iterations + 1):
+            for n in range(max(2, n_xy), max_iterations + 1):
                 y_new = integral_g(n)
                 if np.abs((y_new - y) / y_new) < 1e-9:
                     n_z = n
