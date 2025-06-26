@@ -5,6 +5,9 @@
 ### Improvements
 * Added the function `mathutils.zernike.zernike`, which returns the radial part of Zernike polynomials of degree `n` and azimuthal frequency `m`, evaluated at the locations `r`. To get the full Zernike polynomial, multiply by `cos(m * theta)` and/or `sin(m * theta)`.
 
+### Bug fixes
+* Fixed an exception being thrown by `disk.get_integration_locations` when `Objective.minimal_integration_order` was used and the error in z was leading.
+
 ## v0.7.0 | 2025-06-17
 
 ### Improvements
