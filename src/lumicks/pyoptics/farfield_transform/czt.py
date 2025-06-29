@@ -23,6 +23,50 @@ def near_field_to_far_field_czt(
     sampling_distance: float = 0.0,
     farfield_sampling_n=101,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Calculate the far field based on the sampled near field via a chirped-z transformation.
+
+    Parameters
+    ----------
+    Ex : ArrayLike
+        The x-component of the sampled near field.
+    Ey : ArrayLike
+        The y-component of the sampled near field.
+    Ez : ArrayLike
+        The z-component of the sampled near field.
+    sampling_period : float
+        Spatial step size with which the near field is sampled. Must be in the same units as the
+        wavelength `lambda_vac`.
+    radius : float
+        Radius at which to calculate the far field, in the same units as the wavelength.
+    acceptance_angle : float
+        Half the acceptance angle of the cone of rays, or θ in the formulaa NA = n sin θ. Half the
+        acceptance angle of the cone of rays, or θ in the formula NA = n sin θ. Radians.
+    lambda_vac : float
+        Wavelength of the light in vacuum. Must be the same unit as the sampling step.
+    n_medium : float
+        Refractive index of the (semi-)infinite medium that the light propagates in.
+    sampling_distance : float
+        Distance from the origin where the field is sampled. Used to correct for the fact that the
+        transform, when unspecified, assumes that the sampling plane is at the origin.
+    farfield_sampling_n : int
+        Number of samples of the far field to calculate .
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        Tuple of Numpy arrays, with the first three elements sx, sy, sz representing the normal
+        vectors of the far field, and the second three elements Ex_ff, Ey_ff, Ez_ff representing the
+        electric field components of the far field.
+
+    Raises
+    ------
+    ValueError
+        Raised if the sampling step is <= 0.0, if lambda_vac ≤ 0, if n_medium < 1.0, if θ ≤ 0.0 or
+        θ> π/2, if field_radius < 0.0 or if the number of samples of the far field is ≤ 1.
+    RuntimeError
+        Raised if the shapes of the input arrays are not all the same and if the input arrays are
+        not square.
+    """
     Ex, Ey, Ez = [np.atleast_2d(E) for E in (Ex, Ey, Ez)]
 
     if not 0 <= acceptance_angle <= np.pi / 2:

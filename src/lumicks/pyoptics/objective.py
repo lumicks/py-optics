@@ -255,7 +255,6 @@ class Objective:
             kx=kx,
             ky=ky,
             kz=kz,
-            kp=kp,
             Einf_theta=Einf_theta,
             Einf_phi=Einf_phi,
             weights=weights,
