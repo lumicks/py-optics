@@ -1,9 +1,10 @@
 import math
 from collections import namedtuple
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from .farfield import FarfieldData, PropagationDirection, get_k_vectors_from_cosines
 from .mathutils.integration.disk import get_integration_locations
@@ -111,19 +112,8 @@ class Objective:
         sin_theta[bfp_sampling_n:] = _sin_theta[1:]
         return sin_theta
 
-    def sample_bfp(
-        self, f_input_field, coordinates: BackFocalPlaneCoordinates
-    ) -> tuple[np.ndarray, np.ndarray]:
-        if f_input_field is not None:
-            Ex_bfp, Ey_bfp = f_input_field(coordinates, self)
-            if Ex_bfp is None and Ey_bfp is None:
-                raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
-        else:
-            Ex_bfp, Ey_bfp = None, None
-        return Ex_bfp, Ey_bfp
-
     def get_sampling_coordinates_bfp(
-        self, order: int | None = None, method: str = "peirce"
+        self, order: int, method: str = "peirce"
     ) -> BackFocalPlaneCoordinates:
         """Determine the coordinates on the back focal plane where it is to be sampled. Return the
         coordinates in a BackFocalPlaneCoordinates object
@@ -135,12 +125,10 @@ class Objective:
             Objective)`. The function should take the coordinates and return the electric field at
             that location on the back focal plane. The returned value should be a tuple, where the
             first entry is the x-polarized field, and the second entry is the y-polarized field.
-        order : int | None
+        order : int
             Order of the method to integrate over the back focal plane of the objective. Typically,
             the higher the order, the more accurate the result, or the region of convergence
-            expands. If `None`, the function tries to figure out a reasonable default value for the
-            integration methods "peirce" (default, see below) and "equidistant". For other
-            integration methods the order has to be set by hand explicitly.
+            expands.
         method : str, optional
             The method of integrating over the back focal plane. The default is "peirce", which is a
             Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
@@ -196,9 +184,9 @@ class Objective:
         Sample `f_input_field` with `bfp_sampling_n` samples and return the fields as a named tuple
         BackFocalPlaneFields(Ex, Ey).
         """
-        Ex_bfp, Ey_bfp = (
-            f_input_field(coordinates, self) if f_input_field is not None else (None, None)
-        )
+        Ex_bfp, Ey_bfp = f_input_field(coordinates, self)
+        if Ex_bfp is None and Ey_bfp is None:
+            raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
 
         return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
 
@@ -468,108 +456,98 @@ class Objective:
         )
 
     def get_farfield_cosines(self, bfp_coords: BackFocalPlaneCoordinates):
-        bfp_sampling_n = bfp_coords.bfp_sampling_n
         sin_theta_x = bfp_coords.x_bfp / self.focal_length
         sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length * bfp_coords.aperture
-        aperture = bfp_coords.aperture  # sin_theta <= self.sin_theta_max
+        sin_theta = bfp_coords.r_bfp / self.focal_length * (bfp_coords.weights != 0.0)
+        aperture = bfp_coords.weights != 0.0
         cos_theta = np.ones(sin_theta.shape)
         cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
         cos_phi = np.ones_like(sin_theta)
         sin_phi = np.zeros_like(sin_theta)
-        region = sin_theta > 0 & aperture
+        region = sin_theta > 0.0 & aperture
         cos_phi[region] = sin_theta_x[region] / sin_theta[region]
-        cos_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 1
+        cos_phi[bfp_coords.r_bfp == 0.0] = 1.0
         sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[bfp_sampling_n - 1, bfp_sampling_n - 1] = 0
-        sin_phi[np.logical_not(aperture)] = 0
-        cos_phi[np.logical_not(aperture)] = 1
+        sin_phi[bfp_coords.r_bfp == 0.0] = 0.0
+        sin_phi[np.logical_not(aperture)] = 0.0
+        cos_phi[np.logical_not(aperture)] = 1.0
         return cos_theta, sin_theta, cos_phi, sin_phi, aperture
 
-    def farfield_to_back_focal_plane(self, E: Tuple[np.ndarray], s: Tuple[np.ndarray]):
+    def farfield_to_back_focal_plane(
+        self, E: tuple[ArrayLike, ArrayLike, ArrayLike], s: tuple[ArrayLike, ArrayLike, ArrayLike]
+    ):
         Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_unit_vectors(
-            *E, *s, self.n_medium, self.n_bfp
+            E[0], E[1], E[2], s[0], s[1], s[2], self.n_medium, self.n_bfp
         )
         return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
 
 
-def ff_to_bfp(
-    Exff: np.ndarray,
-    Eyff: np.ndarray,
-    Ezff: np.ndarray,
-    Sx: np.ndarray,
-    Sy: np.ndarray,
-    Sz: np.ndarray,
+def farfield_to_back_focal_plane_unit_vectors(
+    Exff: ArrayLike,
+    Eyff: ArrayLike,
+    Ezff: ArrayLike,
+    sx: ArrayLike,
+    sy: ArrayLike,
+    sz: ArrayLike,
     n_medium: float,
     n_bfp: float,
 ):
-    Sp = np.hypot(Sx, Sy)
-    cosP = np.ones(Sp.shape)
-    sinP = np.zeros(Sp.shape)
-    region = Sp > 0
-    cosP[region] = Sx[region] / Sp[region]
-    sinP[region] = Sy[region] / Sp[region]
-    sinP[Sp == 0] = 0
-    Et = np.zeros(Exff.shape, dtype="complex128")
-    Ep = Et.copy()
-    Ex_bfp = Et.copy()
-    Ey_bfp = Et.copy()
+    Exff, Eyff, Ezff, sx, sy, sz = [np.asarray(arr) for arr in (Exff, Eyff, Ezff, sx, sy, sz)]
+    if not all([arr.shape == Exff.shape for arr in (Exff, Eyff, Ezff, sx, sy, sz)]):
+        raise RuntimeError("All input arrays need to be of the same size")
 
-    Et[Sz > 0] = (
-        (
-            (Exff[Sz > 0] * cosP[Sz > 0] + Eyff[Sz > 0] * sinP[Sz > 0]) * Sz[Sz > 0]
-            - Ezff[Sz > 0] * Sp[Sz > 0]
-        )
-        * (n_medium / n_bfp) ** 0.5
-        / (Sz[Sz > 0]) ** 0.5
-    )
-    Ep[Sz > 0] = (
-        (Eyff[Sz > 0] * cosP[Sz > 0] - Exff[Sz > 0] * sinP[Sz > 0])
-        * (n_medium / n_bfp) ** 0.5
-        / (Sz[Sz > 0]) ** 0.5
+    _, _, cos_phi, sin_phi = cosines_from_unit_vectors(sx, sy, sz)
+
+    return farfield_to_back_focal_plane_cosines(
+        Exff=Exff,
+        Eyff=Eyff,
+        Ezff=Ezff,
+        cos_theta=sz,
+        cos_phi=cos_phi,
+        sin_phi=sin_phi,
+        n_medium=n_medium,
+        n_bfp=n_bfp,
     )
 
-    Ex_bfp[Sz > 0] = Et[Sz > 0] * cosP[Sz > 0] - Ep[Sz > 0] * sinP[Sz > 0]
-    Ey_bfp[Sz > 0] = Ep[Sz > 0] * cosP[Sz > 0] + Et[Sz > 0] * sinP[Sz > 0]
 
-    return Ex_bfp, Ey_bfp
-
-
-def ff_to_bfp_angle(
+def farfield_to_back_focal_plane_cosines(
     Exff: np.ndarray,
     Eyff: np.ndarray,
     Ezff: np.ndarray,
-    cosPhi: np.ndarray,
-    sinPhi: np.ndarray,
-    cosTheta: np.ndarray,
+    cos_theta: np.ndarray,
+    cos_phi: np.ndarray,
+    sin_phi: np.ndarray,
     n_medium: float,
     n_bfp: float,
-):
-    Et = np.zeros(Exff.shape, dtype="complex128")
-    Ep = Et.copy()
-    Ex_bfp = Et.copy()
-    Ey_bfp = Et.copy()
+) -> tuple[np.ndarray, np.ndarray]:
+    Exff, Eyff, Ezff, cos_phi, sin_phi, cos_theta = [
+        np.asarray(arr) for arr in (Exff, Eyff, Ezff, cos_phi, sin_phi, cos_theta)
+    ]
+    Et, Ep, Ex_bfp, Ey_bfp = [np.zeros(Exff.shape, dtype="complex128") for _ in range(4)]
+    # Support multiple farfields for same angles
+    cos_theta, cos_phi, sin_phi = [
+        np.broadcast_to(array, Exff.shape) for array in (cos_theta, cos_phi, sin_phi)
+    ]
+    sin_theta = ((1 + cos_theta) * (1 - cos_theta)) ** 0.5
 
-    sinTheta = (1 - cosTheta**2) ** 0.5
-
-    roc = cosTheta > 0  # roc == Region of convergence, avoid division by zero
+    roc = cos_theta > 0  # roc == Region of convergence, avoid division by zero
 
     Et[roc] = (
         (
-            (Exff[roc] * cosPhi[roc] + Eyff[roc] * sinPhi[roc]) * cosTheta[roc]
-            - Ezff[roc] * sinTheta[roc]
+            (Exff[roc] * cos_phi[roc] + Eyff[roc] * sin_phi[roc]) * cos_theta[roc]
+            - Ezff[roc] * sin_theta[roc]
         )
         * (n_medium / n_bfp) ** 0.5
-        / (cosTheta[roc]) ** 0.5
+        / (cos_theta[roc]) ** 0.5
     )
 
     Ep[roc] = (
-        (Eyff[roc] * cosPhi[roc] - Exff[roc] * sinPhi[roc])
+        (Eyff[roc] * cos_phi[roc] - Exff[roc] * sin_phi[roc])
         * (n_medium / n_bfp) ** 0.5
-        / (cosTheta[roc]) ** 0.5
+        / (cos_theta[roc]) ** 0.5
     )
 
-    Ex_bfp[roc] = Et[roc] * cosPhi[roc] - Ep[roc] * sinPhi[roc]
-    Ey_bfp[roc] = Ep[roc] * cosPhi[roc] + Et[roc] * sinPhi[roc]
+    Ex_bfp[roc] = Et[roc] * cos_phi[roc] - Ep[roc] * sin_phi[roc]
+    Ey_bfp[roc] = Ep[roc] * cos_phi[roc] + Et[roc] * sin_phi[roc]
 
     return Ex_bfp, Ey_bfp
