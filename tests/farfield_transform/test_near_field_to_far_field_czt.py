@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from lumicks.pyoptics.farfield_transform import czt_nf_to_ff
+from lumicks.pyoptics.farfield_transform.czt import near_field_to_far_field_czt
 from lumicks.pyoptics.field_distributions.dipole import electric_dipole
 
 
@@ -19,7 +19,7 @@ def create_2d_window(n: int, gamma: float = 0.0):
 
 @pytest.mark.parametrize("axis", (0, 1, 2))
 def test_czt_fft(axis: int):
-    p = [0, 0, 0]
+    p = [0.0, 0.0, 0.0]
     p[axis] = 1e-10
     lambda_vac = 630e-9
     xy_span = 80e-6
@@ -37,7 +37,7 @@ def test_czt_fft(axis: int):
 
     half_angle = math.pi / 2
     Ex, Ey, Ez = [E.reshape(X.shape) * window for E in near_fields[:3]]
-    sx, sy, sz, Ex_ff, Ey_ff, Ez_ff = czt_nf_to_ff(
+    sx, sy, sz, Ex_ff, Ey_ff, Ez_ff = near_field_to_far_field_czt(
         Ex,
         Ey,
         Ez,
