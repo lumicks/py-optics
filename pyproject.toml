@@ -11,3 +11,15 @@ profile = "black"
 skip_gitignore = true
 line_length = 100
 treat_comments_as_code = ["# %%"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+extend-ignore = ["E501", "E203", "E741", "B023"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
