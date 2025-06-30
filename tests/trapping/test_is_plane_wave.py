@@ -128,8 +128,8 @@ def test_plane_wave_bfp(
     bead = trp.Bead(bead_diameter=1e-9, n_bead=n_medium, n_medium=n_medium, lambda_vac=lambda_vac)
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
-    coords, fields = objective.sample_back_focal_plane(None, bfp_sampling_n, method="equidistant")
-    farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
+    coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
+    farfield = objective.back_focal_plane_to_farfield(coords, (None, None), lambda_vac)
 
     k = bead.k
     ks = k * NA / n_medium

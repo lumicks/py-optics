@@ -1,6 +1,6 @@
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -8,12 +8,103 @@ from scipy.constants import epsilon_0 as EPS0
 from scipy.constants import mu_0 as MU0
 from scipy.constants import speed_of_light as _C
 
-from ..mathutils.integration.sphere import get_integration_locations, get_nearest_order
+from lumicks.pyoptics.farfield_transform.equivalence import NearfieldData, near_field_to_far_field
+
+from ..mathutils.integration import sphere as spherical_integration
 from ..objective import BackFocalPlaneCoordinates, Objective
 from .bead import Bead, _determine_integration_order
 from .focused_field_calculation import focus_field_factory
 from .local_coordinates import LocalBeadCoordinates
 from .plane_wave_field_calculation import plane_wave_field_factory
+
+
+def farfield_factory(
+    f_input_field: Callable,
+    objective: Objective,
+    bead: Bead,
+    integration_order_bfp: int,
+    *,
+    integration_method_bfp: str = "peirce",
+    num_spherical_modes: int | None = None,
+    integration_order_near_field: int | None = None,
+    integration_method_near_field: str = "lebedev-laikov",
+):
+    if bead.n_medium != objective.n_medium:
+        raise ValueError("The immersion medium of the bead and the objective have to be the same")
+
+    num_spherical_modes = (
+        bead.number_of_modes if num_spherical_modes is None else max(int(num_spherical_modes), 1)
+    )
+
+    if integration_order_near_field is not None:
+        # Use user's integration order
+        integration_order_near_field = int(np.max((2, integration_order_near_field)))
+        if integration_method_near_field == "lebedev-laikov":
+            # Find nearest integration order that is equal or greater than the user's
+            integration_order_near_field = spherical_integration.get_nearest_order(
+                integration_order_near_field, method=integration_method_near_field
+            )
+    else:
+        integration_order_near_field = _determine_integration_order(
+            integration_method_near_field, num_spherical_modes
+        )
+    x, y, z, w = spherical_integration.get_integration_locations(
+        integration_order_near_field, integration_method_near_field
+    )
+    w = w * 4 * np.pi * (bead.bead_diameter * 0.51) ** 2
+
+    xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
+
+    local_coordinates = LocalBeadCoordinates(
+        xb, yb, zb, bead.bead_diameter, (0.0, 0.0, 0.0), grid=False
+    )
+    external_fields_func = focus_field_factory(
+        objective,
+        bead,
+        f_input_field,
+        local_coordinates,
+        num_spherical_modes=num_spherical_modes,
+        integration_order_bfp=integration_order_bfp,
+        integration_method_bfp=integration_method_bfp,
+        internal=False,
+    )
+
+    def farfield_func(
+        bead_center: Iterable[tuple[float, float, float]] | tuple[float, float, float],
+        cos_theta: np.ndarray,
+        sin_theta: np.ndarray,
+        cos_phi: np.ndarray,
+        sin_phi: np.ndarray,
+        r: float,
+        num_threads: int | None = None,
+    ):
+        bead_center = np.atleast_2d(bead_center)
+        # shape = (numbers of bead positions, number of field coordinates)
+        Ex, Ey, Ez, Hx, Hy, Hz = external_fields_func(bead_center, True, True, False, num_threads)
+        E_theta_all = np.empty((bead_center.shape[0], *cos_theta.shape), dtype="complex128")
+        E_phi_all = np.empty_like(E_theta_all)
+        for bead_idx, (bead_pos_x, bead_pos_y, bead_pos_z) in enumerate(bead_center):
+            near_field_data = NearfieldData(
+                xb + bead_pos_x,
+                yb + bead_pos_y,
+                zb + bead_pos_z,
+                [x, y, z],
+                w,
+                [Ex[bead_idx], Ey[bead_idx], Ez[bead_idx]],
+                [Hx[bead_idx], Hy[bead_idx], Hz[bead_idx]],
+                bead.lambda_vac,
+                bead.n_medium,
+            )
+
+            E_theta, E_phi = near_field_to_far_field(
+                near_field_data, cos_theta, sin_theta, cos_phi, sin_phi, r
+            )
+            E_theta_all[bead_idx, :] = E_theta
+            E_phi_all[bead_idx, :] = E_phi
+
+        return np.squeeze(E_theta_all), np.squeeze(E_phi_all)
+
+    return farfield_func
 
 
 def fields_focus_gaussian(
@@ -457,8 +548,8 @@ def force_factory(
     *,
     integration_method_bfp: str = "peirce",
     num_spherical_modes: int | None = None,
-    spherical_integration_order: int | None = None,
-    spherical_integration_method: str = "lebedev-laikov",
+    integration_order_near_field: int | None = None,
+    integration_method_near_field: str = "lebedev-laikov",
 ) -> Callable:
     """Create and return a function suitable to calculate the force on a bead. Items that can be
     precalculated are stored for rapid subsequent calculations of the force on the bead for
@@ -494,7 +585,7 @@ def force_factory(
         Number of orders that should be included in the calculation the Mie solution. If it is None
         (default), the code will use the Bead.number_of_modes() method to calculate a sufficient
         number.
-    spherical_integration_order : int, optional
+    integration_order_near_field : int, optional
         The order of the integration. If no order is given, the code will determine an order based
         on the number of orders in the Mie solution. If the integration order is provided, that
         order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
@@ -503,7 +594,7 @@ def force_factory(
         `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
         for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
         accurate forces, but a convergence check is recommended.
-    spherical_integration_method : string, optional
+    integration_method_near_field : string, optional
         Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
         "clenshaw-curtis". With automatic determination of the integration order (`integration_order
         = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
@@ -539,19 +630,19 @@ def force_factory(
         else max(math.floor(num_spherical_modes), 1)
     )
 
-    if spherical_integration_order is not None:
+    if integration_order_near_field is not None:
         # Use user's integration order
-        spherical_integration_order = np.max((2, int(spherical_integration_order)))
+        integration_order_near_field = np.max((2, int(integration_order_near_field)))
         # Find nearest integration order that is equal or greater than the user's
-        spherical_integration_order = get_nearest_order(
-            spherical_integration_order, spherical_integration_method
+        integration_order_near_field = spherical_integration.get_nearest_order(
+            integration_order_near_field, integration_method_near_field
         )
     else:
-        spherical_integration_order = _determine_integration_order(
-            spherical_integration_method, n_orders
+        integration_order_near_field = _determine_integration_order(
+            integration_method_near_field, n_orders
         )
-    x, y, z, w = get_integration_locations(
-        spherical_integration_order, spherical_integration_method
+    x, y, z, w = spherical_integration.get_integration_locations(
+        integration_order_near_field, integration_method_near_field
     )
     xb, yb, zb = [c * bead.bead_diameter * 0.51 for c in (x, y, z)]
 
@@ -628,8 +719,8 @@ def forces_focus(
     num_spherical_modes: int | None = None,
     integration_order_bfp: int | None = None,
     integration_method_bfp: str = "peirce",
-    spherical_integration_order: int | None = None,
-    spherical_integration_method: str = "lebedev-laikov",
+    integration_order_near_field: int | None = None,
+    integration_method_near_field: str = "lebedev-laikov",
 ):
     """
     Calculate the forces on a bead in the focus of an arbitrary input beam, going through an
@@ -672,7 +763,7 @@ def forces_focus(
         The method of integrating over the back focal plane. The default is "peirce", which is a
         Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
         "takaki", see notes below.
-    spherical_integration_order : int, optional
+    integration_order_near_field : int, optional
         The order of the integration. If no order is given, the code will determine an order based
         on the number of orders in the Mie solution. If the integration order is provided, that
         order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
@@ -681,7 +772,7 @@ def forces_focus(
         `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
         for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
         accurate forces, but a convergence check is recommended.
-    spherical_integration_method : string, optional
+    integration_method_near_field : string, optional
         Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
         "clenshaw-curtis". With automatic determination of the integration order (`integration_order
         = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
@@ -703,8 +794,8 @@ def forces_focus(
         integration_order_bfp=integration_order_bfp,
         integration_method_bfp=integration_method_bfp,
         num_spherical_modes=num_spherical_modes,
-        spherical_integration_order=spherical_integration_order,
-        spherical_integration_method=spherical_integration_method,
+        integration_order_near_field=integration_order_near_field,
+        integration_method_near_field=integration_method_near_field,
     )
     return force_fun(bead_center)
 
@@ -717,24 +808,26 @@ def _scattered_absorbed_power_focus(
     integration_order_bfp,
     integration_method_bfp,
     num_spherical_modes,
-    spherical_integration_order,
-    spherical_integration_method,
+    integration_order_near_field,
+    integration_method_near_field,
     absorbed: bool,
 ):
     n_orders = (
         bead.number_of_modes if num_spherical_modes is None else max(int(num_spherical_modes), 1)
     )
 
-    if spherical_integration_order is not None:
+    if integration_order_near_field is not None:
         # Use user's integration order
-        spherical_integration_order = np.max((2, int(spherical_integration_order)))
+        integration_order_near_field = np.max((2, int(integration_order_near_field)))
         # Find nearest integration order that is equal or greater than the user's
-        spherical_integration_order = get_nearest_order(
-            spherical_integration_order, spherical_integration_method
+        integration_order_near_field = spherical_integration.get_nearest_order(
+            integration_order_near_field, integration_method_near_field
         )
     else:
-        integration_order = _determine_integration_order(spherical_integration_method, n_orders)
-    x, y, z, w = get_integration_locations(integration_order, spherical_integration_method)
+        integration_order = _determine_integration_order(integration_method_near_field, n_orders)
+    x, y, z, w = spherical_integration.get_integration_locations(
+        integration_order, integration_method_near_field
+    )
     xb, yb, zb = [
         ax * bead.bead_diameter * 0.51 + bead_center[idx] for idx, ax in enumerate((x, y, z))
     ]
@@ -776,8 +869,8 @@ def absorbed_power_focus(
     integration_order_bfp=None,
     integration_method_bfp="peirce",
     num_spherical_modes=None,
-    spherical_integration_order=None,
-    spherical_integration_method="lebedev-laikov",
+    integration_order_near_field=None,
+    integration_method_near_field="lebedev-laikov",
 ):
     """
     Calculate the dissipated power in a bead in the focus of an arbitrary
@@ -824,7 +917,7 @@ def absorbed_power_focus(
         The method of integrating over the back focal plane. The default is "peirce", which is a
         Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
         "takaki", see notes below.
-    spherical_integration_order : int, optional
+    integration_order_near_field : int, optional
         The order of the integration. If no order is given, the code will determine an order based
         on the number of orders in the Mie solution. If the integration order is provided, that
         order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
@@ -833,7 +926,7 @@ def absorbed_power_focus(
         `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
         for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
         accurate forces, but a convergence check is recommended.
-    spherical_integration_method : string, optional
+    integration_method_near_field : string, optional
         Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
         "clenshaw-curtis". With automatic determination of the integration order (`integration_order
         = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
@@ -855,8 +948,8 @@ def absorbed_power_focus(
         integration_order_bfp,
         integration_method_bfp,
         num_spherical_modes,
-        spherical_integration_order,
-        spherical_integration_method,
+        integration_order_near_field,
+        integration_method_near_field,
         True,
     )
 
@@ -869,8 +962,8 @@ def scattered_power_focus(
     integration_order_bfp=None,
     integration_method_bfp="peirce",
     num_spherical_modes=None,
-    spherical_integration_order=None,
-    spherical_integration_method="lebedev-laikov",
+    integration_order_near_field=None,
+    integration_method_near_field="lebedev-laikov",
 ):
     """
     Calculate the scattered power by a bead in the focus of an arbitrary
@@ -914,7 +1007,7 @@ def scattered_power_focus(
         The method of integrating over the back focal plane. The default is "peirce", which is a
         Gaussian-Legendre-like integration method. Other options are "lether", "equidistant" and
         "takaki", see notes below.
-    spherical_integration_order : int, optional
+    integration_order_near_field : int, optional
         The order of the integration. If no order is given, the code will determine an order based
         on the number of orders in the Mie solution. If the integration order is provided, that
         order is used for Gauss-Legendre integration. For Lebedev-Laikov integration, that order or
@@ -923,7 +1016,7 @@ def scattered_power_focus(
         `num_spherical_modes + 1` for Gauss-Legendre integration, and to `2 * num_spherical_modes`
         for Lebedev-Laikov and Clenshaw-Curtis integration. This typically leads to sufficiently
         accurate forces, but a convergence check is recommended.
-    spherical_integration_method : string, optional
+    integration_method_near_field : string, optional
         Integration method. Choices are "lebedev-laikov" (default), "gauss-legendre" and
         "clenshaw-curtis". With automatic determination of the integration order (`integration_order
         = None`), the Lebedev-Laikov scheme typically has less points to evaluate and therefore is
@@ -945,7 +1038,7 @@ def scattered_power_focus(
         integration_order_bfp,
         integration_method_bfp,
         num_spherical_modes,
-        spherical_integration_order,
-        spherical_integration_method,
+        integration_order_near_field,
+        integration_method_near_field,
         False,
     )

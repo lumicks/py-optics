@@ -23,8 +23,8 @@ def test_plane_wave_forces_bfp(
     """
     objective = trp.Objective(focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
-    coords, fields = objective.sample_back_focal_plane(None, bfp_sampling_n, method="equidistant")
-    farfield = objective.back_focal_plane_to_farfield(coords, fields, lambda_vac)
+    coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
+    farfield = objective.back_focal_plane_to_farfield(coords, (None, None), lambda_vac)
 
     n_bead = 2.1
     bead_size = 1e-6  # larger than dipole approximation is valid for

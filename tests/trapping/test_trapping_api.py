@@ -1,7 +1,5 @@
 """Test the czt-based implementation against a trivial implementation which sums plane waves"""
 
-import re
-
 import pytest
 
 import lumicks.pyoptics.trapping as trp
@@ -17,10 +15,6 @@ bead = trp.Bead(bead_diameter=bead_diam, n_bead=n_bead, n_medium=n_wrong_medium)
 objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
 
-def dummy(*args):
-    pass  # We should never get there
-
-
 # Test bead immersion medium and objective medium have to be the same
 @pytest.mark.parametrize(
     "function",
@@ -34,6 +28,6 @@ def test_throw_on_wrong_medium(function) -> None:
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
     with pytest.raises(
         ValueError,
-        match=re.escape("The immersion medium of the bead and the objective have to be the same"),
+        match="The immersion medium of the bead and the objective have to be the same",
     ):
-        function(dummy, objective=objective, bead=bead, integration_order_bfp=2)
+        function(lambda: None, objective=objective, bead=bead, integration_order_bfp=3)

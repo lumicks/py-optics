@@ -211,9 +211,10 @@ def focus_quad(
         raise ValueError(
             "The argument `method` needs to be one of 'peirce', 'lether', 'takaki' or 'equidistant'"
         )
-    bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field, integration_order, integration_method
+    bfp_coords = objective.get_sampling_coordinates_bfp(
+        order=integration_order, method=integration_method
     )
+    bfp_fields = objective.sample_back_focal_plane(f_input_field, bfp_coords)
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()
