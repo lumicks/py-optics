@@ -5,7 +5,7 @@ from functools import partial
 
 import numpy as np
 import pytest
-from scipy.constants import epsilon_0 as _EPS0
+from scipy.constants import epsilon_0
 
 import lumicks.pyoptics.trapping as trp
 
@@ -34,10 +34,10 @@ def test_plane_wave_forces_bfp(
     Fpr = (
         bead.pressure_eff(num_orders)  # Qpr
         * (np.pi * bead.bead_diameter**2 / 4)  # Area
-        * (0.5 * E0**2 * bead.n_medium**2 * _EPS0)  # Intensity
+        * (0.5 * E0**2 * bead.n_medium**2 * epsilon_0)  # Intensity
     )
     k = bead.k
-    ks = k * NA / n_medium
+    ks = k * objective.sin_theta_max
     dk = ks / (bfp_sampling_n - 1)
 
     def input_field(coords, objective: trp.Objective, type: str):
@@ -48,7 +48,7 @@ def test_plane_wave_forces_bfp(
 
         correction = (
             k
-            * farfield.cos_theta[p, m]
+            * farfield.cos_theta[p, m]  # k * cos(theta) == kz
             * (n_medium / n_bfp) ** 0.5
             * farfield.cos_theta[p, m] ** -0.5
         )
@@ -66,8 +66,9 @@ def test_plane_wave_forces_bfp(
             -1j * focal_length * np.exp(-1j * k * focal_length) * dk**2
         )
 
+        w = coords.weights[p, m]
         coords.weights[:] = 0.0
-        coords.weights[p, m] = 1.0
+        coords.weights[p, m] = w
 
         return (Ex, Ey)
 
@@ -94,7 +95,7 @@ def test_plane_wave_forces_bfp(
 
             # check that the magnitude is the same as predicted for Mie
             # scattering
-            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-6, atol=1e-6)
+            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-6, atol=0.0)
             # check that the force direction is in the same direction as the
             # plane wave
             np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-6)
@@ -107,12 +108,14 @@ def test_plane_wave_forces_bfp(
                 integration_order_bfp=bfp_sampling_n,
                 integration_method_bfp="equidistant",
                 num_spherical_modes=num_orders,
+                spherical_integration_method=method,
             )
-            Fn = np.squeeze(F / np.linalg.norm(F))
+            F_norm = np.linalg.norm(F)
+            Fn = np.squeeze(F / F_norm)
 
             # check that the magnitude is the same as predicted for Mie
             # scattering
-            np.testing.assert_allclose(Fpr, np.linalg.norm(F), rtol=1e-6, atol=1e-7)
+            np.testing.assert_allclose(Fpr, F_norm, rtol=1e-6, atol=0.0)
             # check that the force direction is in the same direction as the
             # plane wave
-            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-7)
+            np.testing.assert_allclose(n, Fn, rtol=1e-8, atol=1e-10)

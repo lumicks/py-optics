@@ -24,10 +24,10 @@ def focus_gaussian_quad(
     x: ArrayLike,
     y: ArrayLike,
     z: ArrayLike,
-    integration_order=None,
-    return_grid=False,
-    integration_method="peirce",
-):
+    integration_order: int | None = None,
+    return_grid: bool = False,
+    integration_method: str = "peirce",
+) -> tuple[np.ndarray, ...]:
     """Calculate the 3-dimensional, vectorial Point Spread Function of a Gaussian beam, using the
     angular spectrum of plane waves method and two-dimensional quadrature. See [1], chapter 3.
 
@@ -114,7 +114,7 @@ def focus_quad(
     integration_order=None,
     return_grid=False,
     integration_method="peirce",
-):
+) -> tuple[np.ndarray, ...]:
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
     arbitrary input field, using the angular spectrum of plane waves method, see [1], chapter 3.
 

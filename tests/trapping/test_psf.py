@@ -3,7 +3,7 @@ dedicated pyoptics.psf module"""
 
 import numpy as np
 import pytest
-from scipy.constants import epsilon_0 as _EPS0
+from scipy.constants import epsilon_0
 from scipy.constants import speed_of_light as _C
 
 import lumicks.pyoptics.trapping as trp
@@ -21,14 +21,14 @@ def test_gaussian_input(focal_length, n_medium, NA):
     num_pts = 21
     filling_factor = 0.9
     w0 = filling_factor * focal_length * NA / n_medium
-    z_eval = 0  # np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
+    z_eval = np.linspace(-2 * lambda_vac, 0.0, 2)  # Three planes to check XY
     xy_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     bfp_sampling = 31
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     # Power to get E0 = 1 V/m, to compare with focus_gaussian_czt()
-    P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
+    P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * epsilon_0
 
     Exm, Eym, Ezm = trp.fields_focus_gaussian(
         P,
@@ -43,7 +43,7 @@ def test_gaussian_input(focal_length, n_medium, NA):
         integration_method_bfp="equidistant",
         return_grid=False,
         verbose=True,
-        num_spherical_modes=bead.number_of_modes * 2,
+        num_spherical_modes=bead.number_of_modes * 2,  # Factor 2 required to pass
     )
 
     Exf, Eyf, Ezf = focus_gaussian_czt(
@@ -74,14 +74,14 @@ def test_gaussian_input_bead_shift(bead_center):
     filling_factor = 0.9
     w0 = filling_factor * focal_length * NA / n_medium
     n_bfp = 1.0
-    z_eval = 0  # np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
+    z_eval = np.linspace(-2 * lambda_vac, 0.0, 2)  # Three planes to check XY
     xy_eval = np.linspace(-2 * lambda_vac, 2 * lambda_vac, num_pts)
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     objective = trp.Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
     bfp_sampling = 31
 
     # Power to get E0 = 1 V/m, to compare with focus_gaussian_czt()
-    P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * _EPS0
+    P = 1 / 4 * 1**2 * _C * n_bfp * np.pi * w0**2 * epsilon_0
 
     Exm, Eym, Ezm = trp.fields_focus_gaussian(
         P,

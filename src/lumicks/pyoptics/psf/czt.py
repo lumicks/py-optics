@@ -20,7 +20,7 @@ def focus_gaussian_czt(
     z: float | np.ndarray,
     bfp_sampling_n=None,
     return_grid=False,
-):
+) -> tuple[np.ndarray, ...]:
     """Calculate the 3-dimensional, vectorial Point Spread Function of a Gaussian beam, using the
     angular spectrum of plane waves method, see [1]_, chapter 3. This convenience function uses the
     chirp-z transform (czt) for a speedy evaluation of the fields in and near the focus [2]_, and is
@@ -110,7 +110,7 @@ def focus_czt(
     z: ArrayLike,
     bfp_sampling_n=None,
     return_grid=False,
-):
+) -> tuple[np.ndarray, ...]:
     """Calculate the 3-dimensional, vectorial Point Spread Function of an
     arbitrary input field, using the angular spectrum of plane waves method, see [1]_, chapter 3.
     This function uses the chirp-z transform (czt) for speedy evaluation of the fields in and near
