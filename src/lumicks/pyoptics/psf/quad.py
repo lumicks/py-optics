@@ -1,8 +1,11 @@
 import numpy as np
-from numba import njit
+from numba import config, njit
 from numpy.typing import ArrayLike
 
 from lumicks.pyoptics.objective import BackFocalPlaneCoordinates, Objective
+
+config.THREADING_LAYER = "threadsafe"
+
 
 """
 Functions to calculate a point spread function of a focused wavefront by direct summation of plane
