@@ -1,5 +1,5 @@
-"""Test that for each sample point on the back focal plane, a plane wave is emitted with the correct
-amplitude, polarization and direction"""
+"""Test that for each sample point on the back focal plane, `focus_quad` emits a plane wave is emitted
+with the correct amplitude, polarization and direction"""
 
 from itertools import product
 
