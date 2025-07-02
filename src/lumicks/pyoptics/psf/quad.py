@@ -4,7 +4,7 @@ from numpy.typing import ArrayLike
 
 from lumicks.pyoptics.objective import BackFocalPlaneCoordinates, Objective
 
-config.THREADING_LAYER = "threadsafe"
+config.THREADING_LAYER = "threadsafe"  # type: ignore
 
 
 """
