@@ -15,7 +15,7 @@ def gen_dipole_psf(
 ):
     """Calculate the point spread function of a focused dipole. First calculate the far field, then
     use an Objective to transform that field to the back focal plane. Use another Objective with
-    long focal length to focus the field on the image plane.
+    long focal length to focus the field onto the image plane.
 
     Parameters
     ----------
@@ -68,12 +68,12 @@ def gen_dipole_psf(
             lambda_em,
             ff.cos_phi,
             ff.sin_phi,
-            ff.cos_theta,
+            -ff.cos_theta,
             ff.sin_theta,
             obj.focal_length,
         )
         Ex_bfp, Ey_bfp = tf.ff_to_bfp_angle(
-            Ex, Ey, Ez, ff.cos_phi, ff.sin_phi, ff.cos_theta, n_medium, n_bfp=1.0
+            Ex, Ey, Ez, ff.cos_phi, ff.sin_phi, -ff.cos_theta, n_medium, n_bfp=1.0
         )
 
         return (Ex_bfp, Ey_bfp)
@@ -126,5 +126,6 @@ def test_dipole_psf(
     )
     rtol = 2.0e-2
     atol = np.amax(np.abs(Ex_ref)) * rtol
+    # TODO: Figure out necessity for factor -1
     np.testing.assert_allclose(Ex, -Ex_ref, rtol=rtol, atol=atol)
     np.testing.assert_allclose(Ey, -Ey_ref, rtol=rtol, atol=atol)

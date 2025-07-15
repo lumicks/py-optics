@@ -37,10 +37,9 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
             Ey = np.zeros(coords.x_bfp.shape, dtype="complex128")
 
             correction = (
-                k
-                * farfield.cos_theta[p, m]
+                farfield.kz[p, m]
                 * (obj.n_medium / obj.n_bfp) ** 0.5
-                * farfield.cos_theta[p, m] ** -0.5
+                * (-farfield.cos_theta[p, m]) ** -0.5
             )
 
             Expoint = farfield.cos_phi[p, m] if pol == "theta" else -farfield.sin_phi[p, m]
@@ -65,7 +64,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
             integration_method="equidistant",
         )
 
-        kz = k * farfield.cos_theta[p, m]
+        kz = -k * farfield.cos_theta[p, m]
         kx = -k * farfield.sin_theta[p, m] * farfield.cos_phi[p, m]
         ky = -k * farfield.sin_theta[p, m] * farfield.sin_phi[p, m]
 
@@ -73,8 +72,8 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
         Exp = np.exp(1j * (kx * X + ky * Y + kz * z_eval))
 
         if pol == "theta":
-            Expw = farfield.cos_theta[p, m] * farfield.cos_phi[p, m] * Exp
-            Eypw = farfield.cos_theta[p, m] * farfield.sin_phi[p, m] * Exp
+            Expw = -farfield.cos_theta[p, m] * farfield.cos_phi[p, m] * Exp
+            Eypw = -farfield.cos_theta[p, m] * farfield.sin_phi[p, m] * Exp
             Ezpw = farfield.sin_theta[p, m] * Exp
 
             np.testing.assert_allclose([Ex, Ey, Ez], [Expw, Eypw, Ezpw])

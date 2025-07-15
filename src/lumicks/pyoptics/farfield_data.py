@@ -35,6 +35,6 @@ class FarfieldData:
         """
         Ex = self.Einf_theta * self.cos_phi * self.cos_theta - self.Einf_phi * self.sin_phi
         Ey = self.Einf_theta * self.sin_phi * self.cos_theta + self.Einf_phi * self.cos_phi
-        Ez = self.Einf_theta * self.sin_theta
+        Ez = -self.Einf_theta * self.sin_theta
 
         return Ex, Ey, Ez

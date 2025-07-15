@@ -44,9 +44,12 @@ def _loop_over_rotations(
         # >>> coords = A @ local_coords_stacked
         # >>> z = coords[2, :]
 
-        # The following line is equal to z = coords[2, :] after doing the transform with A
+        # The following line is equal to z = coords[2, :] after doing the transform with A The minus
+        # sign on the second line stems from the fact that we need to align the coordinate system
+        # with the negative z-axis. This is the same as taking cos_theta to be the cosine of theta,
+        # with theta the angle with the negative z axis
         z = (
-            local_coords_stacked[2, :] * cos_theta[item]
+            -local_coords_stacked[2, :] * cos_theta[item]
             - (
                 local_coords_stacked[0, :] * cos_phi[item]
                 + local_coords_stacked[1, :] * sin_phi[item]

@@ -181,13 +181,12 @@ class Objective:
         lambda_vac: float,
     ):
         """
-        Refract the input beam at a Gaussian reference sphere, while taking
-        care that the power in a beamlet is modified according to angle and
-        media before and after the reference surface. Returns an instance of
-        the `FarfieldData` class.
+        Refract the input beam at a Gaussian reference sphere, while taking care that the power in a
+        beamlet is modified according to angle and media before and after the reference surface.
+        Returns an instance of the `FarfieldData` class. `theta` is taken to be the angle with the
+        positive z-axis, therefore cos(theta) is typically negative as the the objective is assumed
+        to be on the left side (negative z-axis) of the origin.
         """
-        sin_theta_x = bfp_coords.x_bfp / self.focal_length
-        sin_theta_y = bfp_coords.y_bfp / self.focal_length
         aperture = bfp_coords.weights > 0.0
         sin_theta = bfp_coords.r_bfp / self.focal_length * aperture
         # Calculate properties of the plane waves in the far field
@@ -195,40 +194,46 @@ class Objective:
 
         cos_theta = np.ones(sin_theta.shape)
         cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
-
+        cos_theta *= -1  # Negative z axis
         cos_phi = np.ones_like(sin_theta)
         sin_phi = np.zeros_like(sin_theta)
         region = sin_theta > 0 & aperture
 
-        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
-
+        cos_phi[region] = bfp_coords.x_bfp[region] / bfp_coords.r_bfp[region]
         cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1
-        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
+        sin_phi[region] = bfp_coords.y_bfp[region] / bfp_coords.r_bfp[region]
         sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0
+
         sin_phi[np.logical_not(aperture)] = 0
         cos_phi[np.logical_not(aperture)] = 1
 
-        kz = k * cos_theta
-        kp = k * sin_theta
-        kx = -kp * cos_phi
-        ky = -kp * sin_phi
+        # cos(theta) < 0 (theta > pi/2) but kz positive (light travels from left to right)
+        kz = -k * cos_theta
+        kp = -k * sin_theta
+        kx = kp * cos_phi
+        ky = kp * sin_phi
 
         # Transform the input wavefront to a spherical one, after refracting on the Gaussian
         # reference sphere [2], Ch. 3. The field magnitude changes because of the different media,
-        # and because of the angle (preservation of power in a beamlet).
+        # and because of the angle (preservation of power in a beamlet). Note that in the reference,
+        # theta is defined as the angle with the negative z axis when it comes to the square root.
         E_inf = []
         for bfp_field in bfp_fields:
             if bfp_field is not None:
-                E = np.complex128(
-                    np.sqrt(self.n_bfp / self.n_medium) * bfp_field * np.sqrt(cos_theta)
+                E = np.where(
+                    aperture,
+                    np.complex128(
+                        np.sqrt(self.n_bfp / self.n_medium) * bfp_field * np.sqrt(-cos_theta)
+                    ),
+                    0.0,
                 )
-                E[np.logical_not(aperture)] = 0
+                # E[np.logical_not(aperture)] = 0.0
             else:
-                E = 0
+                E = 0.0 + 0.0j
             E_inf.append(E)
 
         # Get p- and s-polarized parts
-        Einf_theta = E_inf[0] * cos_phi + E_inf[1] * sin_phi
+        Einf_theta = -E_inf[0] * cos_phi - E_inf[1] * sin_phi
         Einf_phi = E_inf[1] * cos_phi - E_inf[0] * sin_phi
         weights = bfp_coords.weights * (self.sin_theta_max * k / self.r_bfp_max) ** 2
         return FarfieldData(
@@ -331,7 +336,6 @@ class Objective:
             return self._minimal_integration_order_peirce(coordinates, lambda_vac)
 
     def _minimal_integration_order_equidistant(self, coordinates, lambda_vac) -> int:
-
         def N_z():
             if max_z == 0.0:  # sampling not affected by z coordinate
                 return 2
