@@ -181,30 +181,28 @@ class Objective:
         lambda_vac: float,
     ):
         """
-        Refract the input beam at a Gaussian reference sphere, while taking
-        care that the power in a beamlet is modified according to angle and
-        media before and after the reference surface. Returns an instance of
-        the `FarfieldData` class.
+        Refract the input beam at a Gaussian reference sphere, while taking care that the power in a
+        beamlet is modified according to angle and media before and after the reference surface.
+        Returns an instance of the `FarfieldData` class. The angle `theta` is taken to be the angle
+        with the positive z-axis.
         """
-        sin_theta_x = bfp_coords.x_bfp / self.focal_length
-        sin_theta_y = bfp_coords.y_bfp / self.focal_length
         aperture = bfp_coords.weights > 0.0
         sin_theta = bfp_coords.r_bfp / self.focal_length * aperture
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
 
-        cos_theta = np.ones(sin_theta.shape)
+        cos_theta = np.ones_like(sin_theta)
         cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
 
         cos_phi = np.ones_like(sin_theta)
         sin_phi = np.zeros_like(sin_theta)
-        region = sin_theta > 0 & aperture
+        region = bfp_coords.r_bfp > 0 & aperture
 
-        cos_phi[region] = sin_theta_x[region] / sin_theta[region]
+        cos_phi[region] = bfp_coords.x_bfp[region] / bfp_coords.r_bfp[region]
+        cos_phi[bfp_coords.r_bfp == 0.0] = 1
+        sin_phi[region] = bfp_coords.y_bfp[region] / bfp_coords.r_bfp[region]
+        sin_phi[bfp_coords.r_bfp == 0.0] = 0
 
-        cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1
-        sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0
         sin_phi[np.logical_not(aperture)] = 0
         cos_phi[np.logical_not(aperture)] = 1
 
@@ -216,20 +214,21 @@ class Objective:
         # Transform the input wavefront to a spherical one, after refracting on the Gaussian
         # reference sphere [2], Ch. 3. The field magnitude changes because of the different media,
         # and because of the angle (preservation of power in a beamlet).
+
         E_inf = []
         for bfp_field in bfp_fields:
             if bfp_field is not None:
-                E = np.complex128(
-                    np.sqrt(self.n_bfp / self.n_medium) * bfp_field * np.sqrt(cos_theta)
-                )
-                E[np.logical_not(aperture)] = 0
+                E = np.empty_like(cos_theta, dtype="complex128")
+                E = np.sqrt(self.n_bfp / self.n_medium) * bfp_field * cos_theta**0.5
+                E[np.logical_not(aperture)] = 0.0
             else:
-                E = 0
+                E = 0.0 + 0.0j
             E_inf.append(E)
 
-        # Get p- and s-polarized parts
-        Einf_theta = E_inf[0] * cos_phi + E_inf[1] * sin_phi
-        Einf_phi = E_inf[1] * cos_phi - E_inf[0] * sin_phi
+        # Get p- and s-polarized parts. We map n_phi (cylindrical) to -n_phi (spherical) and n_r to
+        # -n_theta. 
+        Einf_theta = -E_inf[0] * cos_phi -E_inf[1] * sin_phi
+        Einf_phi = -E_inf[1] * cos_phi + E_inf[0] * sin_phi
         weights = bfp_coords.weights * (self.sin_theta_max * k / self.r_bfp_max) ** 2
         return FarfieldData(
             cos_phi=cos_phi,
@@ -388,17 +387,17 @@ class Objective:
             n_xy = n
             return n_xy
 
-        def _min_order_z(max_iterations=max_iterations):
+        def _min_order_z(max_iterations=max_iterations) -> int:
             from scipy.special import roots_legendre
 
-            def g(x):
+            def g(x) -> np.ndarray:
                 # Toy model function for the complex exponential e^(1j k_z z). Note that k_z is the
                 # independent variable.
                 return np.cos(
                     2 * np.pi * (1 - self.NA / self.n_medium * x**2) ** 0.5 * max_z / lambda_vac
                 )
 
-            def integral_g(n):
+            def integral_g(n) -> np.floating:
                 xi, w = roots_legendre(n)
                 w /= 2
                 xi = (xi * 0.5 + 0.5) ** 0.5

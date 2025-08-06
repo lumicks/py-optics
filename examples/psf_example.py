@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.7
+#       jupytext_version: 1.16.6
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -20,6 +20,7 @@ import numpy as np
 
 from lumicks.pyoptics.psf.czt import Objective, focus_czt, focus_gaussian_czt
 from lumicks.pyoptics.psf.reference import focused_gauss_ref
+import lumicks.pyoptics.trapping as trp 
 
 # %% [markdown]
 # # Visual comparison
@@ -32,7 +33,7 @@ NA = 1.2
 n_medium = 1.33
 n_bfp = 1.0
 focal_length = 4.43e-3
-
+bead = trp.Bead(1e-9, n_medium, n_medium, 1064e-9)
 # Create an instance of the Objective class, used by the fft-based functions that calculate a focus
 objective = Objective(NA=NA, focal_length=focal_length, n_medium=n_medium, n_bfp=n_bfp)
 
@@ -66,16 +67,14 @@ Ex_ref, Ey_ref, Ez_ref = focused_gauss_ref(
 # Change `bfp_sampling_n` below to see aliasing (`bfp_sampling_n=5`), or to largely suppress it in this area (`bfp_sampling_n=30`)
 
 # %%
-Ex, Ey, Ez, X, Y, Z = focus_gaussian_czt(
+Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
+    1.0,
     objective=objective,
-    lambda_vac=1064e-9,
     filling_factor=0.9,
-    x_range=xy_range,
-    y_range=xy_range,
+    bead=bead,
+    x=x_range,
+    y=x_range,
     z=z,
-    numpoints_x=numpoints,
-    numpoints_y=numpoints,
-    bfp_sampling_n=5,
     return_grid=True,
 )
 

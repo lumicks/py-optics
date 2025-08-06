@@ -3,6 +3,7 @@ import pytest
 
 import lumicks.pyoptics.trapping as trp
 
+# TODO: test other angles to ensure proper definition of E_theta and E_phi
 
 @pytest.mark.parametrize("n_medium", [1.0, 1.33, 1.5])
 @pytest.mark.parametrize("n_bead", [1.0, 1.33, 1.5, 2.5])

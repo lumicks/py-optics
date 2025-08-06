@@ -7,7 +7,7 @@ import pytest
 import lumicks.pyoptics.farfield_transform as tf
 import lumicks.pyoptics.field_distributions as fd
 import lumicks.pyoptics.psf.reference as ref
-from lumicks.pyoptics.psf.czt import BackFocalPlaneCoordinates, Objective, focus_czt
+from lumicks.pyoptics.psf.quad import BackFocalPlaneCoordinates, Objective, focus_quad
 
 
 def gen_dipole_psf(
@@ -15,7 +15,7 @@ def gen_dipole_psf(
 ):
     """Calculate the point spread function of a focused dipole. First calculate the far field, then
     use an Objective to transform that field to the back focal plane. Use another Objective with
-    long focal length to focus the field on the image plane.
+    long focal length to focus the field onto the image plane.
 
     Parameters
     ----------
@@ -55,6 +55,8 @@ def gen_dipole_psf(
 
     xy_range = 2 * lambda_em
     dim_xy = (-xy_range / 2, xy_range / 2)
+    x = np.linspace(-xy_range / 2, xy_range / 2, numpoints)
+    y = x
     z = np.linspace(dim_xy[0], dim_xy[1], numpoints)
 
     def field_func(coords: BackFocalPlaneCoordinates, tube_lens: Objective):
@@ -78,16 +80,13 @@ def gen_dipole_psf(
 
         return (Ex_bfp, Ey_bfp)
 
-    Ex, Ey, Ez, X, Y, Z = focus_czt(
+    Ex, Ey, Ez, X, Y, Z = focus_quad(
         field_func,
         tubelens,
         lambda_em,
-        x_range=dim_xy,
-        numpoints_x=numpoints,
-        y_range=dim_xy,
-        numpoints_y=numpoints,
+        x=x,
+        y=y,
         z=z * (n_image_plane / n_medium * magnification**2),
-        bfp_sampling_n=bfp_sampling_n,
         return_grid=True,
     )
 
@@ -124,7 +123,8 @@ def test_dipole_psf(
         z,
         False,
     )
-    rtol = 2.0e-2
-    atol = np.amax(np.abs(Ex_ref)) * rtol
+    rtol = 1.0e-4
+    atol = np.max(np.hypot(np.abs(Ex_ref), np.abs(Ey_ref))) * rtol
+    # TODO: Figure out necessity for factor -1: is it because of inverted image?
     np.testing.assert_allclose(Ex, -Ex_ref, rtol=rtol, atol=atol)
     np.testing.assert_allclose(Ey, -Ey_ref, rtol=rtol, atol=atol)

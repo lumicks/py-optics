@@ -47,7 +47,7 @@ def _loop_over_rotations(
         # The following line is equal to z = coords[2, :] after doing the transform with A
         z = (
             local_coords_stacked[2, :] * cos_theta[item]
-            - (
+            + (
                 local_coords_stacked[0, :] * cos_phi[item]
                 + local_coords_stacked[1, :] * sin_phi[item]
             )

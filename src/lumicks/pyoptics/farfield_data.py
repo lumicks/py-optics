@@ -33,8 +33,15 @@ class FarfieldData:
         Ez : np.ndarray
             Array with the electric field in the z direction
         """
-        Ex = self.Einf_theta * self.cos_phi * self.cos_theta - self.Einf_phi * self.sin_phi
-        Ey = self.Einf_theta * self.sin_phi * self.cos_theta + self.Einf_phi * self.cos_phi
-        Ez = self.Einf_theta * self.sin_theta
+        # Note: the sines and cosines do not define the k-vector, but define the location on the
+        # back-focal plane from where the plane wave originates. Therefore, the signs of terms
+        # involving phi are negated with respect to the common transformation of spherical to
+        # cartesian coordinates. Effectively, pi is added to the angle phi -> sin(phi) => -sin(phi),
+        # cos(phi) => -cos(phi)
+
+        # TODO: replace with vector.spherical_to_cartesian
+        Ex = -self.Einf_theta * self.cos_phi * self.cos_theta + self.Einf_phi * self.sin_phi
+        Ey = -self.Einf_theta * self.sin_phi * self.cos_theta - self.Einf_phi * self.cos_phi
+        Ez = -self.Einf_theta * self.sin_theta
 
         return Ex, Ey, Ez

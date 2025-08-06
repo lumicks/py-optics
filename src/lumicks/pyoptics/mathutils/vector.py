@@ -121,11 +121,9 @@ def spherical_to_cartesian(
     """
     x, y, z = locations
     cos_theta, sin_theta, cos_phi, sin_phi = cosines_from_unit_vectors(x, y, z, normalize=True)
-    f_x, f_y, f_z = spherical_to_cartesian_from_angles(
+    return spherical_to_cartesian_from_angles(
         cos_theta, sin_theta, cos_phi, sin_phi, f_radial, f_theta, f_phi
     )
-
-    return f_x, f_y, f_z
 
 
 def spherical_to_cartesian_from_angles(

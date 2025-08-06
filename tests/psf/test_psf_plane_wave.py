@@ -30,11 +30,13 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
         if farfield.weights[p, m] == 0.0:
             continue
 
+        # Launch plane waves with n_rho and n_phi polarization before refraction at the Gaussiam
+        # reference sphere:
         def input_field(coords: BackFocalPlaneCoordinates, obj: Objective):
             # Create an input field that is theta-polarized with 1 V/m after refraction by the lens
             # and propagation to the focal plane
-            Ex = np.zeros(coords.x_bfp.shape, dtype="complex128")
-            Ey = np.zeros(coords.x_bfp.shape, dtype="complex128")
+            Ex = np.zeros_like(coords.x_bfp, dtype="complex128")
+            Ey = np.zeros_like(coords.x_bfp, dtype="complex128")
 
             correction = (
                 k
