@@ -441,11 +441,10 @@ class Objective:
             for n in range(max(2, n_xy), max_iterations + 1):
                 y_new = integral_g(n)
                 if np.abs((y_new - y) / y_new) < 1e-9:
-                    n_z = n
                     break
                 else:
                     y = y_new
-            return n_z
+            return n
 
         max_x, max_y, max_z = [np.max(np.abs(ax)) for ax in coordinates]
         n_z = n_xy = 1
