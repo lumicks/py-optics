@@ -133,3 +133,4 @@ dmypy.json
 .vscode
 *.ipynb
 *.npz
+.DS_Store
