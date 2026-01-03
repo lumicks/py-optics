@@ -221,14 +221,7 @@ def focus_quad(
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()
-    # Calculate properties of the plane waves
-    #
-    # As they come from the negative z-direction, a point at infinity with a negative x coordinate
-    # leads to a positive value for kx (as the wave is traveling towards point (0,0,0)). Similarly,
-    # a negative y coordinate also leads to a positive value for ky
-    kx = farfield_data.kx
-    ky = farfield_data.ky
-    kz = farfield_data.kz
+    kx, ky, kz = farfield_data.kx, farfield_data.ky, farfield_data.kz
 
     Ex, Ey, Ez = _do_loop(farfield_data.weights, X, Y, Z, kx, ky, kz, Einfx, Einfy, Einfz)
 
