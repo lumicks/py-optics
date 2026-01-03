@@ -6,7 +6,7 @@ from itertools import product
 
 import numpy as np
 import pytest
-from scipy.constants import epsilon_0 as _EPS0
+from scipy.constants import epsilon_0
 
 import lumicks.pyoptics.trapping as trp
 from lumicks.pyoptics.psf.czt import Objective, focus_czt
@@ -38,12 +38,12 @@ czt_keyword_args = {
 }
 
 # quasi-static polarizability
-a_s = (4 * np.pi * _EPS0 * n_medium**2 * (bead_size / 2) ** 3 * (n_bead**2 - n_medium**2)) / (
+a_s = (4 * np.pi * epsilon_0 * n_medium**2 * (bead_size / 2) ** 3 * (n_bead**2 - n_medium**2)) / (
     n_bead**2 + 2 * n_medium**2
 )
 
 # correct for radiation reaction
-a = a_s + 1j * k**3 / (6 * np.pi * _EPS0 * n_medium**2) * a_s**2
+a = a_s + 1j * k**3 / (6 * np.pi * epsilon_0 * n_medium**2) * a_s**2
 
 
 def field_func(coordinates, objective: Objective, derivative_axis: str | None = None):

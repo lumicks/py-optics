@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 import pytest
-from scipy.constants import mu_0 as MU0
+from scipy.constants import mu_0
 from scipy.constants import speed_of_light as C
 
 import lumicks.pyoptics.trapping as trp
@@ -56,9 +56,9 @@ def test_mie_nearfield(dataset: int):
     np.testing.assert_allclose(Ex, Exr, rtol=1e-3)
     np.testing.assert_allclose(Ey, Eyr, rtol=1e-3)
     np.testing.assert_allclose(Ez, Ezr, rtol=1e-3)
-    np.testing.assert_allclose(Hx * C * MU0, Hxr, rtol=1e-3)
-    np.testing.assert_allclose(Hy * C * MU0, Hyr, rtol=1e-3)
-    np.testing.assert_allclose(Hz * C * MU0, Hzr, rtol=1e-3)
+    np.testing.assert_allclose(Hx * C * mu_0, Hxr, rtol=1e-3)
+    np.testing.assert_allclose(Hy * C * mu_0, Hyr, rtol=1e-3)
+    np.testing.assert_allclose(Hz * C * mu_0, Hzr, rtol=1e-3)
 
 
 @pytest.mark.parametrize("bead_diameter, n_bead", [(4e-6, 1.5), (0.2e-6, 0.1 + 2j)])

@@ -6,7 +6,7 @@ from functools import partial
 
 import numpy as np
 import pytest
-from scipy.constants import epsilon_0 as _EPS0
+from scipy.constants import epsilon_0
 from scipy.constants import speed_of_light as _C
 
 import lumicks.pyoptics.trapping as trp
@@ -30,7 +30,7 @@ def test_plane_wave_absorption_scattering(
 
     bead_size = 0.5e-6  # larger than dipole approximation is valid for
     E0 = 2.2
-    intensity = 0.5 * E0**2 * _EPS0 * _C * n_medium
+    intensity = 0.5 * E0**2 * epsilon_0 * _C * n_medium
     bead = trp.Bead(bead_size, n_bead, n_medium, lambda_vac)
     num_orders = None
 

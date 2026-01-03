@@ -4,8 +4,8 @@ from collections.abc import Callable, Iterable
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.constants import epsilon_0 as EPS0
-from scipy.constants import mu_0 as MU0
+from scipy.constants import epsilon_0
+from scipy.constants import mu_0
 from scipy.constants import speed_of_light as _C
 
 from lumicks.pyoptics.farfield_transform.equivalence import NearfieldData, near_field_to_far_field
@@ -219,7 +219,7 @@ def fields_focus_gaussian(
     """
     w0 = filling_factor * objective.r_bfp_max  # [m]
     I0 = 2 * beam_power / (np.pi * w0**2)  # [W/m^2]
-    E0 = (I0 * 2 / (EPS0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
+    E0 = (I0 * 2 / (epsilon_0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
     def gaussian_beam(coordinates: BackFocalPlaneCoordinates, objective: Objective):
         Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2) * E0
@@ -659,8 +659,8 @@ def force_factory(
         integration_method_bfp=integration_method_bfp,
         internal=False,
     )
-    _eps = EPS0 * bead.n_medium**2
-    _mu = MU0
+    _eps = epsilon_0 * bead.n_medium**2
+    _mu = mu_0
 
     # Normal vectors with weight factor incorporated
     nw = w[:, np.newaxis] * np.concatenate([np.atleast_2d(ax) for ax in (x, y, z)], axis=0).T

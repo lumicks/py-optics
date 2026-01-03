@@ -3,7 +3,7 @@ plane waves, and the local fields as the subsequent response of each plane wave"
 
 import numpy as np
 from numba import get_thread_id, njit, prange
-from scipy.constants import mu_0 as MU0
+from scipy.constants import mu_0
 from scipy.constants import speed_of_light as C
 
 
@@ -480,9 +480,9 @@ def _scattered_magnetic_field(
 
     # Extra factor of -1 as B&H does not include the Condon–Shortley phase,
     # but our associated Legendre polynomials do include it
-    Hr *= -sinP / (k0r) ** 2 * n_medium / (C * MU0)
-    Ht *= -sinP / (k0r) * n_medium / (C * MU0)
-    Hp *= -cosP / (k0r) * n_medium / (C * MU0)
+    Hr *= -sinP / (k0r) ** 2 * n_medium / (C * mu_0)
+    Ht *= -sinP / (k0r) * n_medium / (C * mu_0)
+    Hp *= -cosP / (k0r) * n_medium / (C * mu_0)
 
     # Cartesian components
     Hx = Hr * sin_theta * cosP + Ht * cos_theta * cosP - Hp * sinP
@@ -490,7 +490,7 @@ def _scattered_magnetic_field(
     Hz = Hr * cos_theta - Ht * sin_theta
     if total_field:
         # Incident field (E field x-polarized)
-        Hy += np.exp(1j * k0r * cos_theta) * n_medium / (C * MU0)
+        Hy += np.exp(1j * k0r * cos_theta) * n_medium / (C * mu_0)
     return np.concatenate((Hx, Hy, Hz), axis=0)
 
 
@@ -534,9 +534,9 @@ def _internal_magnetic_field(
             - 1j * cn[n - 1] * alp_sin[n - 1, :] * (jn_1[n - 1, :] - n * jn_over_k1r[n - 1, :])
         )
 
-    Hr *= sinP * n_bead / (C * MU0)
-    Ht *= -sinP * n_bead / (C * MU0)
-    Hp *= cosP * n_bead / (C * MU0)
+    Hr *= sinP * n_bead / (C * mu_0)
+    Ht *= -sinP * n_bead / (C * mu_0)
+    Hp *= cosP * n_bead / (C * mu_0)
     # Cartesian components
     Hx = Hr * sin_theta * cosP + Ht * cos_theta * cosP - Hp * sinP
     Hy = Hr * sin_theta * sinP + Ht * cos_theta * sinP + Hp * cosP
