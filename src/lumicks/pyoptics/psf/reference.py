@@ -86,17 +86,18 @@ def focused_gauss_ref(
     th_max = np.arcsin(NA / n_medium)
 
     # Storage for the results of the integrals
-    I0 = np.zeros(r.shape[0], dtype="complex128")
-    I1 = np.zeros(r.shape[0], dtype="complex128")
-    I2 = np.zeros(r.shape[0], dtype="complex128")
+    I0 = np.zeros_like(r, dtype="complex128")
+    I1 = np.zeros_like(r, dtype="complex128")
+    I2 = np.zeros_like(r, dtype="complex128")
 
     # Storage for the actual fields
-    Ex = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
-    Ey = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
-    Ez = np.zeros((x.shape[0], y.shape[0], z.shape[0]), dtype="complex128")
+    Ex = np.zeros((x.size, y.size, z.size), dtype="complex128")
+    Ey = np.zeros_like(Ex, dtype="complex128")
+    Ez = np.zeros_like(Ex, dtype="complex128")
 
     f0 = filling_factor
     f = focal_length
+    factor = -1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)
 
     for z_idx, zz in enumerate(z):
         for idx, rr in enumerate(r):
@@ -125,15 +126,13 @@ def focused_gauss_ref(
                     * np.exp(1j * k * zz * np.cos(th))
                 )
 
-            I0[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
-                __I00, 0, th_max, complex_func=True
-            )[0]
-            I1[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
-                __I01, 0, th_max, complex_func=True
-            )[0]
-            I2[idx] = (-1j * k * f / 2 * (n_bfp / n_medium) ** 0.5 * np.exp(-1j * k * f)) * quad(
-                __I02, 0, th_max, complex_func=True
-            )[0]
+            I0[idx] = quad(__I00, 0, th_max, complex_func=True)[0]
+            I1[idx] = quad(__I01, 0, th_max, complex_func=True)[0]
+            I2[idx] = quad(__I02, 0, th_max, complex_func=True)[0]
+
+        np.multiply(I0, factor, out=I0)
+        np.multiply(I1, factor, out=I1)
+        np.multiply(I2, factor, out=I2)
 
         # Transform the results back to the grid
         sx = X.shape
