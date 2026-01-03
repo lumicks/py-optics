@@ -221,10 +221,8 @@ def focus_czt(
     k = 2 * np.pi * objective.n_medium / lambda_vac
     ks = k * objective.sin_theta_max
     dk = ks / (bfp_sampling_n - 1)
-
-    bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field, bfp_sampling_n, "equidistant"
-    )
+    bfp_coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
+    bfp_fields = objective.sample_back_focal_plane(f_input_field, bfp_coords)
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()

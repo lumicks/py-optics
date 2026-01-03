@@ -29,9 +29,11 @@ def focus_field_factory(
     integration_order_bfp: int,
     integration_method_bfp: str,
 ):
-
-    bfp_coords, bfp_fields = objective.sample_back_focal_plane(
-        f_input_field=f_input_field, order=integration_order_bfp, method=integration_method_bfp
+    bfp_coords = objective.get_sampling_coordinates_bfp(
+        order=integration_order_bfp, method=integration_method_bfp
+    )
+    bfp_fields = objective.sample_back_focal_plane(
+        f_input_field=f_input_field, coordinates=bfp_coords
     )
 
     farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)
