@@ -222,7 +222,7 @@ def fields_focus_gaussian(
     E0 = (I0 * 2 / (epsilon_0 * _C * objective.n_bfp)) ** 0.5  # [V/m]
 
     def gaussian_beam(coordinates: BackFocalPlaneCoordinates, objective: Objective):
-        Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2) * E0
+        Ex = np.exp(-(coordinates.x**2 + coordinates.y**2) / w0**2) * E0
         return (Ex, None)
 
     return fields_focus(

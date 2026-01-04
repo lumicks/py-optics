@@ -216,12 +216,12 @@ w0 = filling_factor * objective.r_bfp_max
 
 
 def field_func_x(coordinates, _):
-    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2)
+    Ein = np.exp(-((coordinates.x) ** 2 + coordinates.y**2) / w0**2)
     return (Ein, None)
 
 
 def field_func_y(coordinates, _):
-    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2)
+    Ein = np.exp(-((coordinates.x) ** 2 + coordinates.y**2) / w0**2)
     return (None, Ein)
 
 

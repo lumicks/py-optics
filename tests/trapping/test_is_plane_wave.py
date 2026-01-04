@@ -148,8 +148,8 @@ def test_plane_wave_bfp(
                 # Create an input field that is theta-polarized with 1 V/m after refraction by the
                 # lens and propagation to the focal plane
 
-                Ex = np.zeros_like(coords.x_bfp, dtype="complex128")
-                Ey = np.zeros_like(coords.x_bfp, dtype="complex128")
+                Ex = np.zeros_like(coords.x, dtype="complex128")
+                Ey = np.zeros_like(coords.x, dtype="complex128")
 
                 correction = (
                     farfield.kz[p, m]

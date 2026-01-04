@@ -33,8 +33,8 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
         def input_field(coords: BackFocalPlaneCoordinates, obj: Objective):
             # Create an input field that is theta-polarized with 1 V/m after refraction by the lens
             # and propagation to the focal plane
-            Ex = np.zeros(coords.x_bfp.shape, dtype="complex128")
-            Ey = np.zeros(coords.x_bfp.shape, dtype="complex128")
+            Ex = np.zeros(coords.x.shape, dtype="complex128")
+            Ey = np.zeros(coords.x.shape, dtype="complex128")
 
             correction = (
                 k

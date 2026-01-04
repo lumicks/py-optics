@@ -18,9 +18,9 @@ class BackFocalPlaneCoordinates:
     """
 
     weights: np.ndarray
-    x_bfp: np.ndarray
-    y_bfp: np.ndarray
-    r_bfp: np.ndarray
+    x: np.ndarray
+    y: np.ndarray
+    r: np.ndarray
 
 
 class Objective:
@@ -141,9 +141,9 @@ class Objective:
             weights = (sin_theta <= self.sin_theta_max).astype(float) * dx**2
             return BackFocalPlaneCoordinates(
                 weights=weights,
-                x_bfp=x_bfp,
-                y_bfp=y_bfp,
-                r_bfp=r_bfp,
+                x=x_bfp,
+                y=y_bfp,
+                r=r_bfp,
             )
 
         def _disk_coords(method: str):
@@ -154,9 +154,9 @@ class Objective:
             r_bfp = np.hypot(x_bfp, y_bfp)
             return BackFocalPlaneCoordinates(
                 weights=w,
-                x_bfp=x_bfp,
-                y_bfp=y_bfp,
-                r_bfp=r_bfp,
+                x=x_bfp,
+                y=y_bfp,
+                r=r_bfp,
             )
 
         if method == "equidistant":
@@ -180,10 +180,10 @@ class Objective:
         beamlet is modified according to angle and media before and after the reference surface.
         Returns an instance of the `FarfieldData` class.
         """
-        sin_theta_x = bfp_coords.x_bfp / self.focal_length
-        sin_theta_y = bfp_coords.y_bfp / self.focal_length
+        sin_theta_x = bfp_coords.x / self.focal_length
+        sin_theta_y = bfp_coords.y / self.focal_length
         aperture = bfp_coords.weights > 0.0
-        sin_theta = bfp_coords.r_bfp / self.focal_length * aperture
+        sin_theta = bfp_coords.r / self.focal_length * aperture
         # Calculate properties of the plane waves in the far field
         k = 2 * np.pi * self.n_medium / lambda_vac
 
@@ -196,9 +196,9 @@ class Objective:
 
         cos_phi[region] = sin_theta_x[region] / sin_theta[region]
 
-        cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1.0
+        cos_phi[np.logical_and(bfp_coords.x == 0.0, bfp_coords.y == 0.0)] = 1.0
         sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0.0
+        sin_phi[np.logical_and(bfp_coords.x == 0.0, bfp_coords.y == 0.0)] = 0.0
         sin_phi[np.logical_not(aperture)] = 0.0
         cos_phi[np.logical_not(aperture)] = 1.0
 
@@ -429,9 +429,9 @@ class Objective:
         )
 
     def get_farfield_cosines(self, bfp_coords: BackFocalPlaneCoordinates):
-        sin_theta_x = bfp_coords.x_bfp / self.focal_length
-        sin_theta_y = bfp_coords.y_bfp / self.focal_length
-        sin_theta = bfp_coords.r_bfp / self.focal_length * (bfp_coords.weights != 0.0)
+        sin_theta_x = bfp_coords.x / self.focal_length
+        sin_theta_y = bfp_coords.y / self.focal_length
+        sin_theta = bfp_coords.r / self.focal_length * (bfp_coords.weights != 0.0)
         aperture = bfp_coords.weights != 0.0
         cos_theta = np.ones(sin_theta.shape)
         cos_theta[aperture] = ((1 + sin_theta[aperture]) * (1 - sin_theta[aperture])) ** 0.5
@@ -439,9 +439,9 @@ class Objective:
         sin_phi = np.zeros_like(sin_theta)
         region = sin_theta > 0.0 & aperture
         cos_phi[region] = sin_theta_x[region] / sin_theta[region]
-        cos_phi[bfp_coords.r_bfp == 0.0] = 1.0
+        cos_phi[bfp_coords.r == 0.0] = 1.0
         sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[bfp_coords.r_bfp == 0.0] = 0.0
+        sin_phi[bfp_coords.r == 0.0] = 0.0
         sin_phi[np.logical_not(aperture)] = 0.0
         cos_phi[np.logical_not(aperture)] = 1.0
         return cos_theta, sin_theta, cos_phi, sin_phi, aperture

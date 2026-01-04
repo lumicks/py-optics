@@ -91,7 +91,7 @@ def focus_gaussian_quad(
     w0 = filling_factor * objective.r_bfp_max  # See [1]
 
     def field_func(coords: BackFocalPlaneCoordinates, objective: Objective):
-        Ein = np.exp(-(coords.x_bfp**2 + coords.y_bfp**2) / w0**2)
+        Ein = np.exp(-(coords.x**2 + coords.y**2) / w0**2)
         return Ein, None
 
     return focus_quad(

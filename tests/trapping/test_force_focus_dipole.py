@@ -47,7 +47,7 @@ a = a_s + 1j * k**3 / (6 * np.pi * epsilon_0 * n_medium**2) * a_s**2
 
 
 def field_func(coordinates, objective: Objective, derivative_axis: str | None = None):
-    Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2) + 0.0j
+    Ein = np.exp(-((coordinates.x) ** 2 + coordinates.y**2) / w0**2) + 0.0j
     if derivative_axis is not None:
         ffd = objective.back_focal_plane_to_farfield(
             czt_keyword_args["lambda_vac"], coordinates, None, None

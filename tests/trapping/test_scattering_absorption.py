@@ -46,8 +46,8 @@ def test_plane_wave_absorption_scattering(
     def input_field(coords, _, type: str):
         # Create an input field that is theta-polarized with 1 V/m after
         # refraction by the lens and propagation to the focal plane
-        Ex = np.zeros_like(coords.x_bfp, dtype="complex128")
-        Ey = np.zeros_like(coords.x_bfp, dtype="complex128")
+        Ex = np.zeros_like(coords.x, dtype="complex128")
+        Ey = np.zeros_like(coords.x, dtype="complex128")
 
         correction = (
             k
@@ -70,8 +70,8 @@ def test_plane_wave_absorption_scattering(
 
         return (Ex, Ey)
 
-    for p in range(coords.x_bfp.shape[0]):
-        for m in range(coords.x_bfp.shape[0]):
+    for p in range(coords.x.shape[0]):
+        for m in range(coords.x.shape[0]):
             if coords.weights[p, m] == 0.0:
                 continue
             Psca = trp.scattered_power_focus(

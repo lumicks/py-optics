@@ -123,7 +123,7 @@ def gaussian_beam(
     I0 = 2 * power / (np.pi * w0**2)  # [W/m^2]
     E0 = (I0 * 2 / (epsilon_0 * C * objective.n_bfp)) ** 0.5  # [V/m]
 
-    Ex = np.exp(-(coordinates.x_bfp**2 + coordinates.y_bfp**2) / w0**2).astype("complex128") * E0
+    Ex = np.exp(-(coordinates.x**2 + coordinates.y**2) / w0**2).astype("complex128") * E0
     return (Ex, None)
 
 
