@@ -60,8 +60,8 @@ def focus_gaussian_quad(
     y : np.array
       array of y locations for evaluation [m]
     z : np.array
-      array of z locations for evaluation. The final locations are determined by the
-      output of numpy.meshgrid(x, y, z) [m]
+      array of z locations for evaluation. The final locations are determined by the output of
+      numpy.meshgrid(x, y, z) [m]
     integration_order : int
       Number of discrete steps with which the back focal plane is sampled, from the center to the
       edge. The total number of plane waves scales with the square of integration_order. Default is
@@ -70,8 +70,8 @@ def focus_gaussian_quad(
       return the coordinate sampling grid. Default is False
     method : str
         Method of integration. Options are "equidistant", which yields the same results as
-        `psf.focus_czt` within machine precision, and "peirce", which typical converges much faster
-        and therefore needs less points, but is typically slower.
+        `psf.focus_czt` within machine precision, and "peirce", which typically converges much
+        faster and therefore needs less points, but can be slower.
 
     Returns
     -------
@@ -170,8 +170,8 @@ def focus_quad(
         return the coordinate sampling grid (default = `False`)
     method : str
         Method of integration. Options are "equidistant", which yields the same results as
-        `psf.focus_czt` within machine precision, and "peirce", which typical converges much faster
-        and therefore needs less points.
+        `psf.focus_czt` within machine precision, and "peirce", which typically converges much
+        faster and therefore needs less points.
 
     Returns
     -------
