@@ -146,7 +146,7 @@ class Objective:
                 r=r_bfp,
             )
 
-        def _disk_coords(method: str):
+        def _disk_coords():
             x_bfp, y_bfp, w = get_integration_locations(order, method=method)
             w *= self.r_bfp_max**2
             x_bfp *= self.r_bfp_max
@@ -162,7 +162,7 @@ class Objective:
         if method == "equidistant":
             bfp_coords = _equidistant_coords()
         elif method in ["peirce", "lether", "takaki"]:
-            bfp_coords = _disk_coords(method)
+            bfp_coords = _disk_coords()
         else:
             raise ValueError(f"Sampling method {method} is not supported.")
 
