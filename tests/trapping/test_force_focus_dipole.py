@@ -50,7 +50,7 @@ def field_func(coordinates, objective: Objective, derivative_axis: str | None = 
     Ein = np.exp(-((coordinates.x_bfp) ** 2 + coordinates.y_bfp**2) / w0**2) + 0.0j
     if derivative_axis is not None:
         ffd = objective.back_focal_plane_to_farfield(
-            coordinates, (None, None), czt_keyword_args["lambda_vac"]
+            czt_keyword_args["lambda_vac"], coordinates, None, None
         )
         k_ax = getattr(ffd, f"k{derivative_axis}")
         Ein *= 1j * k_ax

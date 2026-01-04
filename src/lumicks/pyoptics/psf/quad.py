@@ -217,8 +217,8 @@ def focus_quad(
     bfp_coords = objective.get_sampling_coordinates_bfp(
         order=integration_order, method=integration_method
     )
-    bfp_fields = objective.sample_back_focal_plane(f_input_field, bfp_coords)
-    farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
+    Ex, Ey = f_input_field(bfp_coords, objective)
+    farfield_data = objective.back_focal_plane_to_farfield(lambda_vac, bfp_coords, Ex, Ey)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()
     kx, ky, kz = farfield_data.kx, farfield_data.ky, farfield_data.kz

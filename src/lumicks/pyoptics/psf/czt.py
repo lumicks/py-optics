@@ -107,7 +107,7 @@ def focus_czt(
     numpoints_x: int,
     y_range: float | tuple[float, float],
     numpoints_y: int,
-    z: ArrayLike,
+    z: ArrayLike | float,
     bfp_sampling_n=None,
     return_grid=False,
 ) -> tuple[np.ndarray, ...]:
@@ -131,24 +131,24 @@ def focus_czt(
         locations in the back focal plane. In other words, `E_bfp_x` describes the electric field of
         the input beam which is polarized along the x-axis. Similarly, `E_bfp_y` describes the
         y-polarized part of the input beam. The fields may be complex, so a phase difference between
-        x and y is possible. If only one polarization is used, the other return value must be
-        `None`, e.g., y polarization would return `(None, E_bfp_y)`. The fields are post-processed
-        such that any part that falls outside of the NA is set to zero.
+        x and y is possible. If only one polarization is used, the other return value can be `None`,
+        e.g., y polarization would return `(None, E_bfp_y)`. The fields are post-processed such that
+        any part that falls outside of the NA is set to zero.
     objective : Objective
         The objective to be used for focusing.
     lambda_vac : float
         Wavelength of the light [m]
-    x_range : Union[float, tuple(float, float)]
+    x_range : float | tuple[float, float]
         Size of the calculation range along x, in meters. If the range is a single float, it is
         centered around zero. The algorithm will calculate at x locations [-x_range/2..x_range/2].
         Otherwise, it will calculate at locations from [x_range[0]..x_range[1]]
     numpoints_x : int
         Number of points to calculate along the x dimension. Must be >= 1
-    y_range : Union[float, tuple(float, float)]
+    y_range : float | tuple[float, float]
         Same as x, but along y [m]
     numpoints_y : int
         Same as x, but for y
-    z : Union[np.array, float]
+    z : ArrayLike | float
         Numpy array of locations along z, where to calculate the fields. Can be a single number as
         well [m]
     bfp_sampling_n : int, optional
@@ -222,8 +222,8 @@ def focus_czt(
     ks = k * objective.sin_theta_max
     dk = ks / (bfp_sampling_n - 1)
     bfp_coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
-    bfp_fields = objective.sample_back_focal_plane(f_input_field, bfp_coords)
-    farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, lambda_vac)
+    Ex, Ey = f_input_field(bfp_coords, objective)
+    farfield_data = objective.back_focal_plane_to_farfield(lambda_vac, bfp_coords, Ex, Ey)
 
     Einfx, Einfy, Einfz = farfield_data.transform_to_xyz()
 

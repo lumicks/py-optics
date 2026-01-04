@@ -187,7 +187,7 @@ def derivative(field_func, lambda_vac, axis):
 
     def field_derivative(coordinates: BackFocalPlaneCoordinates, objective: Objective):
         # Takes the derivative of the fields to x, y or z in the focus
-        ffd = objective.back_focal_plane_to_farfield(coordinates, (None, None), lambda_vac)
+        ffd = objective.back_focal_plane_to_farfield(lambda_vac, coordinates, None, None)
         Ex, Ey = [
             E.astype("complex128") * 1j * getattr(ffd, f"k{axis}") if E is not None else E
             for E in field_func(coordinates, objective)

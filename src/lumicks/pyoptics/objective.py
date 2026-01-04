@@ -1,6 +1,5 @@
 import math
-from collections import namedtuple
-from collections.abc import Callable, Collection
+from collections.abc import Collection
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,9 +21,6 @@ class BackFocalPlaneCoordinates:
     x_bfp: np.ndarray
     y_bfp: np.ndarray
     r_bfp: np.ndarray
-
-
-BackFocalPlaneFields = namedtuple("BackFocalPlaneFields", ["Ex", "Ey"])
 
 
 class Objective:
@@ -172,53 +168,17 @@ class Objective:
 
         return bfp_coords
 
-    def sample_back_focal_plane(
-        self, f_input_field: Callable, coordinates: BackFocalPlaneCoordinates
-    ) -> BackFocalPlaneFields:
-        """
-        Sample `f_input_field` with `bfp_sampling_n` samples and return the fields as a named tuple
-        BackFocalPlaneFields(Ex, Ey).
-
-        Parameters
-        ----------
-        f_input_field : Callable
-            Function with signature `f(coordinates: BackFocalPlaneCoordinates, objective:
-            Objective)`. The function should take the coordinates and return the electric field at
-            that location on the back focal plane. The returned value should be a tuple, where the
-            first entry is the x-polarized field, and the second entry is the y-polarized field.
-        coordinates : BackFocalPlaneCoordinates
-            Coordinates of the back focal plane at which to sample the electric field.
-
-        Returns
-        -------
-        tuple[np.ndarray | None, np.ndarray | None]
-            A two-element tuple, where the first element is the x-polarized part of the electric
-            field, or None if the field has no x-polarized part. The second element is the
-            y-polarized part, or None if there is no y-polarized part. Only one of the two elements
-            can be None.
-
-        Raises
-        ------
-        RuntimeError
-            Raised if both values returned by `f_input_field` are None.
-        """
-        Ex_bfp, Ey_bfp = f_input_field(coordinates, self)
-        if Ex_bfp is None and Ey_bfp is None:
-            raise RuntimeError("Either an x-polarized or a y-polarized input field is required")
-
-        return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
-
     def back_focal_plane_to_farfield(
         self,
-        bfp_coords: BackFocalPlaneCoordinates,
-        bfp_fields: BackFocalPlaneFields,
         lambda_vac: float,
+        bfp_coords: BackFocalPlaneCoordinates,
+        Ex: ArrayLike | None = None,
+        Ey: ArrayLike | None = None,
     ):
         """
-        Refract the input beam at a Gaussian reference sphere, while taking
-        care that the power in a beamlet is modified according to angle and
-        media before and after the reference surface. Returns an instance of
-        the `FarfieldData` class.
+        Refract the input beam at a Gaussian reference sphere, while taking care that the power in a
+        beamlet is modified according to angle and media before and after the reference surface.
+        Returns an instance of the `FarfieldData` class.
         """
         sin_theta_x = bfp_coords.x_bfp / self.focal_length
         sin_theta_y = bfp_coords.y_bfp / self.focal_length
@@ -236,11 +196,11 @@ class Objective:
 
         cos_phi[region] = sin_theta_x[region] / sin_theta[region]
 
-        cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1
+        cos_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 1.0
         sin_phi[region] = sin_theta_y[region] / sin_theta[region]
-        sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0
-        sin_phi[np.logical_not(aperture)] = 0
-        cos_phi[np.logical_not(aperture)] = 1
+        sin_phi[np.logical_and(bfp_coords.x_bfp == 0.0, bfp_coords.y_bfp == 0.0)] = 0.0
+        sin_phi[np.logical_not(aperture)] = 0.0
+        cos_phi[np.logical_not(aperture)] = 1.0
 
         kz = k * cos_theta
         kp = k * sin_theta
@@ -251,14 +211,12 @@ class Objective:
         # reference sphere [2], Ch. 3. The field magnitude changes because of the different media,
         # and because of the angle (preservation of power in a beamlet).
         E_inf = []
-        for bfp_field in bfp_fields:
+        for bfp_field in (Ex, Ey):
             if bfp_field is not None:
-                E = np.complex128(
-                    np.sqrt(self.n_bfp / self.n_medium) * bfp_field * np.sqrt(cos_theta)
-                )
-                E[np.logical_not(aperture)] = 0
+                E = np.sqrt(self.n_bfp / self.n_medium) * np.asarray(bfp_field) * np.sqrt(cos_theta)
+                E[np.logical_not(aperture)] = 0.0
             else:
-                E = 0
+                E = 0.0
             E_inf.append(E)
 
         # Get p- and s-polarized parts
@@ -273,8 +231,8 @@ class Objective:
             kx=kx,
             ky=ky,
             kz=kz,
-            Einf_theta=Einf_theta,
-            Einf_phi=Einf_phi,
+            Einf_theta=Einf_theta.astype(np.complex128),
+            Einf_phi=Einf_phi.astype(np.complex128),
             weights=weights,
         )
 
@@ -364,7 +322,6 @@ class Objective:
             return self._minimal_integration_order_peirce(coordinates, lambda_vac)
 
     def _minimal_integration_order_equidistant(self, coordinates, lambda_vac) -> int:
-
         def N_z():
             if max_z == 0.0:  # sampling not affected by z coordinate
                 return 2
@@ -421,7 +378,7 @@ class Objective:
             n_xy = n
             return n_xy
 
-        def _min_order_z(max_iterations=max_iterations):
+        def _min_order_z(max_iterations=max_iterations) -> int:
             from scipy.special import roots_legendre
 
             def g(x):
@@ -495,7 +452,7 @@ class Objective:
         Ex_bfp, Ey_bfp = farfield_to_back_focal_plane_unit_vectors(
             E[0], E[1], E[2], s[0], s[1], s[2], self.n_medium, self.n_bfp
         )
-        return BackFocalPlaneFields(Ex=Ex_bfp, Ey=Ey_bfp)
+        return Ex_bfp, Ey_bfp
 
 
 def farfield_to_back_focal_plane_unit_vectors(

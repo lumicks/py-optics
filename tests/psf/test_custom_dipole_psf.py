@@ -58,10 +58,9 @@ def gen_dipole_psf(
     z = np.linspace(dim_xy[0], dim_xy[1], numpoints)
 
     def field_func(coords: BackFocalPlaneCoordinates, tube_lens: Objective):
-        # Get the angles that correspond to the back focal plane:
-        ff = obj.back_focal_plane_to_farfield(
-            coords, (None, None), 1.0  # wavelength doesn't matter as we don't use kx, ky, kz
-        )
+        # Get the angles that correspond to the back focal plane. Wavelength doesn't matter as we
+        # don't use kx, ky, kz
+        ff = obj.back_focal_plane_to_farfield(1.0, coords, None, None)
         Ex, Ey, Ez = fd.dipole.electric_dipole_farfield_angle(
             dipole_moment,
             n_medium,

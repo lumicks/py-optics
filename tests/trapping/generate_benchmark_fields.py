@@ -3,7 +3,7 @@ import numpy as np
 
 
 def create_ref_data(
-    n_bead=1.5, n_medium=1.33, bead_diam=1e-6, lambda_vac=1064e-9, num_pts=100, filename="data"
+    n_bead=1.5, n_medium=1.33, bead_diam=1e-6, lambda_vac=1064e-9, num_pts=10, filename="data"
 ):
 
     print(f"calculating results for {filename}")
@@ -15,7 +15,7 @@ def create_ref_data(
     lmax = int(np.round(size_param + 4 * size_param ** (1 / 3) + 2.0))
     sphere = miepy.single_mie_sphere(bead_diam / 2, bead, lambda_vac, lmax, medium=medium)
 
-    x = np.linspace(-bead_diam, bead_diam, 100)
+    x = np.linspace(-bead_diam, bead_diam, num_pts)
     y = x
     z = x
 

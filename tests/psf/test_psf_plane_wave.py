@@ -16,7 +16,7 @@ def test_plane_wave(focal_length, n_medium, NA, n_bfp=1.0, bfp_sampling_n=7, lam
     objective = Objective(NA=NA, focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium)
 
     coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
-    farfield = objective.back_focal_plane_to_farfield(coords, (None, None), lambda_vac)
+    farfield = objective.back_focal_plane_to_farfield(lambda_vac, coords, None, None)
 
     k = 2 * np.pi * n_medium / lambda_vac
     ks = k * objective.sin_theta_max

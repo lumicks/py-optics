@@ -26,7 +26,7 @@ def test_plane_wave_absorption_scattering(
     objective = trp.Objective(focal_length=focal_length, n_bfp=n_bfp, n_medium=n_medium, NA=NA)
 
     coords = objective.get_sampling_coordinates_bfp(bfp_sampling_n, method="equidistant")
-    farfield = objective.back_focal_plane_to_farfield(coords, (None, None), lambda_vac)
+    farfield = objective.back_focal_plane_to_farfield(lambda_vac, coords, None, None)
 
     bead_size = 0.5e-6  # larger than dipole approximation is valid for
     E0 = 2.2

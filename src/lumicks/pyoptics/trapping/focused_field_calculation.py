@@ -32,15 +32,12 @@ def focus_field_factory(
     bfp_coords = objective.get_sampling_coordinates_bfp(
         order=integration_order_bfp, method=integration_method_bfp
     )
-    bfp_fields = objective.sample_back_focal_plane(
-        f_input_field=f_input_field, coordinates=bfp_coords
-    )
+    Ex, Ey = f_input_field(bfp_coords, objective)
 
-    farfield_data = objective.back_focal_plane_to_farfield(bfp_coords, bfp_fields, bead.lambda_vac)
+    farfield_data = objective.back_focal_plane_to_farfield(bead.lambda_vac, bfp_coords, Ex, Ey)
     farfield_as_dict = {
         f.name: getattr(farfield_data, f.name).reshape(-1)
         for f in fields(farfield_data)
-        if f.name not in ("kp")
     }
     local_coordinates = (
         InternalBeadCoordinates(local_coordinates)
