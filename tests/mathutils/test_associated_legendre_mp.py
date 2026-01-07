@@ -5,7 +5,7 @@ import pytest
 from lumicks.pyoptics.mathutils.associated_legendre import associated_legendre
 
 
-def associated_legendre_mp(n: int, x: mp.mpf):
+def associated_legendre_mp(n: int, x: mp.mpc):
     """associated_legendre(n, x): Return the 1st order (m == 1) of the
     associated Legendre polynomial of degree n, evaluated at x [-1..1]
 
@@ -28,8 +28,8 @@ def associated_legendre_mp(n: int, x: mp.mpf):
         return _fi1(x)
     if n == 2:
         return _fi2(x)
-    bk2 = mp.mpf("0")
-    bk1 = mp.mpf("1")
+    bk2 = mp.mpc(0 + 0j)
+    bk1 = mp.mpc(1 + 0j)
     for k_ in range(n - 1, 1, -1):
         k = mp.mpf(k_)
         bk = ((2 * k + 1) / k) * x * bk1 - (k + 2) / (k + 1) * bk2
@@ -39,7 +39,8 @@ def associated_legendre_mp(n: int, x: mp.mpf):
 
 
 @pytest.mark.parametrize("order", range(200, 300, 3))
-def test_legendre(order):
+@pytest.mark.parametrize("check_complex", (True, False))
+def test_legendre(order, check_complex):
     """
     Test numpy float64 implementation of associated_legendre against a
     higher-precision software floating point format provided by mpmath.
@@ -47,8 +48,10 @@ def test_legendre(order):
     """
     mp.mp.dps = 45
     x = np.linspace(-1, 1, 101)
+    if check_complex:
+        x = x + 0.1j
     y1 = associated_legendre(order, x)
     y2 = []
     for point in x:
-        y2.append(float(associated_legendre_mp(order, point)))
+        y2.append(complex(associated_legendre_mp(order, point)))
     np.testing.assert_allclose(y1, y2, rtol=1e-11)

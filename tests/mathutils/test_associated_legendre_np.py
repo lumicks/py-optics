@@ -66,8 +66,11 @@ def _associated_legendre_dtheta(n: int, cos_theta: np.ndarray, alp_sin_pre=(None
 
 
 @pytest.mark.parametrize("order", range(1, 200))
-def test_legendre(order):
+@pytest.mark.parametrize("check_complex", (True, False))
+def test_legendre(order, check_complex):
     x = np.linspace(-1, 1, 101)
+    if check_complex:
+        x = x + 0.1j
     y1 = associated_legendre(order, x)
     y2 = associated_legendre_npp(order, x)
     np.testing.assert_allclose(y1, y2)

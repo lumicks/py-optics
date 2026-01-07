@@ -103,8 +103,8 @@ def associated_legendre_over_sin_theta(n, cos_theta):
         return -np.ones_like(cos_theta)
     if n == 2:
         return -3.0 * cos_theta
-    bk2 = np.zeros(cos_theta.shape)
-    bk1 = np.ones(cos_theta.shape)
+    bk2 = np.zeros(cos_theta.shape, dtype=cos_theta.dtype)
+    bk1 = np.ones(cos_theta.shape, dtype=cos_theta.dtype)
     for k in range(n - 1, 1, -1):
         bk = ((2 * k + 1) / k) * cos_theta * bk1 - (k + 2) / (k + 1) * bk2
         bk2 = bk1
