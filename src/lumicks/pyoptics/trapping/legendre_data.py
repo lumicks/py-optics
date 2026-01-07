@@ -32,7 +32,7 @@ def _loop_over_rotations(
     # Weird construct to work around tuple unpacking bug in Numba
     # https://github.com/numba/numba/issues/8772
     shape = (weights.size, radii.size)
-    local_cos_theta = np.zeros(shape)
+    local_cos_theta = np.zeros(shape, dtype=cos_theta.dtype)
 
     index = radii == 0
     for item in items:
@@ -63,30 +63,36 @@ def _loop_over_rotations(
 
 @njit(cache=True, parallel=True)
 def _alp_sin_theta_with_parity(
-    unique_abs_cos_theta: np.ndarray,
-    sign_inv: np.ndarray,
-    max_negative_index: int | None,
+    cos_theta: np.ndarray,
+    sign_inv: np.ndarray | None,
+    max_negative_index: np.intp | None,
     n_orders: int,
 ):
     """
     Numba compatible function that computes Associated Legendre Polynomials for
     n_order orders, plus derived quantities
     """
+    # Use parity -> real(cos_theta) >= 0
+    if sign_inv is not None and max_negative_index is not None:
+        # Allocate memory for the Associated Legendre Polynomials divided by sin(theta)
+        alp_sin_theta = np.zeros((n_orders, sign_inv.size), dtype=cos_theta.dtype)
 
-    # Allocate memory for the Associated Legendre Polynomials divided by sin(theta)
-    alp_sin_theta = np.zeros((n_orders, sign_inv.size))
+        # Parity for order L: parity[0] == 1, for L == 1
+        parity = (-1) ** np.arange(n_orders)
+        for L in prange(1, n_orders + 1):
+            alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, cos_theta)[sign_inv]
 
-    # Parity for order L: parity[0] == 1, for L == 1
-    parity = (-1) ** np.arange(n_orders)
-    for L in prange(1, n_orders + 1):
-        alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, unique_abs_cos_theta)[
-            sign_inv
-        ]
+            if parity[L - 1] == -1 and max_negative_index is not None:
+                alp_sin_theta[L - 1, : max_negative_index + 1] *= -1
 
-        if parity[L - 1] == -1 and max_negative_index is not None:
-            alp_sin_theta[L - 1, : max_negative_index + 1] *= -1
+        return alp_sin_theta
+    else:  # Do not use parity
+        alp_sin_theta = np.zeros((n_orders, cos_theta.size), dtype=cos_theta.dtype)
 
-    return alp_sin_theta
+        for L in prange(1, n_orders + 1):
+            alp_sin_theta[L - 1, :] = associated_legendre_over_sin_theta(L, cos_theta)
+
+        return alp_sin_theta
 
 
 def calculate_legendre(
@@ -117,16 +123,22 @@ def calculate_legendre(
     # Get the signs of the cosines, and use parity to reduce the computational
     # load
     max_negative_index = None
+    sign_inv = None
+    parity_cos_theta = unique_cos_theta
     try:
-        max_negative_index = np.argmax(np.where(unique_cos_theta < 0)[0])
+        max_negative_index = np.argmax((unique_cos_theta < 0).nonzero())
+        unique_cos_theta[: max_negative_index + 1] *= -1
+        parity_cos_theta, sign_inv = np.unique(unique_cos_theta, return_inverse=True)
+        unique_cos_theta[: max_negative_index + 1] *= -1
+        if parity_cos_theta.size == unique_cos_theta.size:
+            max_negative_index = sign_inv = None
     except ValueError:
         pass
 
-    unique_abs_cos_theta, sign_inv = np.unique(np.abs(unique_cos_theta), return_inverse=True)
-
     alp_sin_theta = _alp_sin_theta_with_parity(
-        unique_abs_cos_theta, sign_inv, max_negative_index, n_orders
+        parity_cos_theta, sign_inv, max_negative_index, n_orders
     )
-    alp_dtheta = np.empty_like(alp_sin_theta)
+
+    alp_dtheta = np.empty_like(alp_sin_theta, dtype=local_cos_theta.dtype)
     associated_legendre_dtheta(unique_cos_theta, alp_sin_theta, alp_dtheta)
     return (alp_sin_theta, inverse), (alp_dtheta, inverse)
