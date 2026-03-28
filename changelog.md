@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.0 | TBD
+## v0.7.0 | 2025-06-17
 
 ### Improvements
 
