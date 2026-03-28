@@ -1,2 +1,4 @@
-include README.* LICENSE.* setup.cfg setup.py *.toml
-graft src
+include README.* LICENSE.* *.toml
+graft tests
+
+global-exclude *.npz *.py[cod]
