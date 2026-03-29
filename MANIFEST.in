@@ -1,4 +1,7 @@
-include README.* LICENSE.* *.toml
+include README.* LICENSE.* *.toml *.md
 graft tests
+graft docs
+include examples/*.py
+include examples/images/*.png
 
 global-exclude *.npz *.py[cod]
