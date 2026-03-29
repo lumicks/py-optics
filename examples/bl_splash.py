@@ -55,9 +55,10 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     x=x,
     y=0,
     z=z,
-    num_orders=12,  # lower number of orders such that the image looks good, but we need less memory
+    num_spherical_modes=12,  # lower the number of orders such that the image looks good, but we need less memory
     bead_center=bead_center,
-    bfp_sampling_n=bfp_sampling_n,
+    integration_order_bfp=bfp_sampling_n,
+    integration_method_bfp="equidistant",
     return_grid=True,
     verbose=True,
 )
@@ -90,9 +91,10 @@ Ex, Ey, Ez, X, Y, Z = trp.fields_focus_gaussian(
     x=x,
     y=0,
     z=z,
-    num_orders=12,  # lower the number of orders such that the image looks good, but we need less memory
+    num_spherical_modes=12,  # lower the number of orders such that the image looks good, but we need less memory
     bead_center=bead_center,
-    bfp_sampling_n=bfp_sampling_n,
+    integration_order_bfp=bfp_sampling_n,
+    integration_method_bfp="equidistant",
     return_grid=True,
     verbose=True,
 )
