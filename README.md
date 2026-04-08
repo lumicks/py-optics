@@ -18,7 +18,7 @@ Where possible, a multi-threaded implementation, transparently compiled with [Nu
 
 All code is developed in-house at LUMICKS. This is alpha-level software: care is taken to verify calculated results against analytical models and/or reference implementations, but no warranties of any kind are given (see also the [license](LICENSE.md)).
 
-Py-optics is tested to be compatible with Python version 3.10 to 3.14. However, at the time of writing, free-threading builds are **not** supported. Py-optics runs on Linux, Windows and MacOS, and is free to use under the conditions of the [Apache-2.0 open source license](LICENSE.md).
+Py-optics is tested to be compatible with Python version 3.10 to 3.14, including the free-threading build of 3.14. Py-optics runs on Linux, Windows and MacOS, and is free to use under the conditions of the [Apache-2.0 open source license](LICENSE.md).
 
 
 ## How to get started
